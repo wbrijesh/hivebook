@@ -1,0 +1,78 @@
+---
+status: living
+last-reviewed: 2026-05-24
+---
+
+# Architecture Overview
+
+Trenches is a layered system. Each layer has a single responsibility
+and a stable interface to the layers above and below it.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Query surfaces  (UI · API · agent runtime)                  │
+├──────────────────────────────────────────────────────────────┤
+│  Canonicalization engine  (pinned · hot · cold tiers)        │
+├──────────────────────────────────────────────────────────────┤
+│  Book index  (3-level hierarchy of summary topics)           │
+├──────────────────────────────────────────────────────────────┤
+│  Retrieval  (vector + BM25, hybrid)                          │
+├──────────────────────────────────────────────────────────────┤
+│  Raw corpus  (verbatim source content + metadata + ACLs)     │
+├──────────────────────────────────────────────────────────────┤
+│  Ingestion pipeline  (normalize, dedupe, ACL capture)        │
+├──────────────────────────────────────────────────────────────┤
+│  Connectors  (per source: OAuth, sync, ACL surface)          │
+└──────────────────────────────────────────────────────────────┘
+            ▲
+            │  enterprise control plane:
+            │  auth · audit · tenancy · metering
+            ▼
+        Customer tenants
+```
+
+## Layer responsibilities
+
+- **Connectors** — talk to source systems (Slack, Google Workspace,
+  Notion, GitHub, …). Handle OAuth, incremental sync, and ACL
+  extraction. See `ingestion.md`.
+- **Ingestion pipeline** — performs *light* normalization only:
+  source, author, timestamp, ACL, entity links. Does not canonicalize
+  semantically.
+- **Raw corpus** — verbatim storage of every ingested artifact. The
+  source of truth for citations. See `corpus-and-index.md`.
+- **Retrieval** — hybrid vector + BM25 index over the raw corpus.
+  Used both at query time and at ingest time (to decide which topics
+  an incoming artifact might update). See `retrieval.md`.
+- **Book index** — three-level hierarchical organization of the
+  corpus into chapters, topics, and sub-topics. Per-customer. Each
+  entry is a summary doc with cited source spans. See
+  `corpus-and-index.md`.
+- **Canonicalization engine** — decides which topics get canonical
+  summaries (pinned), which get them due to query pressure (hot), and
+  which are built on-demand (cold). See `canonicalization.md`.
+- **Query surfaces** — how humans and agents consume the brain. UI
+  for browsing, API for programmatic access, agent runtime for skills
+  (skills are deferred and not yet designed).
+- **Enterprise control plane** — cross-cutting: SSO, audit log,
+  tenancy, metering, residency. See `tenancy-and-acl.md` and
+  `enterprise-controls.md`.
+
+## Two read paths, two write paths
+
+Two read paths:
+
+1. **Drill-down**: start at the book index, navigate chapter → topic
+   → sub-topic, read the summary, drill into cited source spans only
+   if the summary is insufficient.
+2. **Ad-hoc search**: hybrid retrieval directly over the raw corpus
+   for queries that don't fit any known topic ("did anyone mention the
+   Acme outage this week?").
+
+Two write paths (see `ingestion.md`):
+
+1. **Fast path**: novel content with low similarity to any existing
+   topic goes to an unfiled bucket for periodic LLM-driven filing.
+2. **Slow path**: content with high similarity to existing topics
+   triggers an LLM diff-and-merge to decide whether and how to update
+   those topics.

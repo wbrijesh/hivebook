@@ -1,0 +1,16 @@
+# vmagent scrapes ZITADEL's Prometheus metrics at /debug/metrics (h2c port).
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: zitadel
+  namespace: zitadel
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zitadel
+      app.kubernetes.io/instance: zitadel
+  endpoints:
+    - port: http2-server
+      path: /debug/metrics
+      scheme: http
+      interval: 30s

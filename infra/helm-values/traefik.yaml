@@ -1,0 +1,30 @@
+# Traefik values for OrbStack. Exposed as a LoadBalancer, which OrbStack binds
+# to localhost on :80/:443. Defaults already give web:80 and websecure:443 (TLS
+# on); we only add an HTTP->HTTPS redirect so every host is TLS-only.
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+
+service:
+  type: LoadBalancer
+
+ports:
+  web:
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+# IngressRoute + Certificate CRDs are what we route with; the Kubernetes Ingress
+# provider stays on as well (harmless).
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+
+logs:
+  general:
+    level: INFO

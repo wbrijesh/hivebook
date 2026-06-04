@@ -1,0 +1,34 @@
+# Trenches Documentation
+
+This directory is the long-lived design and decision record for Trenches.
+It is intentionally curated — content lands here only after a decision has
+been discussed and reached, never as raw notes or scratch work.
+
+## What goes where
+
+- **`vision/`** — what we are building and why. Slow-moving. Changes
+  rarely.
+- **`architecture/`** — how the system is built. Living docs, updated
+  as the system evolves.
+- **`design-docs/`** — proposals for specific components or features,
+  written *before* building. Have a lifecycle (draft → accepted →
+  implemented).
+- **`design/`** — the design language: the north star, voice, and the
+  visual/UX system (tokens, type scale, motion, surfaces). The reference
+  every UI decision is checked against.
+- **`adrs/`** — immutable records of decisions. Append-only.
+- **`reference/`** — lookup material (glossary, catalogs, schemas).
+- **`roadmap/`** — sequencing and milestones.
+
+## Conventions
+
+- Architecture and design docs use frontmatter with `status` and
+  `last-reviewed` so it is always clear what is current.
+- ADRs and design docs are numbered (`0001-`, `0002-`, …) for stable
+  ordering.
+- Anything not yet decided is marked explicitly as an **Open question** —
+  never silently inferred or invented.
+
+## Domain
+
+The product is **Trenches**. Production domain: `trenches.run`.

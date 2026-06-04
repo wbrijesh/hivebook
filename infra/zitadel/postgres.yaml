@@ -1,0 +1,77 @@
+# Dedicated Postgres for ZITADEL, deployed separately from the Helm release so
+# it is already resolving when ZITADEL's pre-install init hook runs. (The chart's
+# bundled subchart is a normal resource that Helm creates only AFTER pre-install
+# hooks, so the init job can't reach it — hence our own DB + DSN.)
+#
+# ZITADEL connects to the `postgres` maintenance database with a superuser and
+# creates its own `zitadel` database during init.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zitadel-db
+  namespace: zitadel
+type: Opaque
+stringData:
+  POSTGRES_USER: zitadel
+  POSTGRES_PASSWORD: zitadel-local-pw
+  # Maintenance DB; ZITADEL's Admin connects here and creates the `zitadel` DB.
+  POSTGRES_DB: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zitadel-db
+  namespace: zitadel
+spec:
+  selector:
+    app: zitadel-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zitadel-db
+  namespace: zitadel
+spec:
+  serviceName: zitadel-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zitadel-db
+  template:
+    metadata:
+      labels:
+        app: zitadel-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: zitadel-db
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi

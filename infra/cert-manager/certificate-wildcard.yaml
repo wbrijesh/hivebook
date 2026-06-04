@@ -1,0 +1,46 @@
+# Wildcard leaf cert for *.trenches.localhost, issued by the mkcert CA.
+# One Certificate per namespace that hosts a Traefik IngressRoute, because
+# Traefik resolves `tls.secretName` in the same namespace as the route.
+# Each issued secret also carries `ca.crt` (the mkcert root) which the Go API
+# mounts to trust ZITADEL's TLS when fetching the JWKS in-cluster.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-trenches
+  namespace: zitadel
+spec:
+  secretName: trenches-wildcard-tls
+  dnsNames:
+    - "*.trenches.localhost"
+    - "trenches.localhost"
+  issuerRef:
+    name: mkcert-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-trenches
+  namespace: trenches
+spec:
+  secretName: trenches-wildcard-tls
+  dnsNames:
+    - "*.trenches.localhost"
+    - "trenches.localhost"
+  issuerRef:
+    name: mkcert-ca
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-trenches
+  namespace: observability
+spec:
+  secretName: trenches-wildcard-tls
+  dnsNames:
+    - "*.trenches.localhost"
+    - "trenches.localhost"
+  issuerRef:
+    name: mkcert-ca
+    kind: ClusterIssuer

@@ -1,0 +1,15 @@
+# vmagent scrapes the Go API's /metrics. Lives in the same namespace as the
+# Service it selects; vmagent (selectAllByDefault) discovers it cluster-wide.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: api
+  namespace: trenches
+spec:
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

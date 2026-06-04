@@ -1,0 +1,160 @@
+---
+status: living
+last-reviewed: 2026-05-24
+---
+
+# Corpus and Book Index
+
+Trenches stores knowledge in two strata:
+
+1. **Raw corpus** — every ingested artifact, verbatim, with metadata.
+   The source of truth for citations.
+2. **Book index** — a per-customer hierarchical organization of the
+   corpus into navigable summaries. The product surface.
+
+The raw corpus is append-only and authoritative. The book index is
+derived, regeneratable, and continuously redesigned by the system
+itself as new content arrives.
+
+## The book index
+
+Inspired by the table of contents and index of a reference book.
+Three fixed levels:
+
+```
+Chapter            (broad domain — e.g., "Operations")
+  └── Topic        (specific area — e.g., "Refunds & adjustments")
+        └── Sub-topic   (a single concept or decision point — e.g.,
+                         "EU VAT refunds over €500")
+```
+
+> **Terminology note.** "Chapter / topic / sub-topic" is the working
+> vocabulary. Final user-facing naming is open. See
+> `reference/glossary.md` for current canonical terms.
+
+Three levels are fixed deliberately. Unbounded depth makes
+navigation, LLM reasoning, and maintenance all harder. Three is
+enough for every domain we've considered.
+
+## The hierarchy invariant
+
+**Citations live only at the sub-topic level.** Sub-topic summaries
+cite raw artifacts in the corpus. Topic summaries cite their child
+sub-topic summaries. Chapter summaries cite their child topic
+summaries.
+
+```
+Chapter summary ─cites→ Topic summaries ─cites→ Sub-topic summaries ─cites→ Raw artifacts
+```
+
+This gives the rebuild graph a fixed depth of 3 — no cascading
+explosions — and means a structural change anywhere in the book
+affects at most 3 derived summaries (see
+`design-docs/0002-mark-and-defer-for-structural-changes.md`).
+
+## Per entry: the summary doc
+
+Every entry in the book index has a summary with:
+
+- **Title** — user-facing name (mutable)
+- **Stable ID** — never changes after creation
+- **Summary** — LLM-generated prose
+- **Status** — `current | stale | building`
+- **Last rebuilt** timestamp
+- **Evidence content hash** — used for idempotent rebuilds
+- **Citations** — at sub-topic level: source spans in raw
+  artifacts; at topic level: child sub-topic IDs; at chapter level:
+  child topic IDs
+
+## Per-customer
+
+Each customer has its own book. There is no cross-customer index.
+The content is private to the customer's organization. See
+`tenancy-and-acl.md` for the access model within a customer.
+
+## Bootstrapping a customer's book
+
+The book is **not bootstrapped from the customer's data**. There is
+no upfront analysis or design phase that produces a per-customer
+ontology before ingestion begins.
+
+Instead, every new customer starts with a thin generic chapter
+skeleton (5–8 broad chapters such as "operations", "engineering",
+"customer", "finance", "people", "product"). Topics and sub-topics
+begin empty. As ingestion proceeds, the batched filing pipeline
+(see `design-docs/0001-continuous-ingestion-and-filing.md`)
+continuously designs the structure to fit the customer's actual
+data, creating sub-topics and topics as needed and proposing
+splits and merges as patterns emerge.
+
+The first batches naturally produce some volatile structure; the
+maintenance loop consolidates over the first weeks.
+
+## Editability
+
+Admins can **move** entries:
+
+- move a sub-topic to a different topic
+- move a topic to a different chapter
+- rename any entry (title only — stable ID is preserved)
+
+Admins **cannot** split, merge, create, delete, or directly author
+summaries. The system owns structural creation and consolidation —
+performed by the filing pipeline and the maintenance loop. Admin
+moves are reflected as structural changes that follow the
+mark-and-defer pattern.
+
+The reason for the restriction: free-form authorship requires
+validation, conflict resolution, and version control of prose —
+out of scope for v0.1. Splits and merges are system-quality
+decisions that depend on metadata the admin doesn't see.
+
+## Metadata layer
+
+Every entry carries cheap-to-maintain metadata used by the
+maintenance loop and the summary lifecycle:
+
+- doc count (sub-topic) / child count (topic, chapter)
+- contributor / author distribution
+- source distribution
+- entity overlap (distinct canonical entities mentioned)
+- coherence score (embedding variance around the entry's centroid)
+- recency profile
+- last-touched, last-summarized timestamps
+- evidence content hash
+
+This metadata is updated incrementally on ingest (counters, deltas)
+or recomputed on a periodic sample (coherence). Maintenance never
+re-reads artifacts to make decisions — it reads metadata.
+
+## Maintenance loop
+
+A periodic per-tenant job (daily by default, off-peak per region):
+
+- Processes the unfiled bucket and structural proposals queued by
+  the filing pipeline below the high-confidence threshold.
+- Triggers rebuilds for stale summaries (see `0002`).
+- Proposes splits for sub-topics with high doc count + low
+  coherence score.
+- Proposes merges for sub-topics with low doc count + high pairwise
+  similarity.
+- Consolidates duplicate-shaped structural proposals from prior
+  batches.
+- Cleans up the entity store (unused entities, stale aliases).
+
+All structural changes the maintenance loop applies follow the
+same mark-and-defer pattern as any other change.
+
+## Stable IDs
+
+Topic and sub-topic IDs are stable across renames, moves, splits,
+and merges:
+
+- a rename does not change the ID
+- a split produces new child IDs; the parent ID survives as a
+  redirect
+- a merge keeps one of the IDs; the others become redirects
+
+External references — audit log entries, future skills, eventual
+API references — use IDs, not titles, so they survive editorial
+change.

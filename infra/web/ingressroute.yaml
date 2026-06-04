@@ -1,0 +1,17 @@
+# Web app on https://app.trenches.localhost.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: web
+  namespace: trenches
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`app.trenches.localhost`)
+      kind: Rule
+      services:
+        - name: web
+          port: 3000
+  tls:
+    secretName: trenches-wildcard-tls

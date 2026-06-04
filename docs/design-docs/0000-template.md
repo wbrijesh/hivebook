@@ -1,0 +1,49 @@
+---
+design-id: NNNN
+status: draft
+date: YYYY-MM-DD
+authors:
+  - name <email>
+supersedes:
+superseded-by:
+related-adrs:
+---
+
+# NNNN — Title
+
+## Context
+
+What problem are we solving? What's in the world right now that
+prompts this doc?
+
+## Goals
+
+The outcomes that, if achieved, mean this design has succeeded.
+
+## Non-goals
+
+Things deliberately out of scope. Important — design docs that don't
+name non-goals tend to creep.
+
+## Proposal
+
+The design itself. Be specific. Diagrams welcome.
+
+## Alternatives considered
+
+Other approaches that were on the table, and why they were not
+chosen. At least two alternatives. "Do nothing" is always one of
+them.
+
+## Tradeoffs
+
+What this design gives up. What gets worse.
+
+## Open questions
+
+Things this doc deliberately does not decide.
+
+## Decisions to be recorded as ADRs
+
+A list of specific decisions that, on acceptance, will be captured as
+ADRs.

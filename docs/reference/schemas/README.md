@@ -1,0 +1,12 @@
+# Schemas
+
+Concrete data shapes for entities stored in Trenches. Populated as
+the entities are designed.
+
+Schemas live here rather than embedded in architecture docs because
+they are looked up frequently, change at a different cadence than
+the prose, and need to be precise.
+
+Add a new file per entity (`artifact.md`, `topic.md`, `summary.md`,
+`audit-event.md`, …) when the entity's shape is stable enough to be
+worth recording. Until then, don't fake it.

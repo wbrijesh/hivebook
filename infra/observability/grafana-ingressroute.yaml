@@ -1,0 +1,17 @@
+# Grafana on https://grafana.trenches.localhost (admin / admin).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana
+  namespace: observability
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`grafana.trenches.localhost`)
+      kind: Rule
+      services:
+        - name: vm-grafana
+          port: 80
+  tls:
+    secretName: trenches-wildcard-tls

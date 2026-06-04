@@ -1,0 +1,17 @@
+# Go API on https://api.trenches.localhost. Plain HTTP/1.1 backend (no h2c).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: api
+  namespace: trenches
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`api.trenches.localhost`)
+      kind: Rule
+      services:
+        - name: api
+          port: 8080
+  tls:
+    secretName: trenches-wildcard-tls

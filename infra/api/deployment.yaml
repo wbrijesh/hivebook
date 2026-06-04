@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: trenches
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: trenches-api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: api-config
+          env:
+            # DB name/user/password come from the same secret Postgres uses,
+            # mapped onto the TRENCHES_DB_* names the app reads.
+            - name: TRENCHES_DB_DATABASE
+              valueFrom:
+                secretKeyRef: { name: trenches-db, key: POSTGRES_DB }
+            - name: TRENCHES_DB_USERNAME
+              valueFrom:
+                secretKeyRef: { name: trenches-db, key: POSTGRES_USER }
+            - name: TRENCHES_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: trenches-db, key: POSTGRES_PASSWORD }
+            # Expected token audience — the ZITADEL project id, which the web app
+            # adds to the token aud via the project:id:{id}:aud scope. Optional so
+            # the pod starts before Phase 3 provisioning; re-deploy after.
+            - name: TRENCHES_OIDC_AUDIENCE
+              valueFrom:
+                secretKeyRef: { name: trenches-oidc, key: PROJECT_ID, optional: true }
+          volumeMounts:
+            - name: oidc-ca
+              mountPath: /etc/trenches/tls
+              readOnly: true
+          # Probe "/" (no DB access) — "/health" calls log.Fatalf on DB error in
+          # the scaffolded code, which would crash the pod on a transient blip.
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      volumes:
+        - name: oidc-ca
+          secret:
+            secretName: trenches-wildcard-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

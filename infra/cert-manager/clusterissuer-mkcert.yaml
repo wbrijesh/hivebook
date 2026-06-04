@@ -1,0 +1,13 @@
+# CA-type ClusterIssuer backed by the mkcert root CA.
+# cert-manager reads the signing keypair from the `mkcert-root` TLS secret in
+# its own namespace (cert-manager) and mints leaf certs for our ingress hosts.
+# Because the mkcert root is trusted by the macOS keychain, browsers trust the
+# leaves with no warnings; pods trust them via the ca.crt bundled in each
+# issued TLS secret.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: mkcert-ca
+spec:
+  ca:
+    secretName: mkcert-root

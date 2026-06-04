@@ -1,0 +1,10 @@
+# VictoriaLogs single-node log database. Vector ships pod logs here; Grafana
+# queries it via the VictoriaLogs datasource. Service: victorialogs:9428.
+server:
+  enabled: true
+  fullnameOverride: victorialogs
+  retentionPeriod: "7d"
+  persistentVolume:
+    enabled: true
+    storageClassName: local-path
+    size: 2Gi

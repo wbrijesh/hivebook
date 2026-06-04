@@ -1,0 +1,17 @@
+# CoreDNS rewrite — REQUIRED on OrbStack (the `make verify-dns` probe showed
+# id.trenches.localhost resolving to 127.0.0.1 inside pods, i.e. the pod itself).
+#
+# OrbStack's CoreDNS imports /etc/coredns/custom/*.override into the main `.:53`
+# server block (k3s convention), backed by this `coredns-custom` ConfigMap. The
+# rewrite sends in-cluster lookups of the ZITADEL issuer host to the Traefik
+# service, so the Go API reaches ZITADEL with the original Host/SNI intact:
+#   issuer = https://id.trenches.localhost (browser AND in-cluster, identical)
+#   in-cluster: id.trenches.localhost -> traefik.traefik.svc -> ZITADEL
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  trenches.override: |
+    rewrite name id.trenches.localhost traefik.traefik.svc.cluster.local

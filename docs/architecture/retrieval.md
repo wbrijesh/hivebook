@@ -1,0 +1,72 @@
+---
+status: living
+last-reviewed: 2026-05-24
+---
+
+# Retrieval
+
+The retrieval layer is hybrid (vector + BM25) over the raw corpus,
+and it serves two callers, not one.
+
+## Two callers, one index
+
+1. **Query time** — when a user or agent asks a question, retrieval
+   surfaces candidate spans from the raw corpus and candidate entries
+   from the book index.
+2. **Ingest time** — when a new artifact arrives, retrieval surfaces
+   candidate existing topics that the artifact might update. This is
+   what gates the slow vs. fast write path (see `ingestion.md`).
+
+Using the same index for both means improvements to retrieval quality
+compound. It also keeps the system smaller.
+
+## Why hybrid
+
+- **Vector search** captures semantic similarity ("refund" and "money
+  back" match).
+- **BM25** captures exact-term recall, which matters for proper
+  nouns, product names, identifiers, error codes, and rare terms that
+  embeddings often blur.
+
+Used together, with a learned or hand-tuned reranker, they cover each
+other's weaknesses.
+
+## The query path
+
+A query is not answered by retrieval alone. The flow is:
+
+1. **Hybrid retrieve** over the raw corpus and the book index.
+2. **Navigate the book index** — if a topic summary is a strong
+   match, start there. The summary may answer the question without
+   ever touching the raw corpus.
+3. **Drill down** — if the summary is insufficient, the LLM pulls the
+   cited source spans referenced in the summary (and optionally more
+   from retrieval) and reasons over them.
+4. **Cite** — the answer returned to the user cites the same source
+   spans the summary cited (or any additional spans pulled during
+   drill-down).
+
+For queries that don't map to any known topic, the flow degenerates
+to "plain RAG over the raw corpus." This is acceptable but not the
+common case — most queries are about things the book already has a
+chapter for.
+
+## The ingest path use
+
+When a new artifact lands and we need to decide whether it updates an
+existing topic:
+
+1. Hybrid retrieve over the book index (not the raw corpus) — we want
+   topic matches, not document matches.
+2. If top-K similarity is below threshold: fast path, park in unfiled.
+3. If above threshold: slow path, hand the topic summaries and the
+   new artifact to an LLM and ask which topics, if any, this updates.
+
+## What retrieval does not do
+
+- It does not produce final answers. The LLM does.
+- It does not decide what is canonical. The canonicalization engine
+  does.
+- It does not filter by ACL. ACL filtering happens at a layer above,
+  before results are returned to a caller. (Retrieval indexes
+  everything in the tenant; the ACL filter applies post-retrieval.)

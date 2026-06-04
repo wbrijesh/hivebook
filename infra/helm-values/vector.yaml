@@ -1,0 +1,47 @@
+# Vector as a per-node Agent (DaemonSet) tailing all pod logs and shipping them
+# to VictoriaLogs via its Elasticsearch-bulk ingestion endpoint. App logs that
+# are JSON (our slog output) are parsed so their fields become queryable.
+role: Agent
+
+# No aggregator service needed for the Agent role.
+service:
+  enabled: false
+
+customConfig:
+  data_dir: /vector-data-dir
+  api:
+    enabled: false
+
+  sources:
+    k8s:
+      type: kubernetes_logs
+
+  transforms:
+    parse:
+      type: remap
+      inputs: [k8s]
+      source: |
+        # Promote structured JSON app logs (slog) into top-level fields.
+        parsed, err = parse_json(.message)
+        if err == null && is_object(parsed) {
+          . = merge(., object!(parsed))
+        }
+        # Stream fields VictoriaLogs groups by.
+        .namespace = .kubernetes.pod_namespace
+        .pod = .kubernetes.pod_name
+        .container = .kubernetes.container_name
+
+  sinks:
+    victorialogs:
+      type: elasticsearch
+      inputs: [parse]
+      endpoints:
+        - "http://victorialogs.observability.svc.cluster.local:9428/insert/elasticsearch/"
+      mode: bulk
+      api_version: v8
+      healthcheck:
+        enabled: false
+      query:
+        _msg_field: message
+        _time_field: timestamp
+        _stream_fields: "namespace,pod,container"

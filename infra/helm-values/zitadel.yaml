@@ -1,0 +1,74 @@
+replicaCount: 1
+
+zitadel:
+  # 32-char masterkey created once as a k8s secret (see Makefile `auth` target).
+  # Encrypts data at rest — cannot be rotated after first init without data loss.
+  masterkeySecretName: zitadel-masterkey
+
+  configmapConfig:
+    ExternalDomain: id.trenches.localhost
+    ExternalPort: 443
+    ExternalSecure: true
+    # Traefik terminates TLS; ZITADEL speaks cleartext (h2c) behind it.
+    TLS:
+      Enabled: false
+
+    # DB config lives in configmapConfig (mounted at /config) so the init/setup
+    # hook jobs see it too — `zitadel.env` only reaches the main deployment.
+    # ZITADEL's Admin connects to the `postgres` maintenance DB and creates the
+    # `zitadel` database + runtime user. Plaintext password is fine on the local
+    # cluster (it already lives in the zitadel-db Secret manifest).
+    Database:
+      Postgres:
+        Host: zitadel-db.zitadel.svc.cluster.local
+        Port: 5432
+        Database: zitadel
+        MaxOpenConns: 20
+        MaxIdleConns: 10
+        User:
+          Username: zitadel
+          Password: zitadel-local-pw
+          SSL:
+            Mode: disable
+        Admin:
+          Username: zitadel
+          Password: zitadel-local-pw
+          ExistingDatabase: postgres
+          SSL:
+            Mode: disable
+    # Bootstrap admin for the first instance. Local-only credentials.
+    FirstInstance:
+      Org:
+        Human:
+          UserName: admin
+          Email: admin@trenches.localhost
+          Password: "Password1!"
+          PasswordChangeRequired: false
+        # Machine user with IAM_OWNER + a PAT (stored in secret `iam-admin-pat`),
+        # used for one-off API provisioning today and Terraform automation later.
+        Machine:
+          Machine:
+            Username: iam-admin
+            Name: IAM Admin (automation)
+          Pat:
+            ExpirationDate: '2029-01-01T00:00:00Z'
+
+# We route with our own Traefik IngressRoute (h2c backend) — disable the chart's
+# built-in Ingress for both the API and the Login V2 UI.
+ingress:
+  enabled: false
+login:
+  ingress:
+    enabled: false
+
+# We run our own Postgres (zitadel/postgres.yaml) instead of the bundled subchart,
+# because the bundled DB can't satisfy ZITADEL's pre-install init hook ordering.
+postgresql:
+  enabled: false
+
+# Expose Prometheus metrics at /debug/metrics. The ServiceMonitor is created
+# separately in Phase 6, once the Prometheus Operator CRDs exist.
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false

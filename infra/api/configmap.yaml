@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: trenches
+data:
+  APP_ENV: "local"
+  PORT: "8080"
+  TRENCHES_DB_HOST: "postgres"
+  TRENCHES_DB_PORT: "5432"
+  TRENCHES_DB_SCHEMA: "public"
+  # Same issuer string the browser uses; resolved in-cluster via the CoreDNS
+  # rewrite to the Traefik service.
+  TRENCHES_OIDC_ISSUER: "https://id.trenches.localhost"
+  # mkcert CA (ca.crt from the wildcard TLS secret) so the API trusts ZITADEL's
+  # TLS when fetching the JWKS.
+  TRENCHES_OIDC_CA_FILE: "/etc/trenches/tls/ca.crt"

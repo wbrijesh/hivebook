@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Node / Next (subdirs also have their own; this is belt-and-suspenders)
+node_modules/
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Go build output
+/api/main
+
+# Env / local secrets
+.env
+.env.*
+!.env.example
+
+# Scratch / tool output (prototype exploration, UX review, etc.)
+.playwright-cli/
+.ux-review/
