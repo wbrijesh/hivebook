@@ -1,0 +1,106 @@
+:status: living
+:last-reviewed: 2026-05-24
+
+== Enterprise Controls
+
+Trenches is sold B2B via negotiated contracts (not self-serve
+billing). Enterprise controls are not bolted on later — they shape
+the data model and architecture from day one. This document defines
+what lands when.
+
+=== Day-zero (must be in the data model before any customer ingests)
+
+These cost ~nothing to design in and are catastrophic to retrofit:
+
+* *Hard tenant isolation* — every record has `tenant++_++id`; every
+query filters by it; storage is partitioned by tenant.
+* *Region tagging* — every record carries a `region` field.
+* *BYOK-ready encryption* — data-at-rest encryption uses a key
+derivation path that can be swapped for a customer-managed key
+without re-encrypting the world.
+* *Audit primitives* — every read/write goes through a layer
+that emits an audit event, even before the audit log is exposed.
+* *Metering primitives* — token usage, storage, and connector
+activity captured per tenant from day one to support both
+prepaid and postpaid contracts.
+
+=== Pre-GA (before any logo customer beyond friendly design partners)
+
+* *SSO* — SAML and OIDC. Mandatory before paid customers.
+* *Audit log surface* — admins can see and export events from the
+day-zero audit primitives.
+* *Admin roles* — owner, admin, member, viewer. No fine-grained
+custom roles yet.
+* *SCIM* — can lag the first paid customer by a quarter; most
+mid-market buyers will tolerate manual provisioning for pilots.
+
+=== Post-GA (enterprise tier, sold separately)
+
+These features justify enterprise pricing and are deliberately
+gated:
+
+* *Region pinning beyond default clusters* — bespoke region or
+data-residency arrangements.
+* *Customer-managed keys (CMK)* — customer holds the KMS key;
+we cannot decrypt their data without their cooperation.
+* *VPC / PrivateLink* — connector traffic and API traffic stays
+on customer’s private network.
+* *Fine-grained policy engine* — OPA-style policies beyond the
+default chapter-level ACLs in `tenancy-and-acl.md`.
+* *DLP and retention integration* — feed customer’s existing DLP
+and retention systems.
+* *On-prem inference* — for customers who cannot ship content to
+a multi-tenant inference endpoint. Open question whether this is
+in scope at all; see `vision/audience.md`.
+
+=== Hosted vs. self-hosted
+
+Trenches runs on Kubernetes. The deployment model is:
+
+* *Hosted*: we operate Kubernetes clusters in major regions (US,
+EU, Asia, expanding by demand). Customers pick a cluster at
+onboarding.
+* *Self-hosted (on-prem)*: customers deploy on their own
+infrastructure in any region they choose. Usage limits still
+apply — metering enforcement is part of the offering, in the
+spirit of Red Hat-style licensing.
+
+=== Metering and pricing
+
+Pricing is contract-based, not self-serve. Two billing modes are
+supported:
+
+* *Prepaid*: customers purchase credits granting a corresponding
+usage limit.
+* *Postpaid*: customers configure their own upper-bound limits;
+actual usage is billed at contract rate.
+
+Metered dimensions:
+
+* per-tenant LLM token usage
+* per-tenant storage (raw corpus, embeddings, summaries)
+* per-tenant connector activity (artifacts ingested, source API
+calls)
+
+For early customers a sufficiently-generous limit (effectively
+unlimited) may apply, especially on self-hosted deployments.
+
+=== Suspension and deletion
+
+When a tenant is suspended (contract breach, payment failure,
+customer request) the default behavior is:
+
+* *Archive* the tenant’s data for a default period (3 months;
+admin-configurable per tenant).
+* *No new ingestion or queries* during the archive period.
+* *Restoration* is one-click within the archive period.
+* *Hard delete* at the end of the archive period.
+
+Customers may opt for immediate hard delete on suspension. Export
+of the tenant’s data is available at any time before hard delete.
+
+=== Open: auth build-vs-buy
+
+Auth provider choice (Zitadel vs. WorkOS vs. hand-built) is
+deferred to build time. Whichever option wins must support SAML,
+OIDC, and per-user audit-log views for admins.

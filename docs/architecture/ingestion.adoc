@@ -1,0 +1,92 @@
+:status: living
+:last-reviewed: 2026-05-24
+
+== Ingestion
+
+How content gets from source systems into the Trenches corpus and
+the book index.
+
+=== Boundary: the connector
+
+A connector is the only thing in Trenches that talks to a specific
+source system. It is responsible for:
+
+* *Authentication* — OAuth flow, token storage, refresh.
+* *Sync* — initial backfill plus ongoing incremental updates.
+* *Watermarking* — a per-source position (timestamp, cursor,
+ETag) so resyncs are incremental, not full.
+
+See `reference/connector-catalog.md` for the planned list.
+
+Connectors do *not* extract source-system ACLs. Access control
+in Trenches is admin-managed at the chapter level (see
+`tenancy-and-acl.md`); ingestion is permission-blind.
+
+=== Open question: build vs. integrate
+
+Two options for connector plumbing:
+
+* *Integrate* with a unified API provider (Nango, Paragon, Merge)
+for breadth — fast coverage of the long tail.
+* *Hand-build* for sources where we need deep semantic
+understanding (Slack threading, GitHub PR graph, etc.).
+
+Working hypothesis: *hybrid*. Use a provider for the long tail,
+build in-house for the top 5–10 sources where deep semantics pay
+off. Final decision is deferred to build time and will be captured
+in an ADR.
+
+=== Light normalization
+
+The ingestion pipeline performs only the minimal normalization
+needed to make artifacts comparable and queryable:
+
+* assign a stable internal ID
+* record `source`, `source++_++id`, `author`, `created++_++at`,
+`updated++_++at`
+* compute embeddings for retrieval
+* store the raw content verbatim
+
+Semantic decisions — what topic an artifact belongs to, what
+entities it references, whether the book structure should change to
+accommodate it — happen in the batched filing pipeline that runs
+downstream. See `design-docs/0001-continuous-ingestion-and-filing.md`.
+
+=== Push vs. pull per source
+
+* *Push* (webhooks) for hot sources where freshness matters —
+Slack, Jira, Linear, GitHub, PagerDuty.
+* *Pull* (polling) for cold sources where periodic sync is fine
+— Drive, Confluence, Notion, file storage.
+
+Either way, every record carries an `ingested++_++at` and a
+`source++_++updated++_++at`.
+
+=== Segmentation
+
+Before an artifact enters the batched filing pipeline, it is
+segmented: a Slack thread becomes one or more coherent segments
+rather than one opaque blob; a long doc may be sectioned. Per-source
+segmentation rules use time gaps, reply structure, explicit
+topic-shift markers, and section breaks. Each segment is the unit
+of filing and entity tagging.
+
+The thread or doc remains preserved at the corpus level for
+reconstruction; segments are the addressable unit downstream.
+
+=== Entity tagging
+
+Entity tagging — resolving mentions to canonical entities in the
+per-tenant entity store — runs inside the batched filing LLM call.
+See `design-docs/0003-entity-reconciliation.md`.
+
+=== Failure handling
+
+* Connector failures (auth lapse, rate limit, source-side outage)
+are surfaced to admins via the control plane, not silently
+retried forever.
+* Partial syncs are explicit: the watermark only advances after a
+window is fully ingested.
+* Filing-pipeline failures are idempotent on retry — see `0001`.
+Raw artifacts are persisted before the filing pipeline runs, so
+no data is lost if filing fails.

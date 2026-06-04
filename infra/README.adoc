@@ -1,0 +1,111 @@
+== Trenches local infrastructure (OrbStack Kubernetes)
+
+Everything runs in the local OrbStack cluster (context `orbstack`): auth (ZITADEL),
+the Go API, the Next.js web app, Postgres, and observability (Prometheus {plus}
+Grafana). Traffic enters through Traefik over HTTPS; certs are minted by
+cert-manager from your local *mkcert* CA, so browsers trust them with no
+warnings.
+
+=== URLs
+
+[width="100%",cols="12%,49%,39%",options="header",]
+|===
+|Service |URL |Notes
+|ZITADEL |https://id.trenches.localhost/ui/console |admin@trenches.localhost / Password1!
+|Web app |https://app.trenches.localhost |login {plus} call protected API
+|Go API |https://api.trenches.localhost |`/health`, `/metrics`, `/api/me`
+|Grafana |https://grafana.trenches.localhost |admin / admin
+|===
+
+`++*++.trenches.localhost` resolves to loopback on macOS automatically — no
+`/etc/hosts` edits.
+
+=== Prerequisites
+
+* OrbStack with Kubernetes enabled
+* `helm`, `mkcert`, `just` (`brew install helm mkcert just` && `mkcert -install`)
+* Docker (OrbStack) — local images are used directly, no registry
+
+=== `just` is the control panel
+
+Run `just` (from `infra/`) for the command list. Requires `brew install just`.
+
+[source,sh]
+----
+just start  [service]   # turn ON  — everything, or one service
+just stop   [service]   # turn OFF — everything, or one service
+just logs   [service]   # follow one service's logs, or recent lines from all
+just status [service]   # what's running
+----
+
+With no argument these act on the whole app; with a service name
+(`api`, `web`, `postgres`, `zitadel`, …) they act on just that one. `stop`
+scales workloads to zero (data preserved); `start` scales them back up. They only
+touch our workloads — *OrbStack / Kubernetes itself you start and stop yourself.*
+
+Install/deploy recipes (`install`, `destroy`, `infra`, `auth`, `api`, `web`,
+`observability`, …) exist in the justfile but are hidden — runnable
+(`just api`, `just install`) yet kept out of the help until we need them as
+first-class commands. First-time setup still needs ZITADEL provisioning once
+(see `zitadel/AUTH-SETUP.md`).
+
+=== Observability (VictoriaMetrics {plus} VictoriaLogs)
+
+* *Metrics:* `victoria-metrics-k8s-stack` (VM Operator {plus} vmsingle {plus} vmagent {plus}
+node-exporter {plus} kube-state-metrics). Our services are scraped via
+`VMServiceScrape` (`observability/vmservicescrape-++{++api,zitadel}.yaml`).
+* *Logs:* VictoriaLogs (`victorialogs:9428`) fed by a *Vector* DaemonSet that
+tails every pod and parses JSON app logs into queryable fields.
+* *Grafana* (`https://grafana.trenches.localhost`, admin/admin) has both a
+VictoriaMetrics and a VictoriaLogs datasource. Custom dashboards live in
+`observability/dashboards/++*++.json` and are loaded as label-tagged ConfigMaps
+discovered by the Grafana sidecar:
+** *Trenches API* — RED (rate/errors/latency by route), in-flight, DB pool,
+auth outcomes, web events, and an API logs panel.
+** *ZITADEL* — gRPC rates/errors/latency {plus} Go runtime {plus} logs.
+** *Logs* — errors/5xx, web-event beacon stream, all logs.
+* *App telemetry:* the Go API exposes `trenches++_*++` metrics (RED, DB pool,
+`trenches++_++auth++_++verifications++_++total`, `trenches++_++web++_++events++_++total`) and emits
+structured JSON access logs (slog, with request IDs). The web app sends browser
+events to `POST /events`, recorded as both a metric and a log.
+
+____
+Traces (VictoriaTraces {plus} OTel Collector {plus} ZITADEL OTLP {plus} Go/web spans) are a
+planned next pass, not yet wired.
+____
+
+=== How auth is wired (and why)
+
+* *Single issuer string everywhere.* `https://id.trenches.localhost` is the
+ZITADEL issuer for both the browser and in-cluster callers. The browser
+resolves it to loopback → Traefik. Inside the cluster, a CoreDNS rewrite
+(`coredns/rewrite-patch.yaml`) sends it to the Traefik service, so the Host and
+TLS SNI stay intact and the JWT `iss` matches what discovery reports. This
+avoids the classic issuer-mismatch class of bugs.
+** Note: musl-based tools (Alpine `curl`) short-circuit `.localhost` to
+loopback and ignore the rewrite, but the Go API is built `CGO++_++ENABLED=0` and
+uses Go’s pure resolver, which honors CoreDNS. (Verified: the API completes
+OIDC discovery in-cluster.)
+* *TLS trust in-cluster.* The Go API mounts the mkcert CA (`ca.crt` from the
+wildcard TLS secret) and appends it to its cert pool to validate ZITADEL’s TLS
+when fetching the JWKS.
+* *Token flow.* The web SPA does Authorization Code {plus} PKCE in the browser,
+receives a JWT access token (project ID in the audience via the
+`urn:zitadel:iam:org:project:id:++{++id}:aud` scope), and calls the Go API with it.
+The API verifies signature/issuer/expiry/audience offline.
+
+=== Layout
+
+....
+infra/
+  Makefile                 phase targets
+  namespaces.yaml
+  helm-values/             traefik, zitadel, kube-prometheus-stack
+  cert-manager/            CA ClusterIssuer (mkcert), wildcard Certificates
+  coredns/                 in-cluster issuer rewrite
+  zitadel/                 own Postgres, IngressRoute, AUTH-SETUP.md, oidc secret template
+  postgres/                app Postgres
+  api/                     Go API deploy/service/configmap/ingressroute
+  web/                     web deploy/service/ingressroute
+  observability/           ServiceMonitors + Grafana route
+....
