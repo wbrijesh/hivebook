@@ -6,7 +6,7 @@ zitadel:
   masterkeySecretName: zitadel-masterkey
 
   configmapConfig:
-    ExternalDomain: id.trenches.localhost
+    ExternalDomain: id.hivebook.localhost
     ExternalPort: 443
     ExternalSecure: true
     # Traefik terminates TLS; ZITADEL speaks cleartext (h2c) behind it.
@@ -41,7 +41,7 @@ zitadel:
       Org:
         Human:
           UserName: admin
-          Email: admin@trenches.localhost
+          Email: admin@hivebook.localhost
           Password: "" # injected from infra/.env via helm --set (auth recipe)
           PasswordChangeRequired: false
         # Machine user with IAM_OWNER + a PAT (stored in secret `iam-admin-pat`),

@@ -3,12 +3,12 @@
 
 == Ingestion
 
-How content gets from source systems into the Trenches corpus and
+How content gets from source systems into the Hivebook corpus and
 the book index.
 
 === Boundary: the connector
 
-A connector is the only thing in Trenches that talks to a specific
+A connector is the only thing in Hivebook that talks to a specific
 source system. It is responsible for:
 
 * *Authentication* — OAuth flow, token storage, refresh.
@@ -19,7 +19,7 @@ ETag) so resyncs are incremental, not full.
 See `reference/connector-catalog.adoc` for the planned list.
 
 Connectors do *not* extract source-system ACLs. Access control
-in Trenches is admin-managed at the chapter level (see
+in Hivebook is admin-managed at the chapter level (see
 `tenancy-and-acl.adoc`); ingestion is permission-blind.
 
 === Open question: build vs. integrate

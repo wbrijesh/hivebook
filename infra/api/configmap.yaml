@@ -2,16 +2,16 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: api-config
-  namespace: trenches
+  namespace: hivebook
 data:
   APP_ENV: "local"
   PORT: "8080"
-  TRENCHES_DB_HOST: "postgres"
-  TRENCHES_DB_PORT: "5432"
-  TRENCHES_DB_SCHEMA: "public"
+  HIVEBOOK_DB_HOST: "postgres"
+  HIVEBOOK_DB_PORT: "5432"
+  HIVEBOOK_DB_SCHEMA: "public"
   # Same issuer string the browser uses; resolved in-cluster via the CoreDNS
   # rewrite to the Traefik service.
-  TRENCHES_OIDC_ISSUER: "https://id.trenches.localhost"
+  HIVEBOOK_OIDC_ISSUER: "https://id.hivebook.localhost"
   # mkcert CA (ca.crt from the wildcard TLS secret) so the API trusts ZITADEL's
   # TLS when fetching the JWKS.
-  TRENCHES_OIDC_CA_FILE: "/etc/trenches/tls/ca.crt"
+  HIVEBOOK_OIDC_CA_FILE: "/etc/hivebook/tls/ca.crt"

@@ -1,4 +1,4 @@
-# Wildcard leaf cert for *.trenches.localhost, issued by the mkcert CA.
+# Wildcard leaf cert for *.hivebook.localhost, issued by the mkcert CA.
 # One Certificate per namespace that hosts a Traefik IngressRoute, because
 # Traefik resolves `tls.secretName` in the same namespace as the route.
 # Each issued secret also carries `ca.crt` (the mkcert root) which the Go API
@@ -6,13 +6,13 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-trenches
+  name: wildcard-hivebook
   namespace: zitadel
 spec:
-  secretName: trenches-wildcard-tls
+  secretName: hivebook-wildcard-tls
   dnsNames:
-    - "*.trenches.localhost"
-    - "trenches.localhost"
+    - "*.hivebook.localhost"
+    - "hivebook.localhost"
   issuerRef:
     name: mkcert-ca
     kind: ClusterIssuer
@@ -20,13 +20,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-trenches
-  namespace: trenches
+  name: wildcard-hivebook
+  namespace: hivebook
 spec:
-  secretName: trenches-wildcard-tls
+  secretName: hivebook-wildcard-tls
   dnsNames:
-    - "*.trenches.localhost"
-    - "trenches.localhost"
+    - "*.hivebook.localhost"
+    - "hivebook.localhost"
   issuerRef:
     name: mkcert-ca
     kind: ClusterIssuer
@@ -34,13 +34,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: wildcard-trenches
+  name: wildcard-hivebook
   namespace: observability
 spec:
-  secretName: trenches-wildcard-tls
+  secretName: hivebook-wildcard-tls
   dnsNames:
-    - "*.trenches.localhost"
-    - "trenches.localhost"
+    - "*.hivebook.localhost"
+    - "hivebook.localhost"
   issuerRef:
     name: mkcert-ca
     kind: ClusterIssuer

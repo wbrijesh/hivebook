@@ -5,7 +5,7 @@ import { UserManager, WebStorageStateStore } from "oidc-client-ts"
 // Browser-side OIDC (Authorization Code + PKCE) against ZITADEL. Config is baked
 // at build time from NEXT_PUBLIC_* env (see Dockerfile build args). The browser
 // trusts the mkcert CA via the macOS keychain, so the redirects and token
-// exchange to https://id.trenches.localhost just work.
+// exchange to https://id.hivebook.localhost just work.
 
 let manager: UserManager | null = null
 

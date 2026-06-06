@@ -34,7 +34,7 @@ vmagent:
   enabled: true
   spec:
     # Discover VMServiceScrape/VMPodScrape in every namespace (our api/zitadel
-    # scrapes live in trenches/observability).
+    # scrapes live in hivebook/observability).
     selectAllByDefault: true
 
 grafana:

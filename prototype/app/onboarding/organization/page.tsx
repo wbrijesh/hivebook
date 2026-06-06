@@ -41,7 +41,7 @@ export default function OrganizationPage() {
         <Field
           label="Organization name"
           htmlFor="org"
-          hint={`Your workspace will live at trenches.run/${slug}`}
+          hint={`Your workspace will live at hivebook.co/${slug}`}
         >
           <Input
             id="org"

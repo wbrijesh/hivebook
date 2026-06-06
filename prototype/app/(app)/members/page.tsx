@@ -101,7 +101,7 @@ export default function MembersPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendInvite()}
-                placeholder="name@trenches-test.com"
+                placeholder="name@hivebook-test.com"
                 autoFocus
               />
             </div>

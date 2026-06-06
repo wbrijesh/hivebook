@@ -1,4 +1,4 @@
-== Trenches local infrastructure (OrbStack Kubernetes)
+== Hivebook local infrastructure (OrbStack Kubernetes)
 
 Everything runs in the local OrbStack cluster (context `orbstack`): auth (ZITADEL),
 the Go API, the Next.js web app, Postgres, and observability (Prometheus {plus}
@@ -11,13 +11,13 @@ warnings.
 [width="100%",cols="12%,49%,39%",options="header",]
 |===
 |Service |URL |Notes
-|ZITADEL |https://id.trenches.localhost/ui/console |admin@trenches.localhost / Password1!
-|Web app |https://app.trenches.localhost |login {plus} call protected API
-|Go API |https://api.trenches.localhost |`/health`, `/metrics`, `/api/me`
-|Grafana |https://grafana.trenches.localhost |admin / admin
+|ZITADEL |https://id.hivebook.localhost/ui/console |admin@hivebook.localhost / Password1!
+|Web app |https://app.hivebook.localhost |login {plus} call protected API
+|Go API |https://api.hivebook.localhost |`/health`, `/metrics`, `/api/me`
+|Grafana |https://grafana.hivebook.localhost |admin / admin
 |===
 
-`++*++.trenches.localhost` resolves to loopback on macOS automatically — no
+`++*++.hivebook.localhost` resolves to loopback on macOS automatically — no
 `/etc/hosts` edits.
 
 === Prerequisites
@@ -57,7 +57,7 @@ node-exporter {plus} kube-state-metrics). Our services are scraped via
 `VMServiceScrape` (`observability/vmservicescrape-++{++api,zitadel}.yaml`).
 * *Logs:* VictoriaLogs (`victorialogs:9428`) fed by a *Vector* DaemonSet that
 tails every pod and parses JSON app logs into queryable fields.
-* *Grafana* (`https://grafana.trenches.localhost`, admin/admin) has both a
+* *Grafana* (`https://grafana.hivebook.localhost`, admin/admin) has both a
 VictoriaMetrics and a VictoriaLogs datasource. Custom dashboards live in
 `infra/observability/dashboards/<folder>/<name>.json` and are loaded as
 label-tagged ConfigMaps discovered by the Grafana sidecar, filed into folders:
@@ -65,8 +65,8 @@ label-tagged ConfigMaps discovered by the Grafana sidecar, filed into folders:
 and Logs (access logs, errors).
 ** *Frontend* — Metrics (browser beacon events) and Logs (events, Next.js server).
 ** *Auth* — Metrics (token verifications {plus} ZITADEL runtime/HTTP) and Logs.
-* *App telemetry:* the Go API exposes `trenches++_*++` metrics (RED, DB pool,
-`trenches++_++auth++_++verifications++_++total`, `trenches++_++web++_++events++_++total`) and emits
+* *App telemetry:* the Go API exposes `hivebook++_*++` metrics (RED, DB pool,
+`hivebook++_++auth++_++verifications++_++total`, `hivebook++_++web++_++events++_++total`) and emits
 structured JSON access logs (slog, with request IDs). The web app sends browser
 events to `POST /events`, recorded as both a metric and a log.
 
@@ -77,7 +77,7 @@ ____
 
 === How auth is wired (and why)
 
-* *Single issuer string everywhere.* `https://id.trenches.localhost` is the
+* *Single issuer string everywhere.* `https://id.hivebook.localhost` is the
 ZITADEL issuer for both the browser and in-cluster callers. The browser
 resolves it to loopback → Traefik. Inside the cluster, a CoreDNS rewrite
 (`coredns/rewrite-patch.yaml`) sends it to the Traefik service, so the Host and

@@ -3,7 +3,7 @@
 
 == Tenancy and Access Control
 
-Trenches enforces access at two levels: across customers (strict
+Hivebook enforces access at two levels: across customers (strict
 isolation), and within a customer (admin-managed, chapter-level).
 
 === Across customers: strict isolation
@@ -17,7 +17,7 @@ exists in v0.1.)
 
 === Within a customer: admin-managed chapter access
 
-Trenches does *not* inherit source-system ACLs and does *not*
+Hivebook does *not* inherit source-system ACLs and does *not*
 propagate source permissions through derived summaries. The reason
 is operational: maintaining ACL propagation across heterogeneous
 sources, through segmentation, entity resolution, and filing, into
@@ -58,7 +58,7 @@ populated enough to be meaningful.
 
 User identity comes from the tenant’s SSO provider via the auth
 layer (see `enterprise-controls.adoc`). There is no per-source
-identity mapping in Trenches — a consequence of not using source
+identity mapping in Hivebook — a consequence of not using source
 ACLs.
 
 The build-vs-buy decision for the auth provider itself (Zitadel,

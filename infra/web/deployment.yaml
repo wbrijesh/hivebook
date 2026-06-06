@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: trenches
+  namespace: hivebook
   labels:
     app: web
 spec:
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: trenches-web:dev
+          image: hivebook-web:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

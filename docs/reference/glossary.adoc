@@ -1,6 +1,6 @@
 == Glossary
 
-Canonical terms used across Trenches. When in doubt, this file
+Canonical terms used across Hivebook. When in doubt, this file
 wins. If a term in code or docs drifts from the definition here,
 fix the term or update this file — do not let synonyms accumulate.
 

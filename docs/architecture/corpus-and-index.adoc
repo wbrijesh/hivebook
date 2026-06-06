@@ -3,7 +3,7 @@
 
 == Corpus and Book Index
 
-Trenches stores knowledge in two strata:
+Hivebook stores knowledge in two strata:
 
 [arabic]
 . *Raw corpus* — every ingested artifact, verbatim, with metadata.

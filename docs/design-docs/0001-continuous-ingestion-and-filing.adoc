@@ -11,7 +11,7 @@
 
 === Context
 
-Trenches ingests data continuously from many source systems and
+Hivebook ingests data continuously from many source systems and
 must place every artifact into a hierarchical book index
 (chapter → topic → sub-topic) per customer. The book index is not
 bootstrapped per customer; the system designs and redesigns it

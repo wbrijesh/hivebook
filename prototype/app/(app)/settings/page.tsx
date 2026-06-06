@@ -33,7 +33,7 @@ export default function SettingsPage() {
             </SettingRow>
             <SettingRow label="Workspace URL" description="The slug in your workspace address.">
               <div className="flex items-center gap-1 text-[13px] text-muted-foreground">
-                trenches.app/<span className="font-medium text-foreground">{mockOrg.slug}</span>
+                hivebook.app/<span className="font-medium text-foreground">{mockOrg.slug}</span>
               </div>
             </SettingRow>
             <SettingRow label="Primary domain" description="Verified email domain for SSO and invites.">

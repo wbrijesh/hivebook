@@ -8,7 +8,7 @@ what we learn from the first design partners.
 
 === Goal of v0.1
 
-Demonstrate to a small number of design partners that Trenches can
+Demonstrate to a small number of design partners that Hivebook can
 ingest their fragmented knowledge and produce a navigable, accurate,
 source-cited book of how their organization actually works —
 covering at least three load-bearing operational areas (e.g.,

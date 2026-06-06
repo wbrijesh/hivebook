@@ -33,12 +33,12 @@ type service struct {
 }
 
 var (
-	database   = os.Getenv("TRENCHES_DB_DATABASE")
-	password   = os.Getenv("TRENCHES_DB_PASSWORD")
-	username   = os.Getenv("TRENCHES_DB_USERNAME")
-	port       = os.Getenv("TRENCHES_DB_PORT")
-	host       = os.Getenv("TRENCHES_DB_HOST")
-	schema     = os.Getenv("TRENCHES_DB_SCHEMA")
+	database   = os.Getenv("HIVEBOOK_DB_DATABASE")
+	password   = os.Getenv("HIVEBOOK_DB_PASSWORD")
+	username   = os.Getenv("HIVEBOOK_DB_USERNAME")
+	port       = os.Getenv("HIVEBOOK_DB_PORT")
+	host       = os.Getenv("HIVEBOOK_DB_HOST")
+	schema     = os.Getenv("HIVEBOOK_DB_SCHEMA")
 	dbInstance *service
 )
 

@@ -1,4 +1,4 @@
-# Trenches — local dev control panel (OrbStack Kubernetes). Run `just`.
+# Hivebook — local dev control panel (OrbStack Kubernetes). Run `just`.
 
 set shell := ["bash", "-c"]
 # justfile lives at the repo root, but the manifests/helm-values are under infra/,
@@ -11,7 +11,7 @@ set dotenv-path := 'infra/.env'
 set dotenv-required := false
 
 caroot := `mkcert -CAROOT 2>/dev/null`
-ns := "traefik cert-manager zitadel trenches observability"
+ns := "traefik cert-manager zitadel hivebook observability"
 
 [private]
 default:
@@ -20,7 +20,7 @@ default:
 # Show this help
 help:
     @echo ""
-    @echo "  Trenches — local dev (run from anywhere in the repo)"
+    @echo "  Hivebook — local dev (run from anywhere in the repo)"
     @echo ""
     @echo "  COMMANDS"
     @echo "    just start  [service]   turn ON  — everything, or one service"
@@ -32,12 +32,12 @@ help:
     @echo "    (Kubernetes/OrbStack must be running — you manage that yourself.)"
     @echo ""
     @echo "  URLs & LOGINS  (HTTPS via mkcert · local creds, never reuse)"
-    @echo "    Web app   https://app.trenches.localhost       — sign in via Auth below"
-    @echo "    Auth      https://id.trenches.localhost        admin@trenches.localhost / Password1!"
-    @echo "    Grafana   https://grafana.trenches.localhost   admin / admin"
-    @echo "    API       https://api.trenches.localhost       /health · /metrics · /api/me"
+    @echo "    Web app   https://app.hivebook.localhost       — sign in via Auth below"
+    @echo "    Auth      https://id.hivebook.localhost        admin@hivebook.localhost / Password1!"
+    @echo "    Grafana   https://grafana.hivebook.localhost   admin / admin"
+    @echo "    API       https://api.hivebook.localhost       /health · /metrics · /api/me"
     @echo ""
-    @echo "    App DB       trenches / password1234            (postgres, trenches ns)"
+    @echo "    App DB       hivebook / password1234            (postgres, hivebook ns)"
     @echo "    ZITADEL DB   zitadel / zitadel-local-pw         (postgres, zitadel ns)"
     @echo "    IAM PAT      kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' | base64 -d"
     @echo ""
@@ -51,7 +51,7 @@ start service="all":
       for n in {{ns}}; do
         kubectl -n "$n" scale deploy,statefulset --all --replicas=1 >/dev/null 2>&1 || true
         for ds in $(kubectl -n "$n" get ds -o name 2>/dev/null); do
-          kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"trenches.io/stopped":null}}}}}' >/dev/null 2>&1 || true
+          kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":null}}}}}' >/dev/null 2>&1 || true
         done
       done
       echo ">> ON. 'just status' to watch."
@@ -74,7 +74,7 @@ stop service="all":
         for n in {{ns}}; do
           kubectl -n "$n" scale deploy,statefulset --all --replicas=0 >/dev/null 2>&1 || true
           for ds in $(kubectl -n "$n" get ds -o name 2>/dev/null); do
-            kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"trenches.io/stopped":"true"}}}}}' >/dev/null 2>&1 || true
+            kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":"true"}}}}}' >/dev/null 2>&1 || true
           done
         done
         [ "$pass" = 1 ] && sleep 5
@@ -104,7 +104,7 @@ logs service="all":
 # What's running — all, or one service
 status service="all":
     #!/usr/bin/env bash
-    f="^(traefik|cert-manager|zitadel|trenches|observability) "
+    f="^(traefik|cert-manager|zitadel|hivebook|observability) "
     [ "{{service}}" != all ] && f="{{service}}"
     kubectl get pods -A 2>/dev/null | grep -E "NAMESPACE|$f" || echo ">> cluster unreachable — run 'just start'."
 
@@ -125,7 +125,7 @@ _ns service:
 install: infra coredns auth provision api web observability
     @echo ">> installed. (ZITADEL provisioned automatically — see docs/auth-setup.adoc)"
 
-# Idempotent ZITADEL provisioning: project + web/api apps + trenches-oidc secret.
+# Idempotent ZITADEL provisioning: project + web/api apps + hivebook-oidc secret.
 [private]
 provision:
     bash scripts/provision-zitadel.sh
@@ -192,22 +192,22 @@ auth: repos
 api:
     #!/usr/bin/env bash
     set -uo pipefail
-    docker build -t trenches-api:dev ../api
-    kubectl get ns trenches >/dev/null 2>&1 || kubectl create ns trenches
+    docker build -t hivebook-api:dev ../api
+    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
     # App DB credentials from .env (not committed)
-    kubectl -n trenches create secret generic trenches-db \
-      --from-literal=POSTGRES_DB=trenches --from-literal=POSTGRES_USER=trenches \
-      --from-literal=POSTGRES_PASSWORD="$TRENCHES_DB_PASSWORD" \
+    kubectl -n hivebook create secret generic hivebook-db \
+      --from-literal=POSTGRES_DB=hivebook --from-literal=POSTGRES_USER=hivebook \
+      --from-literal=POSTGRES_PASSWORD="$HIVEBOOK_DB_PASSWORD" \
       --dry-run=client -o yaml | kubectl apply -f -
     kubectl apply -f postgres/
     kubectl apply -f api/
-    kubectl -n trenches rollout restart deployment/api
+    kubectl -n hivebook rollout restart deployment/api
 
 [private]
 web:
-    docker build -t trenches-web:dev ../web --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://id.trenches.localhost --build-arg NEXT_PUBLIC_API_BASE=https://api.trenches.localhost --build-arg NEXT_PUBLIC_OIDC_CLIENT_ID="$(kubectl -n trenches get secret trenches-oidc -o jsonpath='{.data.WEB_CLIENT_ID}' | base64 -d)" --build-arg NEXT_PUBLIC_OIDC_PROJECT_ID="$(kubectl -n trenches get secret trenches-oidc -o jsonpath='{.data.PROJECT_ID}' | base64 -d)"
+    docker build -t hivebook-web:dev ../web --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://id.hivebook.localhost --build-arg NEXT_PUBLIC_API_BASE=https://api.hivebook.localhost --build-arg NEXT_PUBLIC_OIDC_CLIENT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.WEB_CLIENT_ID}' | base64 -d)" --build-arg NEXT_PUBLIC_OIDC_PROJECT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.PROJECT_ID}' | base64 -d)"
     kubectl apply -f web/
-    kubectl -n trenches rollout restart deployment/web
+    kubectl -n hivebook rollout restart deployment/web
 
 [private]
 observability: repos
@@ -218,7 +218,7 @@ observability: repos
     helm upgrade --install vm victoriametrics/victoria-metrics-k8s-stack --namespace observability --values helm-values/victoria-metrics-k8s-stack.yaml --wait --timeout 15m --set grafana.adminPassword="$GRAFANA_ADMIN_PASSWORD"
     helm upgrade --install vector vector/vector --namespace observability --values helm-values/vector.yaml --wait
     # VictoriaLogs datasource (API-created so it doesn't race the plugin load; persists on the PVC)
-    CA="$(mkcert -CAROOT)/rootCA.pem"; G="https://grafana.trenches.localhost"
+    CA="$(mkcert -CAROOT)/rootCA.pem"; G="https://grafana.hivebook.localhost"
     i=0; until curl -sf --cacert "$CA" -u "admin:$GRAFANA_ADMIN_PASSWORD" -o /dev/null "$G/api/health" 2>/dev/null; do i=$((i+1)); [ $i -gt 60 ] && break; sleep 3; done
     curl -sf --cacert "$CA" -u "admin:$GRAFANA_ADMIN_PASSWORD" -X POST "$G/api/datasources" -H 'Content-Type: application/json' \
       -d '{"uid":"VictoriaLogs","name":"VictoriaLogs","type":"victoriametrics-logs-datasource","access":"proxy","url":"http://victorialogs.observability.svc.cluster.local:9428"}' >/dev/null 2>&1 || true

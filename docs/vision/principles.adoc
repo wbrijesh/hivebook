@@ -8,13 +8,13 @@ decision. They are appealable in writing, not in passing.
 
 === 1. Passive ingestion, not user feeding
 
-Knowledge enters Trenches by being connected to the systems where
+Knowledge enters Hivebook by being connected to the systems where
 it already lives — not by users typing it in. If something requires
 a human to remember to log it, it is not in scope.
 
 === 2. The corpus must be legible
 
-Trenches is not a black box of embeddings. The structured form of
+Hivebook is not a black box of embeddings. The structured form of
 the company’s knowledge — the book index — is human-readable,
 human-browsable, and human-auditable. A new employee should be able
 to read it.

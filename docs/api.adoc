@@ -1,6 +1,6 @@
 == api
 
-The Trenches Go API (chi router, pgx/Postgres). Verifies ZITADEL JWT access
+The Hivebook Go API (chi router, pgx/Postgres). Verifies ZITADEL JWT access
 tokens and exposes `/health`, `/metrics`, and the protected `/api/me`.
 
 === Build / deploy / test
@@ -9,7 +9,7 @@ Build and deploy into the cluster from the repo root:
 
 [source,bash]
 ----
-just api          # build trenches-api:dev + deploy to Kubernetes
+just api          # build hivebook-api:dev + deploy to Kubernetes
 ----
 
 Run the Go tests directly (from `api/`):

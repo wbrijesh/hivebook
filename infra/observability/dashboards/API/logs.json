@@ -1,8 +1,8 @@
 {
   "title": "API / Logs",
-  "uid": "trenches-api-logs",
+  "uid": "hivebook-api-logs",
   "tags": [
-    "trenches",
+    "hivebook",
     "api"
   ],
   "timezone": "browser",
@@ -38,7 +38,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "namespace:trenches container:api (level:error OR status:>=500)",
+          "expr": "namespace:hivebook container:api (level:error OR status:>=500)",
           "queryType": "range",
           "datasource": {
             "type": "victoriametrics-logs-datasource",
@@ -69,7 +69,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "namespace:trenches container:api",
+          "expr": "namespace:hivebook container:api",
           "queryType": "range",
           "datasource": {
             "type": "victoriametrics-logs-datasource",

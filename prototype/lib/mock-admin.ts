@@ -18,14 +18,14 @@ export type Member = {
 
 export const MEMBERS: Member[] = [
   { id: "m-brijesh", name: "Brijesh Wawdhane", email: "google@brijesh.dev", initial: "B", role: "owner", status: "active", provisioned: "manual", lastActive: "now" },
-  { id: "m-dana", name: "Dana Olsen", email: "dana@trenches-test.com", initial: "D", role: "admin", status: "active", provisioned: "sso", lastActive: "12 min ago" },
-  { id: "m-priya", name: "Priya Raman", email: "priya@trenches-test.com", initial: "P", role: "admin", status: "active", provisioned: "sso", lastActive: "1 h ago" },
-  { id: "m-sam", name: "Sam Okafor", email: "sam@trenches-test.com", initial: "S", role: "member", status: "active", provisioned: "sso", lastActive: "3 h ago" },
-  { id: "m-lee", name: "Lee Carter", email: "lee@trenches-test.com", initial: "L", role: "member", status: "active", provisioned: "sso", lastActive: "yesterday" },
-  { id: "m-maya", name: "Maya Lin", email: "maya@trenches-test.com", initial: "M", role: "member", status: "active", provisioned: "sso", lastActive: "2 days ago" },
-  { id: "m-tomas", name: "Tomás Vidal", email: "tomas@trenches-test.com", initial: "T", role: "viewer", status: "active", provisioned: "sso", lastActive: "5 days ago" },
-  { id: "m-aisha", name: "Aisha Khan", email: "aisha@trenches-test.com", initial: "A", role: "member", status: "invited", provisioned: "manual", lastActive: "—" },
-  { id: "m-rob", name: "Rob Feeney", email: "rob@trenches-test.com", initial: "R", role: "member", status: "suspended", provisioned: "sso", lastActive: "3 weeks ago" },
+  { id: "m-dana", name: "Dana Olsen", email: "dana@hivebook-test.com", initial: "D", role: "admin", status: "active", provisioned: "sso", lastActive: "12 min ago" },
+  { id: "m-priya", name: "Priya Raman", email: "priya@hivebook-test.com", initial: "P", role: "admin", status: "active", provisioned: "sso", lastActive: "1 h ago" },
+  { id: "m-sam", name: "Sam Okafor", email: "sam@hivebook-test.com", initial: "S", role: "member", status: "active", provisioned: "sso", lastActive: "3 h ago" },
+  { id: "m-lee", name: "Lee Carter", email: "lee@hivebook-test.com", initial: "L", role: "member", status: "active", provisioned: "sso", lastActive: "yesterday" },
+  { id: "m-maya", name: "Maya Lin", email: "maya@hivebook-test.com", initial: "M", role: "member", status: "active", provisioned: "sso", lastActive: "2 days ago" },
+  { id: "m-tomas", name: "Tomás Vidal", email: "tomas@hivebook-test.com", initial: "T", role: "viewer", status: "active", provisioned: "sso", lastActive: "5 days ago" },
+  { id: "m-aisha", name: "Aisha Khan", email: "aisha@hivebook-test.com", initial: "A", role: "member", status: "invited", provisioned: "manual", lastActive: "—" },
+  { id: "m-rob", name: "Rob Feeney", email: "rob@hivebook-test.com", initial: "R", role: "member", status: "suspended", provisioned: "sso", lastActive: "3 weeks ago" },
 ]
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -88,7 +88,7 @@ export const AUDIT_EVENTS: AuditEvent[] = [
   { id: "e5", time: "13:40:18", actor: "Sam Okafor", action: "Triggered sync", target: "Jira", kind: "admin", correlationId: "req_55f0aa" },
   { id: "e6", time: "12:18:03", actor: "System", action: "Resolved entity", target: "Finance → canonical", kind: "write", correlationId: "job_9d2244" },
   { id: "e7", time: "11:52:37", actor: "Tomás Vidal", action: "Ran ask", target: "\"refund threshold EU\"", kind: "read", correlationId: "req_77b310" },
-  { id: "e8", time: "11:09:44", actor: "Brijesh Wawdhane", action: "Invited member", target: "aisha@trenches-test.com", kind: "admin", correlationId: "req_2e88c1" },
+  { id: "e8", time: "11:09:44", actor: "Brijesh Wawdhane", action: "Invited member", target: "aisha@hivebook-test.com", kind: "admin", correlationId: "req_2e88c1" },
   { id: "e9", time: "10:47:21", actor: "Lee Carter", action: "Requested rebuild", target: "US refunds over $600", kind: "write", correlationId: "req_0bb934" },
   { id: "e10", time: "09:31:09", actor: "System", action: "Flagged ambiguity", target: "\"EM\" — 3 candidates", kind: "write", correlationId: "job_aa1f70" },
   { id: "e11", time: "09:02:55", actor: "Rob Feeney", action: "Sign-in blocked", target: "Account suspended", kind: "auth", correlationId: "req_6c4d80" },

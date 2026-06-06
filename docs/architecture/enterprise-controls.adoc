@@ -3,7 +3,7 @@
 
 == Enterprise Controls
 
-Trenches is sold B2B via negotiated contracts (not self-serve
+Hivebook is sold B2B via negotiated contracts (not self-serve
 billing). Enterprise controls are not bolted on later — they shape
 the data model and architecture from day one. This document defines
 what lands when.
@@ -55,7 +55,7 @@ in scope at all; see `vision/audience.adoc`.
 
 === Hosted vs. self-hosted
 
-Trenches runs on Kubernetes. The deployment model is:
+Hivebook runs on Kubernetes. The deployment model is:
 
 * *Hosted*: we operate Kubernetes clusters in major regions (US,
 EU, Asia, expanding by demand). Customers pick a cluster at

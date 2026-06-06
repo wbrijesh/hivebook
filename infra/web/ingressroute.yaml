@@ -1,17 +1,17 @@
-# Web app on https://app.trenches.localhost.
+# Web app on https://app.hivebook.localhost.
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: web
-  namespace: trenches
+  namespace: hivebook
 spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`app.trenches.localhost`)
+    - match: Host(`app.hivebook.localhost`)
       kind: Rule
       services:
         - name: web
           port: 3000
   tls:
-    secretName: trenches-wildcard-tls
+    secretName: hivebook-wildcard-tls

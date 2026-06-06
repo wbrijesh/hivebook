@@ -1,6 +1,6 @@
-== Trenches Documentation
+== Hivebook Documentation
 
-This directory is the long-lived design and decision record for Trenches.
+This directory is the long-lived design and decision record for Hivebook.
 It is intentionally curated — content lands here only after a decision has
 been discussed and reached, never as raw notes or scratch work.
 
@@ -31,4 +31,4 @@ never silently inferred or invented.
 
 === Domain
 
-The product is *Trenches*. Production domain: `trenches.run`.
+The product is *Hivebook*. Production domain: `hivebook.co`.

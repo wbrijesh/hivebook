@@ -74,7 +74,7 @@ export default function PrototypeIndex() {
         <div className="mx-auto max-w-3xl">
           <div className="mb-10">
             <h1 className="text-[28px] font-semibold tracking-tight text-foreground">
-              Trenches frontend prototype
+              Hivebook frontend prototype
             </h1>
             <p className="mt-2 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
               A click-through of every page we&apos;ve built so far. We&apos;re

@@ -1,8 +1,8 @@
 {
   "title": "Frontend / Metrics",
-  "uid": "trenches-fe-metrics",
+  "uid": "hivebook-fe-metrics",
   "tags": [
-    "trenches",
+    "hivebook",
     "frontend"
   ],
   "timezone": "browser",
@@ -12,7 +12,7 @@
     "from": "now-6h",
     "to": "now"
   },
-  "description": "Browser telemetry from the web app's beacon (POST /events -> trenches_web_events_total).",
+  "description": "Browser telemetry from the web app's beacon (POST /events -> hivebook_web_events_total).",
   "templating": {
     "list": []
   },
@@ -34,7 +34,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(trenches_web_events_total[$__rate_interval])) by (type)",
+          "expr": "sum(rate(hivebook_web_events_total[$__rate_interval])) by (type)",
           "legendFormat": "{{type}}",
           "datasource": {
             "type": "prometheus",
@@ -60,7 +60,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(trenches_web_events_total{type=\"page_view\"})",
+          "expr": "sum(hivebook_web_events_total{type=\"page_view\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "VictoriaMetrics"
@@ -85,7 +85,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(trenches_web_events_total{type=\"login_success\"})",
+          "expr": "sum(hivebook_web_events_total{type=\"login_success\"})",
           "legendFormat": "success",
           "datasource": {
             "type": "prometheus",
@@ -94,7 +94,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(trenches_web_events_total{type=\"login_error\"})",
+          "expr": "sum(hivebook_web_events_total{type=\"login_error\"})",
           "legendFormat": "error",
           "datasource": {
             "type": "prometheus",
@@ -120,7 +120,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(trenches_web_events_total) by (type)",
+          "expr": "sum(hivebook_web_events_total) by (type)",
           "legendFormat": "{{type}}",
           "datasource": {
             "type": "prometheus",

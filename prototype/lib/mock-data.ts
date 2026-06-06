@@ -15,14 +15,14 @@ export const mockUser = {
 }
 
 export const mockOrg = {
-  name: "Trenches Test Co",
-  slug: "trenches-test",
-  domain: "trenches-test.com",
+  name: "Hivebook Test Co",
+  slug: "hivebook-test",
+  domain: "hivebook-test.com",
   region: "us-east",
 }
 
 export const mockTenants = [
-  { slug: "trenches-test", name: "Trenches Test Co", role: "Owner", members: 47 },
+  { slug: "hivebook-test", name: "Hivebook Test Co", role: "Owner", members: 47 },
   { slug: "acme", name: "Acme Corp", role: "Member", members: 312 },
   { slug: "globex", name: "Globex Industries", role: "Admin", members: 1840 },
 ]
@@ -118,7 +118,7 @@ export const connectors = [
 ]
 
 export const entityTypes = [
-  { id: "product", label: "Products", placeholder: "e.g. Trenches Cloud, Trenches On-Prem" },
+  { id: "product", label: "Products", placeholder: "e.g. Hivebook Cloud, Hivebook On-Prem" },
   { id: "service", label: "Services", placeholder: "e.g. Onboarding Service, Support Tier 2" },
   { id: "project", label: "Internal projects", placeholder: "e.g. Project Falcon, Migration H2" },
   { id: "tool", label: "Internal tools", placeholder: "e.g. Admin Console, Billing CLI" },

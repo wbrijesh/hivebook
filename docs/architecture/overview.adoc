@@ -3,7 +3,7 @@
 
 == Architecture Overview
 
-Trenches is a layered system. Each layer has a single responsibility
+Hivebook is a layered system. Each layer has a single responsibility
 and a stable interface to the layers above and below it.
 
 ....

@@ -2,25 +2,25 @@
 
 NOTE: This is now *automated*. `just install` runs `just provision`
 (`infra/scripts/provision-zitadel.sh`) — idempotent: it creates the project +
-web/api apps, sets the admin email, and writes the `trenches-oidc` Secret, or
+web/api apps, sets the admin email, and writes the `hivebook-oidc` Secret, or
 reuses them if they already exist. Run `just provision` any time to reconcile.
 The manual console steps below remain as reference for what gets created.
 
 We can provision the project and applications by hand in the console too. The
-result is four values dropped into the `trenches-oidc` Secret (template:
+result is four values dropped into the `hivebook-oidc` Secret (template:
 `oidc-secret.example.yaml`).
 
 === Log in
 
-* Console: https://id.trenches.localhost/ui/console
-* User: `admin@trenches.localhost`
+* Console: https://id.hivebook.localhost/ui/console
+* User: `admin@hivebook.localhost`
 * Password: `Password1!`
 
 (The cert is trusted via the mkcert CA in your macOS keychain — no warning.)
 
 === 1. Create the project
 
-Projects → *Create New Project* → name it *Trenches* → create.
+Projects → *Create New Project* → name it *Hivebook* → create.
 
 Open the project and copy its *Resource Id* (the project ID) — this is
 `PROJECT++_++ID`. The web app puts this ID into the access-token audience, and the Go
@@ -28,13 +28,13 @@ API validates tokens against it.
 
 === 2. Create the `web` application (User Agent / PKCE)
 
-In the Trenches project → Applications → *New*:
+In the Hivebook project → Applications → *New*:
 
 * Name: `web`
 * Type: *User Agent*
 * Authentication method: *PKCE*
-* Redirect URIs: `https://app.trenches.localhost/callback`
-* Post-logout URIs: `https://app.trenches.localhost/`
+* Redirect URIs: `https://app.hivebook.localhost/callback`
+* Post-logout URIs: `https://app.hivebook.localhost/`
 
 Create, then in the app’s *Token settings*, set *Auth Token Type* to
 *JWT* (so the SPA receives a JWT access token the API can validate offline) and
@@ -44,7 +44,7 @@ Copy the app’s *Client Id* — this is `WEB++_++CLIENT++_++ID`.
 
 === 3. Create the `api` application (API)
 
-In the Trenches project → Applications → *New*:
+In the Hivebook project → Applications → *New*:
 
 * Name: `api`
 * Type: *API*
@@ -68,7 +68,7 @@ Keys:
 [width="100%",cols="25%,46%,29%",options="header",]
 |===
 |Key |From |Used by
-|`OIDC++_++ISSUER` |`https://id.trenches.localhost` |web build, api
+|`OIDC++_++ISSUER` |`https://id.hivebook.localhost` |web build, api
 |`PROJECT++_++ID` |step 1 (project Resource Id) |web build, api (audience)
 |`WEB++_++CLIENT++_++ID` |step 2 (web app Client Id) |web build
 |`API++_++CLIENT++_++ID` |step 3 (api app Client Id) |reference / future
@@ -82,7 +82,7 @@ make -C infra web    # bakes WEB_CLIENT_ID/PROJECT_ID into the web image, deploy
 make -C infra api    # redeploys api so it picks up PROJECT_ID as the audience
 ----
 
-Then visit https://app.trenches.localhost, log in, and click *Call
+Then visit https://app.hivebook.localhost, log in, and click *Call
 GET /api/me* — you should see the token claims returned by the Go API.
 
 '''''
@@ -94,14 +94,14 @@ done via the management API as a one-off (not in the Makefile), using the
 `iam-admin` machine user {plus} PAT that the chart bootstraps (`FirstInstance.Org.Machine`,
 secret `iam-admin-pat`). This is the basis for the future Terraform/provider
 automation. The calls, all `Authorization: Bearer ++<++iam-admin PAT++>++` against
-`https://id.trenches.localhost/management/v1`:
+`https://id.hivebook.localhost/management/v1`:
 
-* `POST /projects` `++{++"name":"Trenches"}` → `PROJECT++_++ID`
+* `POST /projects` `++{++"name":"Hivebook"}` → `PROJECT++_++ID`
 * `POST /projects/++{++PROJECT++_++ID}/apps/oidc` with appType `USER++_++AGENT`, auth method
 `NONE` (PKCE), `accessTokenType: OIDC++_++TOKEN++_++TYPE++_++JWT`, the redirect/post-logout
 URIs → `WEB++_++CLIENT++_++ID`
 * `POST /projects/++{++PROJECT++_++ID}/apps/api` → `API++_++CLIENT++_++ID`
 
-The `trenches-oidc` Secret was then created with `kubectl create secret generic`.
+The `hivebook-oidc` Secret was then created with `kubectl create secret generic`.
 Verified end-to-end by minting a project-audience JWT (jwt-bearer grant with the
 `iam-admin` key) and calling `/api/me` → 200 with claims.

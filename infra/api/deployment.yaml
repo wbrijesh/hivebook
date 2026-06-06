@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
-  namespace: trenches
+  namespace: hivebook
   labels:
     app: api
 spec:
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: trenches-api:dev
+          image: hivebook-api:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -27,25 +27,25 @@ spec:
                 name: api-config
           env:
             # DB name/user/password come from the same secret Postgres uses,
-            # mapped onto the TRENCHES_DB_* names the app reads.
-            - name: TRENCHES_DB_DATABASE
+            # mapped onto the HIVEBOOK_DB_* names the app reads.
+            - name: HIVEBOOK_DB_DATABASE
               valueFrom:
-                secretKeyRef: { name: trenches-db, key: POSTGRES_DB }
-            - name: TRENCHES_DB_USERNAME
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_DB }
+            - name: HIVEBOOK_DB_USERNAME
               valueFrom:
-                secretKeyRef: { name: trenches-db, key: POSTGRES_USER }
-            - name: TRENCHES_DB_PASSWORD
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_USER }
+            - name: HIVEBOOK_DB_PASSWORD
               valueFrom:
-                secretKeyRef: { name: trenches-db, key: POSTGRES_PASSWORD }
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_PASSWORD }
             # Expected token audience — the ZITADEL project id, which the web app
             # adds to the token aud via the project:id:{id}:aud scope. Optional so
             # the pod starts before Phase 3 provisioning; re-deploy after.
-            - name: TRENCHES_OIDC_AUDIENCE
+            - name: HIVEBOOK_OIDC_AUDIENCE
               valueFrom:
-                secretKeyRef: { name: trenches-oidc, key: PROJECT_ID, optional: true }
+                secretKeyRef: { name: hivebook-oidc, key: PROJECT_ID, optional: true }
           volumeMounts:
             - name: oidc-ca
-              mountPath: /etc/trenches/tls
+              mountPath: /etc/hivebook/tls
               readOnly: true
           # Probe "/" (no DB access) — "/health" calls log.Fatalf on DB error in
           # the scaffolded code, which would crash the pod on a transient blip.
@@ -63,7 +63,7 @@ spec:
       volumes:
         - name: oidc-ca
           secret:
-            secretName: trenches-wildcard-tls
+            secretName: hivebook-wildcard-tls
             items:
               - key: ca.crt
                 path: ca.crt

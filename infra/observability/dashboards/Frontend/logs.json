@@ -1,8 +1,8 @@
 {
   "title": "Frontend / Logs",
-  "uid": "trenches-fe-logs",
+  "uid": "hivebook-fe-logs",
   "tags": [
-    "trenches",
+    "hivebook",
     "frontend"
   ],
   "timezone": "browser",
@@ -69,7 +69,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "namespace:trenches container:web",
+          "expr": "namespace:hivebook container:web",
           "queryType": "range",
           "datasource": {
             "type": "victoriametrics-logs-datasource",

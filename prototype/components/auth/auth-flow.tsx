@@ -16,7 +16,7 @@ type AuthFlowValue = {
   setLastMethod: (method: string) => void
 }
 
-const LAST_METHOD_KEY = "trenches-last-method"
+const LAST_METHOD_KEY = "hivebook-last-method"
 
 const AuthFlowContext = React.createContext<AuthFlowValue | null>(null)
 

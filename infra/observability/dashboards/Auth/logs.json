@@ -1,8 +1,8 @@
 {
   "title": "Auth / Logs",
-  "uid": "trenches-auth-logs",
+  "uid": "hivebook-auth-logs",
   "tags": [
-    "trenches",
+    "hivebook",
     "auth"
   ],
   "timezone": "browser",

@@ -20,7 +20,7 @@ type dbStatsCollector struct {
 }
 
 func newDBStatsCollector(stats func() sql.DBStats) *dbStatsCollector {
-	ns := "trenches_db"
+	ns := "hivebook_db"
 	d := func(name, help string) *prometheus.Desc {
 		return prometheus.NewDesc(ns+"_"+name, help, nil, nil)
 	}

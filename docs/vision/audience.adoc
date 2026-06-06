@@ -3,7 +3,7 @@
 
 == Audience
 
-Trenches is sold business-to-business. Individuals are not the buyer.
+Hivebook is sold business-to-business. Individuals are not the buyer.
 
 === Buyer profile
 

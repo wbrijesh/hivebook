@@ -33,7 +33,7 @@ brain being trustable first.
 
 === MCP server
 
-Trenches as a tool consumable by external AI applications (chat
+Hivebook as a tool consumable by external AI applications (chat
 apps, coding agents). Single integration surface that exposes
 queries and book navigation. Designed after skills are ready.
 

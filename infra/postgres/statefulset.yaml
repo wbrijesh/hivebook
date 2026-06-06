@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: trenches
+  namespace: hivebook
 spec:
   serviceName: postgres
   replicas: 1
@@ -22,7 +22,7 @@ spec:
               containerPort: 5432
           envFrom:
             - secretRef:
-                name: trenches-db
+                name: hivebook-db
           # POSTGRES_* land the data under a subdir so the PVC mount root stays clean.
           env:
             - name: PGDATA

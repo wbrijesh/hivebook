@@ -4,7 +4,7 @@
 // audience locally.
 //
 // Two wrinkles specific to our setup are handled here:
-//   - The issuer (https://id.trenches.localhost) is served with a cert signed by
+//   - The issuer (https://id.hivebook.localhost) is served with a cert signed by
 //     the local mkcert CA, so we add that CA to the HTTP client's trust pool.
 //   - ZITADEL may not be reachable the instant the API starts, so provider
 //     discovery runs in the background with retries; until it succeeds the
@@ -30,7 +30,7 @@ import (
 
 // verifications counts token-verification outcomes on protected routes.
 var verifications = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "trenches_auth_verifications_total",
+	Name: "hivebook_auth_verifications_total",
 	Help: "Token verification outcomes on protected routes.",
 }, []string{"result"})
 
@@ -71,7 +71,7 @@ func (a *Authenticator) discover(hc *http.Client) {
 		cfg := &oidc.Config{ClientID: a.audience}
 		if a.audience == "" {
 			cfg.SkipClientIDCheck = true
-			log.Printf("auth: no TRENCHES_OIDC_AUDIENCE set — skipping audience check")
+			log.Printf("auth: no HIVEBOOK_OIDC_AUDIENCE set — skipping audience check")
 		}
 		a.verifier.Store(provider.Verifier(cfg))
 		log.Printf("auth: OIDC provider ready (issuer=%s audience=%q)", a.issuer, a.audience)

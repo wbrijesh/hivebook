@@ -4,7 +4,7 @@ apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMServiceScrape
 metadata:
   name: api
-  namespace: trenches
+  namespace: hivebook
 spec:
   selector:
     matchLabels:

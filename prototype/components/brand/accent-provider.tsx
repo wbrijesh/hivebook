@@ -28,7 +28,7 @@ type AccentContextValue = AccentConfig & {
   pickerVisible: boolean
 }
 
-const STORAGE_KEY = "trenches-accent"
+const STORAGE_KEY = "hivebook-accent"
 
 const AccentContext = React.createContext<AccentContextValue | null>(null)
 

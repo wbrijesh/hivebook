@@ -4,13 +4,13 @@
 == Apex — Design Language
 
 ____
-*Apex* is the Trenches design system. Every UI decision should be
+*Apex* is the Hivebook design system. Every UI decision should be
 checkable against this document.
 ____
 
 === North star
 
-*Trenches should feel engineered, not marketed — a precise, quiet instrument
+*Hivebook should feel engineered, not marketed — a precise, quiet instrument
 that veterans admire for its craft and founders trust with their company’s
 brain.*
 

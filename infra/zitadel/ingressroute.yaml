@@ -1,4 +1,4 @@
-# Traefik routing for ZITADEL on https://id.trenches.localhost.
+# Traefik routing for ZITADEL on https://id.hivebook.localhost.
 #
 # Two routes on one host:
 #   - /ui/v2/login  -> the Login V2 container (Next.js, HTTP/1.1)
@@ -16,16 +16,16 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: Host(`id.trenches.localhost`) && PathPrefix(`/ui/v2/login`)
+    - match: Host(`id.hivebook.localhost`) && PathPrefix(`/ui/v2/login`)
       kind: Rule
       services:
         - name: zitadel-login
           port: 3000
-    - match: Host(`id.trenches.localhost`)
+    - match: Host(`id.hivebook.localhost`)
       kind: Rule
       services:
         - name: zitadel
           port: 8080
           scheme: h2c
   tls:
-    secretName: trenches-wildcard-tls
+    secretName: hivebook-wildcard-tls

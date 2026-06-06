@@ -17,7 +17,7 @@ export function SiteFooter({ className }: { className?: string }) {
       )}
     >
       <div className="flex items-center gap-2">
-        <span>Trenches © 2026</span>
+        <span>Hivebook © 2026</span>
       </div>
       <nav className="flex items-center gap-5">
         {links.map((l) => (

@@ -1,8 +1,8 @@
 {
   "title": "API / Metrics",
-  "uid": "trenches-api-metrics",
+  "uid": "hivebook-api-metrics",
   "tags": [
-    "trenches",
+    "hivebook",
     "api"
   ],
   "timezone": "browser",
@@ -33,7 +33,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(trenches_http_requests_total[$__rate_interval])) by (route)",
+          "expr": "sum(rate(hivebook_http_requests_total[$__rate_interval])) by (route)",
           "legendFormat": "{{route}}",
           "datasource": {
             "type": "prometheus",
@@ -59,7 +59,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(trenches_http_requests_total{code=~\"4..\"}[$__rate_interval]))",
+          "expr": "sum(rate(hivebook_http_requests_total{code=~\"4..\"}[$__rate_interval]))",
           "legendFormat": "4xx",
           "datasource": {
             "type": "prometheus",
@@ -68,7 +68,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(rate(trenches_http_requests_total{code=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum(rate(hivebook_http_requests_total{code=~\"5..\"}[$__rate_interval]))",
           "legendFormat": "5xx",
           "datasource": {
             "type": "prometheus",
@@ -94,7 +94,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.50, sum(rate(trenches_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(hivebook_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p50",
           "datasource": {
             "type": "prometheus",
@@ -103,7 +103,7 @@
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.90, sum(rate(trenches_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(rate(hivebook_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p90",
           "datasource": {
             "type": "prometheus",
@@ -112,7 +112,7 @@
         },
         {
           "refId": "C",
-          "expr": "histogram_quantile(0.99, sum(rate(trenches_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(hivebook_http_request_duration_seconds_bucket[$__rate_interval])) by (le))",
           "legendFormat": "p99",
           "datasource": {
             "type": "prometheus",
@@ -138,7 +138,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "trenches_http_requests_in_flight",
+          "expr": "hivebook_http_requests_in_flight",
           "datasource": {
             "type": "prometheus",
             "uid": "VictoriaMetrics"
@@ -163,7 +163,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(trenches_auth_verifications_total[$__rate_interval])) by (result)",
+          "expr": "sum(rate(hivebook_auth_verifications_total[$__rate_interval])) by (result)",
           "legendFormat": "{{result}}",
           "datasource": {
             "type": "prometheus",
@@ -189,7 +189,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "trenches_db_open_connections",
+          "expr": "hivebook_db_open_connections",
           "legendFormat": "open",
           "datasource": {
             "type": "prometheus",
@@ -198,7 +198,7 @@
         },
         {
           "refId": "B",
-          "expr": "trenches_db_in_use_connections",
+          "expr": "hivebook_db_in_use_connections",
           "legendFormat": "in use",
           "datasource": {
             "type": "prometheus",
@@ -207,7 +207,7 @@
         },
         {
           "refId": "C",
-          "expr": "trenches_db_idle_connections",
+          "expr": "hivebook_db_idle_connections",
           "legendFormat": "idle",
           "datasource": {
             "type": "prometheus",
@@ -216,7 +216,7 @@
         },
         {
           "refId": "D",
-          "expr": "trenches_db_max_open_connections",
+          "expr": "hivebook_db_max_open_connections",
           "legendFormat": "max",
           "datasource": {
             "type": "prometheus",

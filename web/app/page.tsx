@@ -41,7 +41,7 @@ export default function Page() {
 
   return (
     <main style={{ padding: 24, fontFamily: "sans-serif", maxWidth: 720 }}>
-      <h1>Trenches</h1>
+      <h1>Hivebook</h1>
       {!user ? (
         <button onClick={login}>Log in with ZITADEL</button>
       ) : (

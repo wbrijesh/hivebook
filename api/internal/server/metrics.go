@@ -14,24 +14,24 @@ import (
 // HTTP request metrics, scraped by Prometheus at /metrics.
 var (
 	httpRequests = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "trenches_http_requests_total",
+		Name: "hivebook_http_requests_total",
 		Help: "Total HTTP requests handled, by method, route and status code.",
 	}, []string{"method", "route", "code"})
 
 	httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "trenches_http_request_duration_seconds",
+		Name:    "hivebook_http_request_duration_seconds",
 		Help:    "HTTP request latency in seconds, by method and route.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"method", "route"})
 
 	httpInFlight = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "trenches_http_requests_in_flight",
+		Name: "hivebook_http_requests_in_flight",
 		Help: "Number of HTTP requests currently being served.",
 	})
 
 	// Bumped by the /events endpoint for each browser telemetry event.
 	webEventsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "trenches_web_events_total",
+		Name: "hivebook_web_events_total",
 		Help: "Total web (browser) telemetry events received, by type.",
 	}, []string{"type"})
 )

@@ -19,7 +19,7 @@ export function Logo({ className, variant = "full", size = "md" }: LogoProps) {
       <LogoMark className={s.mark} />
       {variant === "full" && (
         <span className={cn("font-semibold tracking-tight", s.text)}>
-          Trenches
+          Hivebook
         </span>
       )}
     </span>

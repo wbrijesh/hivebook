@@ -27,9 +27,9 @@ func NewServer() *http.Server {
 
 		db: database.New(),
 		auth: auth.New(
-			os.Getenv("TRENCHES_OIDC_ISSUER"),
-			os.Getenv("TRENCHES_OIDC_AUDIENCE"),
-			os.Getenv("TRENCHES_OIDC_CA_FILE"),
+			os.Getenv("HIVEBOOK_OIDC_ISSUER"),
+			os.Getenv("HIVEBOOK_OIDC_AUDIENCE"),
+			os.Getenv("HIVEBOOK_OIDC_CA_FILE"),
 		),
 	}
 

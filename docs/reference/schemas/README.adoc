@@ -1,6 +1,6 @@
 == Schemas
 
-Concrete data shapes for entities stored in Trenches. Populated as
+Concrete data shapes for entities stored in Hivebook. Populated as
 the entities are designed.
 
 Schemas live here rather than embedded in architecture docs because
