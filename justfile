@@ -1,6 +1,14 @@
 # Trenches — local dev control panel (OrbStack Kubernetes). Run `just`.
 
 set shell := ["bash", "-c"]
+# justfile lives at the repo root, but the manifests/helm-values are under infra/,
+# so recipes run from there and keep their infra-relative paths (and ../api, ../web).
+set working-directory := 'infra'
+# Single source of secret values (gitignored). Recipes inject these into the
+# cluster; not required for start/stop/status so it's fine if it's missing.
+set dotenv-load := true
+set dotenv-path := 'infra/.env'
+set dotenv-required := false
 
 caroot := `mkcert -CAROOT 2>/dev/null`
 ns := "traefik cert-manager zitadel trenches observability"
@@ -12,15 +20,26 @@ default:
 # Show this help
 help:
     @echo ""
-    @echo "  Trenches — local dev (run from infra/)"
+    @echo "  Trenches — local dev (run from anywhere in the repo)"
     @echo ""
-    @echo "  just start  [service]   turn ON  — everything, or one service"
-    @echo "  just stop   [service]   turn OFF — everything, or one service"
-    @echo "  just logs   [service]   logs     — follow one service, or recent from all"
-    @echo "  just status [service]   what's running"
+    @echo "  COMMANDS"
+    @echo "    just start  [service]   turn ON  — everything, or one service"
+    @echo "    just stop   [service]   turn OFF — everything, or one service"
+    @echo "    just logs   [service]   logs     — follow one service, or recent from all"
+    @echo "    just status [service]   what's running"
     @echo ""
-    @echo "  services: api · web · postgres · zitadel · zitadel-db · zitadel-login"
-    @echo "  (Kubernetes/OrbStack must be running — you manage that yourself.)"
+    @echo "    services: api · web · postgres · zitadel · zitadel-db · zitadel-login"
+    @echo "    (Kubernetes/OrbStack must be running — you manage that yourself.)"
+    @echo ""
+    @echo "  URLs & LOGINS  (HTTPS via mkcert · local creds, never reuse)"
+    @echo "    Web app   https://app.trenches.localhost       — sign in via Auth below"
+    @echo "    Auth      https://id.trenches.localhost        admin@trenches.localhost / Password1!"
+    @echo "    Grafana   https://grafana.trenches.localhost   admin / admin"
+    @echo "    API       https://api.trenches.localhost       /health · /metrics · /api/me"
+    @echo ""
+    @echo "    App DB       trenches / password1234            (postgres, trenches ns)"
+    @echo "    ZITADEL DB   zitadel / zitadel-local-pw         (postgres, zitadel ns)"
+    @echo "    IAM PAT      kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' | base64 -d"
     @echo ""
 
 # Turn ON — the whole app (default) or one service
@@ -103,8 +122,13 @@ _ns service:
     echo "$n"
 
 [private]
-install: infra coredns auth api web observability
-    @echo ">> installed. Provision ZITADEL (zitadel/AUTH-SETUP.md), then: just web api"
+install: infra coredns auth provision api web observability
+    @echo ">> installed. (ZITADEL provisioned automatically — see docs/auth-setup.adoc)"
+
+# Idempotent ZITADEL provisioning: project + web/api apps + trenches-oidc secret.
+[private]
+provision:
+    bash scripts/provision-zitadel.sh
 
 [private]
 destroy:
@@ -147,15 +171,34 @@ coredns:
 
 [private]
 auth: repos
+    #!/usr/bin/env bash
+    set -uo pipefail
+    kubectl get ns zitadel >/dev/null 2>&1 || kubectl create ns zitadel
+    # DB credentials from .env (not committed)
+    kubectl -n zitadel create secret generic zitadel-db \
+      --from-literal=POSTGRES_USER=zitadel --from-literal=POSTGRES_DB=postgres \
+      --from-literal=POSTGRES_PASSWORD="$ZITADEL_DB_PASSWORD" \
+      --dry-run=client -o yaml | kubectl apply -f -
     kubectl apply -f zitadel/postgres.yaml
     kubectl -n zitadel rollout status statefulset/zitadel-db --timeout 180s
     kubectl -n zitadel get secret zitadel-masterkey >/dev/null 2>&1 || kubectl -n zitadel create secret generic zitadel-masterkey --from-literal=masterkey="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 32)"
-    helm upgrade --install zitadel zitadel/zitadel --namespace zitadel --values helm-values/zitadel.yaml --wait --timeout 10m
+    helm upgrade --install zitadel zitadel/zitadel --namespace zitadel --values helm-values/zitadel.yaml --wait --timeout 10m \
+      --set zitadel.configmapConfig.FirstInstance.Org.Human.Password="$ZITADEL_ADMIN_PASSWORD" \
+      --set zitadel.configmapConfig.Database.Postgres.User.Password="$ZITADEL_DB_PASSWORD" \
+      --set zitadel.configmapConfig.Database.Postgres.Admin.Password="$ZITADEL_DB_PASSWORD"
     kubectl apply -f zitadel/ingressroute.yaml
 
 [private]
 api:
+    #!/usr/bin/env bash
+    set -uo pipefail
     docker build -t trenches-api:dev ../api
+    kubectl get ns trenches >/dev/null 2>&1 || kubectl create ns trenches
+    # App DB credentials from .env (not committed)
+    kubectl -n trenches create secret generic trenches-db \
+      --from-literal=POSTGRES_DB=trenches --from-literal=POSTGRES_USER=trenches \
+      --from-literal=POSTGRES_PASSWORD="$TRENCHES_DB_PASSWORD" \
+      --dry-run=client -o yaml | kubectl apply -f -
     kubectl apply -f postgres/
     kubectl apply -f api/
     kubectl -n trenches rollout restart deployment/api
@@ -172,8 +215,13 @@ observability: repos
     set -uo pipefail
     helm -n observability uninstall kube-prometheus-stack 2>/dev/null || true
     helm upgrade --install victoria-logs victoriametrics/victoria-logs-single --namespace observability --values helm-values/victoria-logs.yaml --wait
-    helm upgrade --install vm victoriametrics/victoria-metrics-k8s-stack --namespace observability --values helm-values/victoria-metrics-k8s-stack.yaml --wait --timeout 10m
+    helm upgrade --install vm victoriametrics/victoria-metrics-k8s-stack --namespace observability --values helm-values/victoria-metrics-k8s-stack.yaml --wait --timeout 15m --set grafana.adminPassword="$GRAFANA_ADMIN_PASSWORD"
     helm upgrade --install vector vector/vector --namespace observability --values helm-values/vector.yaml --wait
+    # VictoriaLogs datasource (API-created so it doesn't race the plugin load; persists on the PVC)
+    CA="$(mkcert -CAROOT)/rootCA.pem"; G="https://grafana.trenches.localhost"
+    i=0; until curl -sf --cacert "$CA" -u "admin:$GRAFANA_ADMIN_PASSWORD" -o /dev/null "$G/api/health" 2>/dev/null; do i=$((i+1)); [ $i -gt 60 ] && break; sleep 3; done
+    curl -sf --cacert "$CA" -u "admin:$GRAFANA_ADMIN_PASSWORD" -X POST "$G/api/datasources" -H 'Content-Type: application/json' \
+      -d '{"uid":"VictoriaLogs","name":"VictoriaLogs","type":"victoriametrics-logs-datasource","access":"proxy","url":"http://victorialogs.observability.svc.cluster.local:9428"}' >/dev/null 2>&1 || true
     kubectl apply -f observability/vmservicescrape-api.yaml -f observability/vmservicescrape-zitadel.yaml
     kubectl apply -f observability/grafana-ingressroute.yaml
     for d in observability/dashboards/*/; do

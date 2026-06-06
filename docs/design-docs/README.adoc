@@ -41,7 +41,7 @@ form that survives editorial change.
 
 === Conventions
 
-* Numbered `NNNN-kebab-case-title.md` starting at `0001-`.
-* Use the frontmatter from `0000-template.md`.
+* Numbered `NNNN-kebab-case-title.adoc` starting at `0001-`.
+* Use the frontmatter from `0000-template.adoc`.
 * Link to related ADRs when they are written.
 * Keep prose dense — design docs are read, not skimmed.

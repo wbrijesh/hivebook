@@ -16,11 +16,11 @@ source system. It is responsible for:
 * *Watermarking* — a per-source position (timestamp, cursor,
 ETag) so resyncs are incremental, not full.
 
-See `reference/connector-catalog.md` for the planned list.
+See `reference/connector-catalog.adoc` for the planned list.
 
 Connectors do *not* extract source-system ACLs. Access control
 in Trenches is admin-managed at the chapter level (see
-`tenancy-and-acl.md`); ingestion is permission-blind.
+`tenancy-and-acl.adoc`); ingestion is permission-blind.
 
 === Open question: build vs. integrate
 
@@ -50,7 +50,7 @@ needed to make artifacts comparable and queryable:
 Semantic decisions — what topic an artifact belongs to, what
 entities it references, whether the book structure should change to
 accommodate it — happen in the batched filing pipeline that runs
-downstream. See `design-docs/0001-continuous-ingestion-and-filing.md`.
+downstream. See `design-docs/0001-continuous-ingestion-and-filing.adoc`.
 
 === Push vs. pull per source
 
@@ -78,7 +78,7 @@ reconstruction; segments are the addressable unit downstream.
 
 Entity tagging — resolving mentions to canonical entities in the
 per-tenant entity store — runs inside the batched filing LLM call.
-See `design-docs/0003-entity-reconciliation.md`.
+See `design-docs/0003-entity-reconciliation.adoc`.
 
 === Failure handling
 

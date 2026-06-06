@@ -39,7 +39,7 @@ vmagent:
 
 grafana:
   enabled: true
-  adminPassword: admin
+  adminPassword: "" # injected from infra/.env via helm --set (observability recipe)
   # Persist /var/lib/grafana so the VictoriaLogs plugin + datasource survive
   # restarts (otherwise every start re-downloads the plugin, ~slow, and the logs
   # datasource provisioning races the install).
@@ -48,6 +48,10 @@ grafana:
     type: pvc
     size: 2Gi
     storageClassName: local-path
+  # The chown init container runs non-root and can't chown grafana-owned dirs on
+  # the local-path PVC (and fsGroup already makes the volume writable). Disable it.
+  initChownData:
+    enabled: false
   # The VictoriaLogs datasource plugin is downloaded at startup; on a slow network
   # that can exceed the default probe window and crash-loop Grafana. Give it room.
   livenessProbe:
@@ -61,16 +65,10 @@ grafana:
   # VictoriaLogs datasource plugin so logs are queryable in Grafana.
   plugins:
     - victoriametrics-logs-datasource
-  additionalDataSources:
-    - name: VictoriaLogs
-      # Fixed uid so dashboards can reference it directly (datasource template
-      # variables don't auto-resolve for a non-default type on provisioned boards).
-      uid: VictoriaLogs
-      type: victoriametrics-logs-datasource
-      access: proxy
-      url: http://victorialogs.observability.svc.cluster.local:9428
-      jsonData:
-        timeInterval: "5s"
+  # The VictoriaLogs datasource (uid VictoriaLogs) is created via the Grafana API
+  # by the `observability` recipe — provisioning here races the plugin's at-boot
+  # load and fails. With persistence on, the API-created datasource lives in
+  # grafana.db on the PVC and survives restarts.
   # Dashboard sidecar discovers ConfigMaps labelled grafana_dashboard=1, and
   # files them into Grafana folders named by the `grafana_folder` annotation
   # (API / Frontend / Auth), each holding a Metrics + Logs dashboard.

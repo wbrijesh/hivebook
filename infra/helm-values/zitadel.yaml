@@ -1,7 +1,7 @@
 replicaCount: 1
 
 zitadel:
-  # 32-char masterkey created once as a k8s secret (see Makefile `auth` target).
+  # 32-char masterkey created once as a k8s secret (see the `auth` recipe).
   # Encrypts data at rest — cannot be rotated after first init without data loss.
   masterkeySecretName: zitadel-masterkey
 
@@ -16,8 +16,8 @@ zitadel:
     # DB config lives in configmapConfig (mounted at /config) so the init/setup
     # hook jobs see it too — `zitadel.env` only reaches the main deployment.
     # ZITADEL's Admin connects to the `postgres` maintenance DB and creates the
-    # `zitadel` database + runtime user. Plaintext password is fine on the local
-    # cluster (it already lives in the zitadel-db Secret manifest).
+    # `zitadel` database + runtime user. Passwords are injected at deploy time
+    # from infra/.env via `helm --set` (the `auth` recipe) — blank here on purpose.
     Database:
       Postgres:
         Host: zitadel-db.zitadel.svc.cluster.local
@@ -27,12 +27,12 @@ zitadel:
         MaxIdleConns: 10
         User:
           Username: zitadel
-          Password: zitadel-local-pw
+          Password: ""
           SSL:
             Mode: disable
         Admin:
           Username: zitadel
-          Password: zitadel-local-pw
+          Password: ""
           ExistingDatabase: postgres
           SSL:
             Mode: disable
@@ -42,7 +42,7 @@ zitadel:
         Human:
           UserName: admin
           Email: admin@trenches.localhost
-          Password: "Password1!"
+          Password: "" # injected from infra/.env via helm --set (auth recipe)
           PasswordChangeRequired: false
         # Machine user with IAM_OWNER + a PAT (stored in secret `iam-admin-pat`),
         # used for one-off API provisioning today and Terraform automation later.

@@ -6,7 +6,6 @@ import {
   Public_Sans,
   Source_Sans_3,
 } from "next/font/google"
-import localFont from "next/font/local"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -28,19 +27,6 @@ const fontPlex = IBM_Plex_Sans({
   variable: "--font-ibm-plex",
   display: "swap",
 })
-const fontDin = localFont({
-  src: [
-    { path: "./fonts/DIN2014-ExtraLight.ttf", weight: "200", style: "normal" },
-    { path: "./fonts/DIN2014-Light.ttf", weight: "300", style: "normal" },
-    { path: "./fonts/DIN2014-Regular.ttf", weight: "400", style: "normal" },
-    { path: "./fonts/DIN2014-DemiBold.ttf", weight: "500", style: "normal" },
-    { path: "./fonts/DIN2014-DemiBold.ttf", weight: "600", style: "normal" },
-    { path: "./fonts/DIN2014-Bold.ttf", weight: "700", style: "normal" },
-  ],
-  variable: "--font-din",
-  display: "swap",
-})
-
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
@@ -52,7 +38,6 @@ const fontVariables = [
   fontGeist.variable,
   fontPublic.variable,
   fontPlex.variable,
-  fontDin.variable,
   fontMono.variable,
 ]
 

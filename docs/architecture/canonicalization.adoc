@@ -5,7 +5,7 @@
 
 Every entry in the book index — chapter, topic, sub-topic — can
 carry a summary. Summaries are LLM-generated and follow the
-hierarchy invariant from `corpus-and-index.md`: sub-topic summaries
+hierarchy invariant from `corpus-and-index.adoc`: sub-topic summaries
 cite raw artifacts; topic summaries cite their child sub-topic
 summaries; chapter summaries cite their child topic summaries.
 
@@ -35,7 +35,7 @@ A chapter summary follows the same pattern, one level higher.
 === When a summary is refreshed
 
 A summary is *marked stale* by the mark-and-defer pattern (see
-`design-docs/0002-mark-and-defer-for-structural-changes.md`)
+`design-docs/0002-mark-and-defer-for-structural-changes.adoc`)
 whenever:
 
 * A structural change touches the entry or its descendants.
@@ -49,7 +49,7 @@ A stale summary is *rebuilt* when:
 triggers an async rebuild.
 * The maintenance loop processes the stale queue.
 * The summary’s stale age exceeds the max-stale-age threshold (see
-`design-docs/0004-tunable-defaults-to-dynamic-functions.md`).
+`design-docs/0004-tunable-defaults-to-dynamic-functions.adoc`).
 
 === Build process
 

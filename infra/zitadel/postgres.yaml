@@ -5,18 +5,9 @@
 #
 # ZITADEL connects to the `postgres` maintenance database with a superuser and
 # creates its own `zitadel` database during init.
-apiVersion: v1
-kind: Secret
-metadata:
-  name: zitadel-db
-  namespace: zitadel
-type: Opaque
-stringData:
-  POSTGRES_USER: zitadel
-  POSTGRES_PASSWORD: zitadel-local-pw
-  # Maintenance DB; ZITADEL's Admin connects here and creates the `zitadel` DB.
-  POSTGRES_DB: postgres
----
+#
+# The `zitadel-db` Secret (POSTGRES_USER/PASSWORD/DB) is created by the `auth`
+# recipe from infra/.env — not committed here.
 apiVersion: v1
 kind: Service
 metadata:

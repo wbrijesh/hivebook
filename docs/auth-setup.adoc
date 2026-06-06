@@ -1,9 +1,14 @@
-== ZITADEL provisioning (manual, day 1)
+== ZITADEL provisioning
 
-We provision the project and applications *by hand* in the console for now.
-Automating it (Terraform / ZITADEL provider) comes later, once the auth model
-is stable. These are the exact clicks; the result is four values dropped into the
-`trenches-oidc` Secret (template: `oidc-secret.example.yaml`).
+NOTE: This is now *automated*. `just install` runs `just provision`
+(`infra/scripts/provision-zitadel.sh`) — idempotent: it creates the project +
+web/api apps, sets the admin email, and writes the `trenches-oidc` Secret, or
+reuses them if they already exist. Run `just provision` any time to reconcile.
+The manual console steps below remain as reference for what gets created.
+
+We can provision the project and applications by hand in the console too. The
+result is four values dropped into the `trenches-oidc` Secret (template:
+`oidc-secret.example.yaml`).
 
 === Log in
 

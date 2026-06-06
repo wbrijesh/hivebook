@@ -14,7 +14,7 @@ surfaces candidate spans from the raw corpus and candidate entries
 from the book index.
 . *Ingest time* — when a new artifact arrives, retrieval surfaces
 candidate existing topics that the artifact might update. This is
-what gates the slow vs. fast write path (see `ingestion.md`).
+what gates the slow vs. fast write path (see `ingestion.adoc`).
 
 Using the same index for both means improvements to retrieval quality
 compound. It also keeps the system smaller.

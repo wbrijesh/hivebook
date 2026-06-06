@@ -28,7 +28,8 @@ warnings.
 
 === `just` is the control panel
 
-Run `just` (from `infra/`) for the command list. Requires `brew install just`.
+Run `just` from anywhere in the repo for the command list (the justfile lives at
+the repo root). Requires `brew install just`.
 
 [source,sh]
 ----
@@ -43,11 +44,11 @@ With no argument these act on the whole app; with a service name
 scales workloads to zero (data preserved); `start` scales them back up. They only
 touch our workloads — *OrbStack / Kubernetes itself you start and stop yourself.*
 
-Install/deploy recipes (`install`, `destroy`, `infra`, `auth`, `api`, `web`,
-`observability`, …) exist in the justfile but are hidden — runnable
+Install/deploy recipes (`install`, `destroy`, `provision`, `infra`, `auth`,
+`api`, `web`, `observability`, …) exist in the justfile but are hidden — runnable
 (`just api`, `just install`) yet kept out of the help until we need them as
-first-class commands. First-time setup still needs ZITADEL provisioning once
-(see `zitadel/AUTH-SETUP.md`).
+first-class commands. `just install` provisions ZITADEL automatically via
+`just provision` (idempotent; see `docs/auth-setup.adoc`).
 
 === Observability (VictoriaMetrics {plus} VictoriaLogs)
 
@@ -58,12 +59,12 @@ node-exporter {plus} kube-state-metrics). Our services are scraped via
 tails every pod and parses JSON app logs into queryable fields.
 * *Grafana* (`https://grafana.trenches.localhost`, admin/admin) has both a
 VictoriaMetrics and a VictoriaLogs datasource. Custom dashboards live in
-`observability/dashboards/++*++.json` and are loaded as label-tagged ConfigMaps
-discovered by the Grafana sidecar:
-** *Trenches API* — RED (rate/errors/latency by route), in-flight, DB pool,
-auth outcomes, web events, and an API logs panel.
-** *ZITADEL* — gRPC rates/errors/latency {plus} Go runtime {plus} logs.
-** *Logs* — errors/5xx, web-event beacon stream, all logs.
+`infra/observability/dashboards/<folder>/<name>.json` and are loaded as
+label-tagged ConfigMaps discovered by the Grafana sidecar, filed into folders:
+** *API* — Metrics (RED by route, in-flight, DB pool, auth outcomes, web events)
+and Logs (access logs, errors).
+** *Frontend* — Metrics (browser beacon events) and Logs (events, Next.js server).
+** *Auth* — Metrics (token verifications {plus} ZITADEL runtime/HTTP) and Logs.
 * *App telemetry:* the Go API exposes `trenches++_*++` metrics (RED, DB pool,
 `trenches++_++auth++_++verifications++_++total`, `trenches++_++web++_++events++_++total`) and emits
 structured JSON access logs (slog, with request IDs). The web app sends browser
@@ -97,15 +98,17 @@ The API verifies signature/issuer/expiry/audience offline.
 === Layout
 
 ....
+justfile                   the control panel (repo root)
 infra/
-  Makefile                 phase targets
+  .env / .env.example      local secret values (gitignored / keys-only template)
   namespaces.yaml
-  helm-values/             traefik, zitadel, kube-prometheus-stack
+  helm-values/             traefik, zitadel, victoria-metrics-k8s-stack, victoria-logs, vector
   cert-manager/            CA ClusterIssuer (mkcert), wildcard Certificates
   coredns/                 in-cluster issuer rewrite
-  zitadel/                 own Postgres, IngressRoute, AUTH-SETUP.md, oidc secret template
+  scripts/                 provision-zitadel.sh
+  zitadel/                 own Postgres, IngressRoute, oidc secret template
   postgres/                app Postgres
   api/                     Go API deploy/service/configmap/ingressroute
   web/                     web deploy/service/ingressroute
-  observability/           ServiceMonitors + Grafana route
+  observability/           VMServiceScrapes, Grafana route, dashboards/
 ....

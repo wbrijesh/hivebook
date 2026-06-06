@@ -46,12 +46,12 @@ we cannot decrypt their data without their cooperation.
 * *VPC / PrivateLink* — connector traffic and API traffic stays
 on customer’s private network.
 * *Fine-grained policy engine* — OPA-style policies beyond the
-default chapter-level ACLs in `tenancy-and-acl.md`.
+default chapter-level ACLs in `tenancy-and-acl.adoc`.
 * *DLP and retention integration* — feed customer’s existing DLP
 and retention systems.
 * *On-prem inference* — for customers who cannot ship content to
 a multi-tenant inference endpoint. Open question whether this is
-in scope at all; see `vision/audience.md`.
+in scope at all; see `vision/audience.adoc`.
 
 === Hosted vs. self-hosted
 

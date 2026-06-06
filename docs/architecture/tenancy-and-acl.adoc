@@ -57,7 +57,7 @@ populated enough to be meaningful.
 === Identity
 
 User identity comes from the tenant’s SSO provider via the auth
-layer (see `enterprise-controls.md`). There is no per-source
+layer (see `enterprise-controls.adoc`). There is no per-source
 identity mapping in Trenches — a consequence of not using source
 ACLs.
 
@@ -77,10 +77,10 @@ Region selection happens at the tenant level. Hosted tenants pick
 a region cluster at onboarding; we operate Kubernetes clusters in
 major regions (US, EU, Asia, expanding by demand). Self-hosted
 tenants deploy on their own infrastructure in any region they
-choose. See `enterprise-controls.md`.
+choose. See `enterprise-controls.adoc`.
 
 === Audit
 
 Every read and every privileged write is recorded to a per-tenant
-audit log. See `enterprise-controls.md` for the audit log
+audit log. See `enterprise-controls.adoc` for the audit log
 specification.

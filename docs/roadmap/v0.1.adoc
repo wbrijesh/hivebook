@@ -25,19 +25,19 @@ and trustable.
 * SSO (SAML / OIDC) with at least one identity provider
 * Onboarding flow with entity seed form
 * Metering primitives supporting prepaid and postpaid contracts
-* The v0.1 connector set (see `reference/connector-catalog.md`)
+* The v0.1 connector set (see `reference/connector-catalog.adoc`)
 * Admin-managed chapter-level access control with templates
 * Raw corpus storage with citation support
 * Hybrid retrieval (vector {plus} BM25)
 * Thin generic chapter skeleton with LLM-driven continuous
 structure design (see
-`design-docs/0001-continuous-ingestion-and-filing.md`)
+`design-docs/0001-continuous-ingestion-and-filing.adoc`)
 * Mark-and-defer summary lifecycle (see
-`design-docs/0002-mark-and-defer-for-structural-changes.md`)
+`design-docs/0002-mark-and-defer-for-structural-changes.adoc`)
 * Entity reconciliation pipeline with ambiguity queue (see
-`design-docs/0003-entity-reconciliation.md`)
+`design-docs/0003-entity-reconciliation.adoc`)
 * Tunable-default parameters from config (see
-`design-docs/0004-tunable-defaults-to-dynamic-functions.md`)
+`design-docs/0004-tunable-defaults-to-dynamic-functions.adoc`)
 * Admin reorganization UI (move {plus} rename only)
 * Basic audit log (queryable, not exportable)
 * Internal browse UI for the book
@@ -60,11 +60,11 @@ only)
 === Major open questions blocking concrete planning
 
 * Mid-market vs. true enterprise positioning (see
-`vision/audience.md`)
+`vision/audience.adoc`)
 * Build vs. integrate for connectors (see
-`architecture/ingestion.md`)
+`architecture/ingestion.adoc`)
 * Build vs. buy for auth — Zitadel vs. WorkOS vs. hand-built (see
-`architecture/enterprise-controls.md`)
+`architecture/enterprise-controls.adoc`)
 * Notion vs. Confluence as the wiki connector
 * Which ticketing tool first
 * Which meeting recorder, if any, in v0.1

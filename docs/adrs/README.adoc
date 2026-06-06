@@ -32,10 +32,10 @@ and a link to its replacement.
 
 === Conventions
 
-* Numbered `NNNN-kebab-case-title.md` starting at `0001-`.
+* Numbered `NNNN-kebab-case-title.adoc` starting at `0001-`.
 * One decision per ADR. If you find yourself listing two decisions,
 write two ADRs.
-* Use the frontmatter from `0000-template.md`.
+* Use the frontmatter from `0000-template.adoc`.
 * Keep them short — an ADR is not a design doc. The design doc
 explains the design; the ADR records the chosen point in the
 design space.

@@ -66,7 +66,7 @@ Update metadata
 ....
 
 Entity resolution rides inside the same batched LLM call. See
-`0003-entity-reconciliation.md` for the resolution-specific
+`0003-entity-reconciliation.adoc` for the resolution-specific
 mechanics.
 
 ==== Batch trigger
@@ -83,7 +83,7 @@ These two numbers are *tunable defaults* drawn from runtime
 configuration. The medium-term plan is to replace them with
 per-container dynamic functions of source heat, arrival rate, and
 artifact size. For v0.1 they are constants. See
-`0004-tunable-defaults-to-dynamic-functions.md`.
+`0004-tunable-defaults-to-dynamic-functions.adoc`.
 
 ==== Pre-LLM retrieval (cheap, no LLM)
 
@@ -163,7 +163,7 @@ maintenance loop reviews them.
 lower-confidence proposals queue for the maintenance loop.
 . Every affected summary (sub-topic → parent topic → parent
 chapter) is marked stale per
-`0002-mark-and-defer-for-structural-changes.md`.
+`0002-mark-and-defer-for-structural-changes.adoc`.
 . One audit log entry per filing and per structural change,
 correlated to the originating batch.
 

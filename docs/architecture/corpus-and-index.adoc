@@ -30,7 +30,7 @@ Chapter            (broad domain — e.g., "Operations")
 ____
 *Terminology note.* "`Chapter / topic / sub-topic`" is the working
 vocabulary. Final user-facing naming is open. See
-`reference/glossary.md` for current canonical terms.
+`reference/glossary.adoc` for current canonical terms.
 ____
 
 Three levels are fixed deliberately. Unbounded depth makes
@@ -51,7 +51,7 @@ Chapter summary ─cites→ Topic summaries ─cites→ Sub-topic summaries ─c
 This gives the rebuild graph a fixed depth of 3 — no cascading
 explosions — and means a structural change anywhere in the book
 affects at most 3 derived summaries (see
-`design-docs/0002-mark-and-defer-for-structural-changes.md`).
+`design-docs/0002-mark-and-defer-for-structural-changes.adoc`).
 
 === Per entry: the summary doc
 
@@ -71,7 +71,7 @@ child topic IDs
 
 Each customer has its own book. There is no cross-customer index.
 The content is private to the customer’s organization. See
-`tenancy-and-acl.md` for the access model within a customer.
+`tenancy-and-acl.adoc` for the access model within a customer.
 
 === Bootstrapping a customer’s book
 
@@ -83,7 +83,7 @@ Instead, every new customer starts with a thin generic chapter
 skeleton (5–8 broad chapters such as "`operations`", "`engineering`",
 "`customer`", "`finance`", "`people`", "`product`"). Topics and sub-topics
 begin empty. As ingestion proceeds, the batched filing pipeline
-(see `design-docs/0001-continuous-ingestion-and-filing.md`)
+(see `design-docs/0001-continuous-ingestion-and-filing.adoc`)
 continuously designs the structure to fit the customer’s actual
 data, creating sub-topics and topics as needed and proposing
 splits and merges as patterns emerge.

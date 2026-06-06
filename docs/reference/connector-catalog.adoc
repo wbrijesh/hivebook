@@ -85,4 +85,4 @@ for the top 5–10 highest-value sources.
 Paragon, Merge). Used for the long tail.
 
 The build-vs-integrate split itself is an open question — see
-`architecture/ingestion.md`.
+`architecture/ingestion.adoc`.

@@ -33,28 +33,28 @@ and a stable interface to the layers above and below it.
 
 * *Connectors* — talk to source systems (Slack, Google Workspace,
 Notion, GitHub, …). Handle OAuth, incremental sync, and ACL
-extraction. See `ingestion.md`.
+extraction. See `ingestion.adoc`.
 * *Ingestion pipeline* — performs _light_ normalization only:
 source, author, timestamp, ACL, entity links. Does not canonicalize
 semantically.
 * *Raw corpus* — verbatim storage of every ingested artifact. The
-source of truth for citations. See `corpus-and-index.md`.
+source of truth for citations. See `corpus-and-index.adoc`.
 * *Retrieval* — hybrid vector {plus} BM25 index over the raw corpus.
 Used both at query time and at ingest time (to decide which topics
-an incoming artifact might update). See `retrieval.md`.
+an incoming artifact might update). See `retrieval.adoc`.
 * *Book index* — three-level hierarchical organization of the
 corpus into chapters, topics, and sub-topics. Per-customer. Each
 entry is a summary doc with cited source spans. See
-`corpus-and-index.md`.
+`corpus-and-index.adoc`.
 * *Canonicalization engine* — decides which topics get canonical
 summaries (pinned), which get them due to query pressure (hot), and
-which are built on-demand (cold). See `canonicalization.md`.
+which are built on-demand (cold). See `canonicalization.adoc`.
 * *Query surfaces* — how humans and agents consume the brain. UI
 for browsing, API for programmatic access, agent runtime for skills
 (skills are deferred and not yet designed).
 * *Enterprise control plane* — cross-cutting: SSO, audit log,
-tenancy, metering, residency. See `tenancy-and-acl.md` and
-`enterprise-controls.md`.
+tenancy, metering, residency. See `tenancy-and-acl.adoc` and
+`enterprise-controls.adoc`.
 
 === Two read paths, two write paths
 
@@ -68,7 +68,7 @@ if the summary is insufficient.
 for queries that don’t fit any known topic ("`did anyone mention the
 Acme outage this week?`").
 
-Two write paths (see `ingestion.md`):
+Two write paths (see `ingestion.adoc`):
 
 [arabic]
 . *Fast path*: novel content with low similarity to any existing

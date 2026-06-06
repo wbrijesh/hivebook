@@ -15,7 +15,7 @@ what _order_ things land in — not the dates.
 * Per-customer connector health dashboard
 * Per-source variable batch frequency (function of source heat)
 * Dynamic computation of tunable parameters (see
-`design-docs/0004-tunable-defaults-to-dynamic-functions.md`)
+`design-docs/0004-tunable-defaults-to-dynamic-functions.adoc`)
 
 === First enterprise feature wave
 
@@ -42,4 +42,4 @@ queries and book navigation. Designed after skills are ready.
 * Provider-mediated connector breadth
 * Cross-customer learning (opt-in only, very carefully)
 * On-prem inference for customers who require it (depends on the
-audience decision in `vision/audience.md`)
+audience decision in `vision/audience.adoc`)

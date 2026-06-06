@@ -12,7 +12,7 @@
     "from": "now-1h",
     "to": "now"
   },
-  "description": "ZITADEL from /debug/metrics + the API's token-verification outcomes. gRPC panels assume standard grpc_server_* names; adjust if empty.",
+  "description": "ZITADEL from /debug/metrics (job=zitadel) + the API's token-verification outcomes.",
   "templating": {
     "list": []
   },
@@ -46,7 +46,7 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "ZITADEL gRPC errors (non-OK)",
+      "title": "ZITADEL gRPC errors (non-200)",
       "datasource": {
         "type": "prometheus",
         "uid": "VictoriaMetrics"
@@ -60,8 +60,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(grpc_server_handled_total{job=~\"zitadel.*\",grpc_code!=\"OK\"}[$__rate_interval])) by (grpc_code)",
-          "legendFormat": "{{grpc_code}}",
+          "expr": "sum(rate(grpc_server_grpc_status_code_total{job=\"zitadel\",return_code!=\"200\"}[$__rate_interval])) by (return_code)",
+          "legendFormat": "{{return_code}}",
           "datasource": {
             "type": "prometheus",
             "uid": "VictoriaMetrics"
@@ -86,7 +86,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(grpc_server_handled_total{job=~\"zitadel.*\"}[$__rate_interval])) by (grpc_method)",
+          "expr": "sum(rate(grpc_server_grpc_status_code_total{job=\"zitadel\"}[$__rate_interval])) by (grpc_method)",
           "legendFormat": "{{grpc_method}}",
           "datasource": {
             "type": "prometheus",

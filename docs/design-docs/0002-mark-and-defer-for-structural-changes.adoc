@@ -14,7 +14,7 @@
 The book index is a 3-level DAG: chapter → topic → sub-topic. Every
 entry above sub-topic carries a summary that derives from the
 entries below it (see the hierarchy invariant in
-`architecture/corpus-and-index.md`). When a sub-topic changes —
+`architecture/corpus-and-index.adoc`). When a sub-topic changes —
 moved, renamed, summary rebuilt, or its evidence updated — the
 summaries of its parent topic and grandparent chapter become
 potentially out of date.
