@@ -1,0 +1,37 @@
+= Product Principles
+:status: stable
+:last-reviewed: 2026-06-06
+
+The load-bearing commitments behind every design decision. Appealable
+in writing, not in passing.
+
+. *Passive ingestion, not user feeding.* Knowledge enters by connecting
+the systems where it already lives. If something requires a human to
+remember to log it, it is out of scope.
+. *The corpus must be legible.* The structured form — the book index —
+is human-readable, browsable, and auditable. A new employee can read
+it. Hivebook is not a black box of embeddings.
+. *Every claim cites its source.* Summaries cite specific evidence, per
+the hierarchy invariant (xref:ROOT:adrs/0003-hierarchy-invariant.adoc[ADR-0003]). Trust and stale-detection both
+depend on it.
+. *Access is admin-controlled.* Admins assign chapter-level access
+directly or via templates. The system does not infer access from
+source-system ACLs (xref:ROOT:adrs/0009-chapter-level-access.adoc[ADR-0009]).
+. *Per-customer isolation is absolute.* No content crosses customers,
+and no cross-customer signal is shared without explicit opt-in
+(xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]).
+
+== Non-goals
+
+* *No graph database.* Cross-references are flat related-entry links.
+Multi-hop graph reasoning is out of scope.
+* *No freeform editing of summaries.* Admins reorganize structurally
+(move entries) but do not author or edit summary prose. Summaries come
+from evidence.
+* *No structural creation by admins.* Splits, merges, and new entries
+are system-quality decisions made by the filing pipeline and
+maintenance loop, not by users.
+* *Not a chatbot.* Conversational Q&A may be an interface; the product
+is the structured corpus.
+* *Not a search engine.* Search exists internally but is not the
+primary user surface.

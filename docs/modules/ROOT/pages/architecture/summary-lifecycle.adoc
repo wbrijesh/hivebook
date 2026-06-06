@@ -1,0 +1,74 @@
+= Summary Lifecycle
+:status: living
+:last-reviewed: 2026-06-06
+
+Every index entry can carry an LLM-generated summary that follows the
+hierarchy invariant (xref:ROOT:adrs/0003-hierarchy-invariant.adoc[ADR-0003]): sub-topic summaries cite raw artifacts;
+topic and chapter summaries cite their children.
+
+Summaries are generated and refreshed *lazily*. The system never
+eagerly summarizes the whole book. Most entries in a typical book never
+carry a summary, because they are never queried and never prioritized by
+maintenance.
+
+== When a summary is first generated
+
+A *sub-topic* summary is generated when either:
+
+* the first query touching the sub-topic requests it, or
+* the maintenance loop decides it crosses a generation threshold
+(enough artifacts filed, sufficient coherence, meaningful recency).
+
+A *topic* summary is generated once its child sub-topic summaries exist
+and either a query touches the topic or maintenance builds it for a
+browse path. A *chapter* summary follows the same pattern one level up.
+
+== When a summary is refreshed
+
+A summary is marked stale by mark-and-defer (xref:ROOT:adrs/0006-mark-and-defer.adoc[ADR-0006];
+xref:ROOT:design-docs/0002-mark-and-defer-for-structural-changes.adoc[]) whenever:
+
+* a structural change touches the entry or its descendants
+* new evidence is filed under a descendant
+* cited evidence is modified or deleted at the source
+
+A stale summary is rebuilt when:
+
+* a user requests a fresh version
+* the first read of a stale summary in a high-traffic entry triggers an
+async rebuild
+* the maintenance loop processes the stale queue
+* its stale age exceeds `MAX++_++STALE++_++AGE` (a tunable default;
+xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011])
+
+== Build process
+
+[arabic]
+. Gather citations — sub-topic builds gather source spans; topic and
+chapter builds gather child summaries.
+. Hand to the LLM with a structured prompt: produce a summary, cite
+every claim, flag contradictions and unknowns.
+. Validate that every claim has at least one citation. Reject and retry
+if not.
+. Store the summary with `last++_++rebuilt = now`, its citations, and a
+content hash of the cited evidence.
+
+== Idempotent rebuilds
+
+A rebuild is keyed by the content hash of the cited evidence. If the
+hash matches the previous build, the rebuild short-circuits — no LLM
+call — and clears the stale flag. This absorbs the cost of marks where
+the evidence did not actually change (e.g., a sibling sub-topic was
+renamed).
+
+== Citations are non-negotiable
+
+Every claim cites at least one piece of evidence. A summary that fails
+citation validation is not written.
+
+== Cost notes
+
+* A summary is built once per evidence-hash and reused.
+* Rebuilds in the same maintenance pass share retrieval setup and issue
+in parallel.
+* The lazy default keeps most entries summary-free.

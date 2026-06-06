@@ -1,0 +1,44 @@
+= Milestones
+:status: draft
+:last-reviewed: 2026-05-24
+
+Sequencing beyond v0.1. Highly speculative until v0.1 design
+partners exist. The point of this file is to keep us honest about
+what _order_ things land in — not the dates.
+
+== After v0.1: maturity
+
+* SCIM
+* Audit log export
+* Maintenance-loop proposals UI (admin review queue)
+* Per-customer connector health dashboard
+* Per-source variable batch frequency (function of source heat)
+* Dynamic computation of tunable parameters (see
+xref:ROOT:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[])
+
+== First enterprise feature wave
+
+* Region pinning beyond default clusters
+* Customer-managed keys
+* VPC / PrivateLink option
+* Fine-grained policy engine on top of default chapter ACLs
+
+== Skills layer
+
+Deferred. Will be designed in its own design doc once the corpus
+and book index are real enough to derive from. The skills layer is
+the eventual headline output of the product, but it depends on the
+brain being trustable first.
+
+== MCP server
+
+Hivebook as a tool consumable by external AI applications (chat
+apps, coding agents). Single integration surface that exposes
+queries and book navigation. Designed after skills are ready.
+
+== Long tail
+
+* Provider-mediated connector breadth
+* Cross-customer learning (opt-in only, very carefully)
+* On-prem inference for customers who require it (depends on the
+audience decision in xref:ROOT:vision/audience.adoc[])

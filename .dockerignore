@@ -1,0 +1,6 @@
+.git
+**/node_modules
+web/.next
+public
+*.tsbuildinfo
+infra/.env

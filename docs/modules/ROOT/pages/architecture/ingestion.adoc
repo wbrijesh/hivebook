@@ -1,0 +1,78 @@
+= Ingestion
+:status: living
+:last-reviewed: 2026-06-06
+
+How content gets from source systems into the raw corpus and, downstream,
+the book index.
+
+== The connector
+
+A connector is the only component that talks to a specific source
+system. It handles:
+
+* *Authentication* — OAuth flow, token storage, refresh.
+* *Sync* — initial backfill plus ongoing incremental updates.
+* *Watermarking* — a per-source position (timestamp, cursor, ETag) so
+resyncs are incremental.
+
+Connectors do not extract source-system ACLs; access control is
+admin-managed at the chapter level (xref:ROOT:adrs/0009-chapter-level-access.adoc[ADR-0009]). See
+xref:ROOT:reference/connector-catalog.adoc[] for the planned list.
+
+== Open question: build vs. integrate
+
+* *Integrate* with a unified API provider (Nango, Paragon, Merge) for
+breadth across the long tail.
+* *Hand-build* for sources needing deep semantics (Slack threading,
+GitHub PR graph).
+
+Working hypothesis: hybrid — provider for the long tail, in-house for
+the top 5–10 sources. Final decision is deferred to build time and will
+be captured in an ADR.
+
+== Light normalization
+
+The pipeline performs only the normalization needed to make artifacts
+comparable and queryable:
+
+* assign a stable internal ID
+* record `source`, `source++_++id`, `author`, `created++_++at`,
+`updated++_++at`
+* compute embeddings for retrieval
+* store the raw content verbatim
+
+Semantic decisions — topic placement, entity references, structural
+change — happen downstream in the batched filing pipeline
+(xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[]).
+
+== Push vs. pull per source
+
+* *Push* (webhooks) for hot sources where freshness matters — Slack,
+Jira, Linear, GitHub, PagerDuty.
+* *Pull* (polling) for cold sources where periodic sync is fine —
+Drive, Confluence, Notion, file storage.
+
+Every record carries an `ingested++_++at` and a `source++_++updated++_++at`.
+
+== Segmentation
+
+Before filing, an artifact is segmented: a Slack thread becomes one or
+more coherent segments; a long doc is sectioned. Per-source rules use
+time gaps, reply structure, topic-shift markers, and section breaks. The
+segment is the unit of filing and entity tagging; the full thread or doc
+stays in the corpus for reconstruction.
+
+== Entity tagging
+
+Entity tagging — resolving mentions to canonical entities in the
+per-tenant entity store — runs inside the batched filing LLM call
+(xref:ROOT:adrs/0008-entity-reconciliation-in-filing.adoc[ADR-0008]; xref:ROOT:design-docs/0003-entity-reconciliation.adoc[]).
+
+== Failure handling
+
+* Connector failures (auth lapse, rate limit, source outage) surface to
+admins via the control plane, not silent infinite retry.
+* Partial syncs are explicit: the watermark advances only after a
+window is fully ingested.
+* Raw artifacts persist before the filing pipeline runs, so filing
+failures lose no data; filing retries are idempotent (see xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[0001]).

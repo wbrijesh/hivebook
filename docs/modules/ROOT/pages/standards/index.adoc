@@ -1,0 +1,34 @@
+= Standards
+:status: living
+:last-reviewed: 2026-06-06
+
+Conventions everyone follows so independent decisions converge. Architecture
+decides _what_ we build; standards keep us from building it five slightly
+different ways.
+
+Entropy in a codebase rarely comes from architecture. It comes from many people
+making slightly different local choices — five logging styles, four error
+shapes, three response formats, ad-hoc directory layouts, inconsistent tests.
+Standards remove those choices so they stop being decisions.
+
+== The rule
+
+. *Follow the standard.* If none exists for what you're doing, the surrounding
+code is the standard — match it.
+. *Disagree in writing, not in passing.* To change a standard, change its page
+in a PR; don't fork it locally.
+. *Standards state what is* (or what we've committed to), in the terse voice of
+xref:ROOT:style-guide.adoc[the style guide].
+
+== Areas
+
+* *Go* — xref:ROOT:standards/go/package-layout.adoc[package layout] ·
+xref:ROOT:standards/go/errors.adoc[errors & responses] ·
+xref:ROOT:standards/go/logging.adoc[logging] ·
+xref:ROOT:standards/go/testing.adoc[testing]
+* *Frontend* — xref:ROOT:standards/frontend/component-patterns.adoc[component patterns] ·
+xref:ROOT:standards/frontend/state-management.adoc[state management]
+* *Infra* — xref:ROOT:standards/infra/namespaces.adoc[namespaces] ·
+xref:ROOT:standards/infra/labels.adoc[labels & naming]
+* *Docs* — xref:ROOT:standards/docs/adr-process.adoc[ADR process] ·
+xref:ROOT:standards/docs/design-doc-process.adoc[design-doc process]

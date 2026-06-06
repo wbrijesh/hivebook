@@ -1,0 +1,33 @@
+= Audience
+:status: draft
+:last-reviewed: 2026-06-06
+
+Hivebook is sold business-to-business. The buyer is a company, not an
+individual. It:
+
+* has fragmented operational knowledge across SaaS tools and human heads
+* runs, or wants to run, AI agents that need that knowledge
+* has the security and procurement posture of a real business — an
+enterprise sales motion, not credit-card self-serve
+
+== Open question: mid-market vs. true enterprise for the first 18 months
+
+These are different products in practice. The decision changes storage
+architecture, deployment model, and sales motion, and is needed before
+the architecture and roadmap can be made concrete.
+
+[width="100%",cols="21%,39%,40%",options="header",]
+|===
+|Dimension |Mid-market (200–2k employees) |True enterprise (5k{plus})
+|Deployment |SaaS only |SaaS, VPC, or on-prem inference
+|Storage |Single multi-tenant region |Customer-pinned region, BYO storage
+|Auth |SSO (SAML/OIDC) {plus} SCIM |Plus fine-grained policy engine, CMK
+|Sales cycle |Weeks |Quarters
+|Procurement bar |Security questionnaire |Pen-test reports, SOC2/ISO, DPIA, MSAs
+|Per-customer ARR |$20k–150k |$250k{plus}
+|===
+
+Until this is decided, the architecture leaves the door open to true
+enterprise — tenant isolation, residency tagging, and BYOK-ready
+encryption are day-zero (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]) — without requiring the full
+enterprise stack on day one.

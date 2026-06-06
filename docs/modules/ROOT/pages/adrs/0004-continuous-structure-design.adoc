@@ -1,0 +1,32 @@
+= 0004 — Continuous structure design, no per-customer bootstrap
+:adr-id: 0004
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0001-continuous-ingestion-and-filing.adoc
+
+== Context
+
+Each customer's knowledge has a different shape, and the book structure
+must fit it. The structure can be designed up front or grown from data.
+
+== Decision
+
+No per-customer bootstrap. Every customer starts from a thin generic
+chapter skeleton (5-8 broad chapters); topics and sub-topics begin
+empty. The filing pipeline designs and redesigns structure continuously
+as content arrives.
+
+== Alternatives considered
+
+* *Upfront per-customer ontology* — slow and expensive, and wrong
+before any ingestion data exists.
+* *Per-vertical templates* — real organizations vary too much;
+templates either shoehorn content or proliferate.
+
+== Consequences
+
+Onboarding is instant and structure emerges from real data. Early
+batches produce volatile structure that the maintenance loop
+consolidates over the first weeks.

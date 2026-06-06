@@ -1,0 +1,31 @@
+= 0003 — Citations only at the sub-topic level
+:adr-id: 0003
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+Summaries derive from evidence and from each other. Where citations
+attach determines the shape of the rebuild graph.
+
+== Decision
+
+*Citations live only at the sub-topic level.* Sub-topic summaries cite
+raw artifacts; topic summaries cite their child sub-topic summaries;
+chapter summaries cite their child topic summaries. This is the
+*hierarchy invariant*.
+
+== Alternatives considered
+
+* *Citations at every level pointing at raw artifacts* — explodes the
+rebuild graph and duplicates evidence.
+* *No structured citations* — breaks trust and stale-detection.
+
+== Consequences
+
+Fixed-depth-3 rebuild graph (with xref:ROOT:adrs/0002-three-level-hierarchy.adoc[ADR-0002]). Every claim traces to
+verbatim evidence in a bounded number of hops, and stale-detection is
+local. Cost: a chapter-level claim is two hops from its evidence.

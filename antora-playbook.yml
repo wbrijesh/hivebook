@@ -1,0 +1,33 @@
+site:
+  title: Hivebook Docs
+  url: https://docs.hivebook.localhost
+  start_page: hivebook::index.adoc
+
+content:
+  sources:
+    - url: .
+      branches: HEAD
+      start_path: docs
+
+asciidoc:
+  extensions:
+    - asciidoctor-kroki
+  attributes:
+    # Fetch each diagram's SVG at build time and store it as a site asset,
+    # so the served pages never call Kroki at runtime.
+    kroki-fetch-diagram: true
+    kroki-default-format: svg
+    kroki-server-url: https://kroki.io
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files: ./docs/supplemental-ui
+
+output:
+  dir: ./public
+
+runtime:
+  log:
+    failure_level: warn

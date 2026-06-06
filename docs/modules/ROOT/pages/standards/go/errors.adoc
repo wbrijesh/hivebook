@@ -1,0 +1,43 @@
+= Go · Errors & Responses
+:status: living
+:last-reviewed: 2026-06-06
+
+One response shape, one error path. The page that stops "four error formats"
+before it starts.
+
+== Success responses
+
+Set `Content-Type: application/json` explicitly, then write JSON — through one
+helper, not ad-hoc `json.Marshal` + `w.Write`:
+
+[source,go]
+----
+func writeJSON(w http.ResponseWriter, status int, v any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(status)
+    _ = json.NewEncoder(w).Encode(v)
+}
+----
+
+[NOTE]
+====
+`HelloWorldHandler` and `healthHandler` predate this helper and set the header
+inconsistently. New handlers use `writeJSON`; migrate the old ones when touched.
+====
+
+== Error responses
+
+* Reject with `http.Error(w, msg, status)` — a lowercase, factual message and
+the right status. No stack traces or internal detail to the client.
+* Status codes: `400` invalid input · `401` missing/invalid token · `403`
+authorized but forbidden · `404` not found · `503` dependency not ready · `500`
+unexpected. (See `internal/auth` for the 401/503 split.)
+* Cap and validate input — wrap bodies in `http.MaxBytesReader` and reject on
+decode error (see `eventsHandler`).
+
+== Error values
+
+* Wrap with context and `%w`: `fmt.Errorf("discover provider: %w", err)`.
+* `log.Fatal` / `panic` only at startup (`main`), never in a handler — a handler
+returns an error response and lets the _request_ fail, not the process.
+* Sentinel errors via `errors.New`; compare with `errors.Is`.

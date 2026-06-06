@@ -1,0 +1,31 @@
+= Go · Package Layout
+:status: living
+:last-reviewed: 2026-06-06
+
+The API is a single Go module, `api` (`api/go.mod`), laid out with the standard
+`cmd` + `internal` split.
+
+----
+api/
+  cmd/<binary>/main.go    entrypoint — wiring only
+  internal/<domain>/      one package per concern, not importable outside
+----
+
+Current packages: `internal/auth` (OIDC token verification), `internal/database`
+(pgx pool + health), `internal/server` (chi router, middleware, handlers).
+
+== Rules
+
+. *`main` wires, it does not implement.* `cmd/api/main.go` installs logging,
+constructs the server, and runs graceful shutdown. Logic lives in `internal/*`.
+. *One concern per package*, named for what it owns (`auth`, `database`,
+`server`) — never `utils`, `helpers`, or `common`.
+. *`internal/` for everything not meant to be imported elsewhere.* There is no
+public API surface yet.
+. *Every package has a doc comment* — a `// Package x …` sentence stating what
+it owns (see `internal/auth`).
+. *Import groups in order:* standard library, third-party, local (`api/…`),
+each separated by a blank line.
+. *Config is read once, at construction* (`os.Getenv` in `server.NewServer`),
+not scattered through the code. App config is prefixed `HIVEBOOK_`
+(xref:ROOT:standards/infra/labels.adoc[naming]).

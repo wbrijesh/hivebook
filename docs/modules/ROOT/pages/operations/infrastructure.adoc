@@ -1,0 +1,117 @@
+= Hivebook local infrastructure (OrbStack Kubernetes)
+
+Everything runs in the local OrbStack cluster (context `orbstack`): auth (ZITADEL),
+the Go API, the Next.js web app, Postgres, and observability (Prometheus {plus}
+Grafana). Traffic enters through Traefik over HTTPS; certs are minted by
+cert-manager from your local *mkcert* CA, so browsers trust them with no
+warnings.
+
+== URLs
+
+[width="100%",cols="12%,49%,39%",options="header",]
+|===
+|Service |URL |Notes
+|ZITADEL |https://id.hivebook.localhost/ui/console |admin@hivebook.localhost / Password1!
+|Web app |https://app.hivebook.localhost |login {plus} call protected API
+|Go API |https://api.hivebook.localhost |`/health`, `/metrics`, `/api/me`
+|Docs |https://docs.hivebook.localhost |Antora site (no login)
+|Grafana |https://grafana.hivebook.localhost |admin / password1234
+|===
+
+`++*++.hivebook.localhost` resolves to loopback on macOS automatically — no
+`/etc/hosts` edits.
+
+== Prerequisites
+
+* OrbStack with Kubernetes enabled
+* `helm`, `mkcert`, `just`, `gum` (`brew install helm mkcert just gum` && `mkcert -install`)
+** `gum` powers the styled output of `just start` / `just stop`; without it
+they fall back to plain text.
+* Docker (OrbStack) — local images are used directly, no registry
+
+== `just` is the control panel
+
+Run `just` from anywhere in the repo for the command list (the justfile lives at
+the repo root). Requires `brew install just`.
+
+[source,sh]
+----
+just start  [service]   # turn ON  — everything, or one service
+just stop   [service]   # turn OFF — everything, or one service
+just logs   [service]   # follow one service's logs, or recent lines from all
+just status [service]   # what's running
+----
+
+With no argument these act on the whole app; with a service name
+(`api`, `web`, `postgres`, `zitadel`, …) they act on just that one. `stop`
+scales workloads to zero (data preserved); `start` scales them back up. They only
+touch our workloads — *OrbStack / Kubernetes itself you start and stop yourself.*
+
+Install/deploy recipes (`install`, `destroy`, `provision`, `infra`, `auth`,
+`api`, `web`, `observability`, …) exist in the justfile but are hidden — runnable
+(`just api`, `just install`) yet kept out of the help until we need them as
+first-class commands. `just install` provisions ZITADEL automatically via
+`just provision` (idempotent; see xref:ROOT:operations/auth.adoc[]).
+
+== Observability (VictoriaMetrics {plus} VictoriaLogs)
+
+* *Metrics:* `victoria-metrics-k8s-stack` (VM Operator {plus} vmsingle {plus} vmagent {plus}
+node-exporter {plus} kube-state-metrics). Our services are scraped via
+`VMServiceScrape` (`observability/vmservicescrape-++{++api,zitadel}.yaml`).
+* *Logs:* VictoriaLogs (`victorialogs:9428`) fed by a *Vector* DaemonSet that
+tails every pod and parses JSON app logs into queryable fields.
+* *Grafana* (`https://grafana.hivebook.localhost`, admin/password1234) has both a
+VictoriaMetrics and a VictoriaLogs datasource. Custom dashboards live in
+`infra/observability/dashboards/<folder>/<name>.json` and are loaded as
+label-tagged ConfigMaps discovered by the Grafana sidecar, filed into folders:
+** *API* — Metrics (RED by route, in-flight, DB pool, auth outcomes, web events)
+and Logs (access logs, errors).
+** *Frontend* — Metrics (browser beacon events) and Logs (events, Next.js server).
+** *Auth* — Metrics (token verifications {plus} ZITADEL runtime/HTTP) and Logs.
+* *App telemetry:* the Go API exposes `hivebook++_*++` metrics (RED, DB pool,
+`hivebook++_++auth++_++verifications++_++total`, `hivebook++_++web++_++events++_++total`) and emits
+structured JSON access logs (slog, with request IDs). The web app sends browser
+events to `POST /events`, recorded as both a metric and a log.
+
+____
+Traces (VictoriaTraces {plus} OTel Collector {plus} ZITADEL OTLP {plus} Go/web spans) are a
+planned next pass, not yet wired.
+____
+
+== How auth is wired (and why)
+
+* *Single issuer string everywhere.* `https://id.hivebook.localhost` is the
+ZITADEL issuer for both the browser and in-cluster callers. The browser
+resolves it to loopback → Traefik. Inside the cluster, a CoreDNS rewrite
+(`coredns/rewrite-patch.yaml`) sends it to the Traefik service, so the Host and
+TLS SNI stay intact and the JWT `iss` matches what discovery reports. This
+avoids the classic issuer-mismatch class of bugs.
+** Note: musl-based tools (Alpine `curl`) short-circuit `.localhost` to
+loopback and ignore the rewrite, but the Go API is built `CGO++_++ENABLED=0` and
+uses Go’s pure resolver, which honors CoreDNS. (Verified: the API completes
+OIDC discovery in-cluster.)
+* *TLS trust in-cluster.* The Go API mounts the mkcert CA (`ca.crt` from the
+wildcard TLS secret) and appends it to its cert pool to validate ZITADEL’s TLS
+when fetching the JWKS.
+* *Token flow.* The web SPA does Authorization Code {plus} PKCE in the browser,
+receives a JWT access token (project ID in the audience via the
+`urn:zitadel:iam:org:project:id:++{++id}:aud` scope), and calls the Go API with it.
+The API verifies signature/issuer/expiry/audience offline.
+
+== Layout
+
+....
+justfile                   the control panel (repo root)
+infra/
+  .env / .env.example      local secret values (gitignored / keys-only template)
+  namespaces.yaml
+  helm-values/             traefik, zitadel, victoria-metrics-k8s-stack, victoria-logs, vector
+  cert-manager/            CA ClusterIssuer (mkcert), wildcard Certificates
+  coredns/                 in-cluster issuer rewrite
+  scripts/                 provision-zitadel.sh
+  zitadel/                 own Postgres, IngressRoute, oidc secret template
+  postgres/                app Postgres
+  api/                     Go API deploy/service/configmap/ingressroute
+  web/                     web deploy/service/ingressroute
+  observability/           VMServiceScrapes, Grafana route, dashboards/
+....

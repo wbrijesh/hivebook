@@ -19,46 +19,121 @@ default:
 
 # Show this help
 help:
-    @echo ""
-    @echo "  Hivebook — local dev (run from anywhere in the repo)"
-    @echo ""
-    @echo "  COMMANDS"
-    @echo "    just start  [service]   turn ON  — everything, or one service"
-    @echo "    just stop   [service]   turn OFF — everything, or one service"
-    @echo "    just logs   [service]   logs     — follow one service, or recent from all"
-    @echo "    just status [service]   what's running"
-    @echo ""
-    @echo "    services: api · web · postgres · zitadel · zitadel-db · zitadel-login"
-    @echo "    (Kubernetes/OrbStack must be running — you manage that yourself.)"
-    @echo ""
-    @echo "  URLs & LOGINS  (HTTPS via mkcert · local creds, never reuse)"
-    @echo "    Web app   https://app.hivebook.localhost       — sign in via Auth below"
-    @echo "    Auth      https://id.hivebook.localhost        admin@hivebook.localhost / Password1!"
-    @echo "    Grafana   https://grafana.hivebook.localhost   admin / admin"
-    @echo "    API       https://api.hivebook.localhost       /health · /metrics · /api/me"
-    @echo ""
-    @echo "    App DB       hivebook / password1234            (postgres, hivebook ns)"
-    @echo "    ZITADEL DB   zitadel / zitadel-local-pw         (postgres, zitadel ns)"
-    @echo "    IAM PAT      kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' | base64 -d"
-    @echo ""
+    #!/usr/bin/env bash
+    . scripts/ui.sh
+    ui_logo
+    ui_subtle "local dev control panel · OrbStack Kubernetes (run from anywhere in the repo)"
+    echo
+    ui_section "Commands"
+    ui_box \
+      "just start  [service]   turn ON  — everything, or one service" \
+      "just stop   [service]   turn OFF — everything, or one service" \
+      "just status [service]   what's running (pod readiness)" \
+      "just health             real health checks across services" \
+      "just logs   [service]   follow one service, or recent from all" \
+      "just urls               service URLs & logins"
+    ui_subtle "services: api · web · docs · postgres · zitadel · zitadel-db · zitadel-login"
+
+# Service URLs & logins
+urls:
+    #!/usr/bin/env bash
+    . scripts/ui.sh
+    ui_section "URLs & logins  (HTTPS via mkcert · local creds, never reuse)"
+    ui_box \
+      "Web app   https://app.hivebook.localhost" \
+      "Docs      https://docs.hivebook.localhost       Antora site (no login)" \
+      "Auth      https://id.hivebook.localhost         admin@hivebook.localhost / Password1!" \
+      "API       https://api.hivebook.localhost        /health · /metrics · /api/me" \
+      "Grafana   https://grafana.hivebook.localhost    admin / password1234"
+    ui_subtle "App DB  hivebook / password1234    ·    ZITADEL DB  zitadel / zitadel-local-pw"
+    ui_subtle "IAM PAT  kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' | base64 -d"
+
+# Real health checks (HTTP endpoints + DB + datasources), grouped by tier
+health:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    . scripts/ui.sh
+    CA="$(mkcert -CAROOT 2>/dev/null)/rootCA.pem"
+    GPW="${GRAFANA_ADMIN_PASSWORD:-admin}"
+    G="https://grafana.hivebook.localhost"
+    if ! kubectl get ns >/dev/null 2>&1; then ui_fail "cluster unreachable — run 'just start'."; exit 1; fi
+    hc_ok=0; hc_total=0
+    http() { curl -sf -o /dev/null --max-time 6 --cacert "$CA" "$1"; }          # 0 on 2xx/3xx
+    gds()  { curl -sf --max-time 8 --cacert "$CA" -u "admin:$GPW" "$G/api/datasources/uid/$1/health" 2>/dev/null | grep -q '"status":"OK"'; }
+    check() {
+      local name="$1" detail="$2"; shift 2
+      hc_total=$((hc_total+1))
+      if "$@" >/dev/null 2>&1; then ui_ok "$(printf '%-16s %s' "$name" "$detail")"; hc_ok=$((hc_ok+1))
+      else ui_fail "$(printf '%-16s %s' "$name" "$detail")"; fi
+    }
+
+    ui_header "System Health"
+
+    ui_section "Infrastructure"
+    check "Traefik" "TLS verified :443" bash -c "echo | openssl s_client -connect 127.0.0.1:443 -servername app.hivebook.localhost -CAfile '$CA' 2>/dev/null | grep -q 'Verify return code: 0 '"
+    check "cert-manager" "wildcard cert Ready" bash -c "kubectl -n hivebook get certificate wildcard-hivebook -o jsonpath='{.status.conditions}' 2>/dev/null | grep -q '\"status\":\"True\"'"
+
+    ui_section "Identity"
+    check "ZITADEL" "OIDC discovery 200" http "https://id.hivebook.localhost/.well-known/openid-configuration"
+
+    ui_section "Hivebook"
+    check "API" "/health 200" http "https://api.hivebook.localhost/health"
+    check "Web" "HTTP 200" http "https://app.hivebook.localhost/"
+    check "Docs" "HTTP 200" http "https://docs.hivebook.localhost/"
+    check "Postgres" "pg_isready" kubectl -n hivebook exec statefulset/postgres -- pg_isready -q
+
+    ui_section "Observability"
+    check "Grafana" "/api/health 200" http "$G/api/health"
+    vm_uid=$(curl -sf --max-time 6 --cacert "$CA" -u "admin:$GPW" "$G/api/datasources" 2>/dev/null | tr '}' '\n' | grep '"type":"prometheus"' | grep -oE '"uid":"[^"]+"' | head -1 | cut -d'"' -f4)
+    check "VictoriaMetrics" "datasource query" gds "${vm_uid:-VictoriaMetrics}"
+    check "VictoriaLogs" "datasource query" gds "VictoriaLogs"
+
+    # Workload readiness footer.
+    wl_ready=0; wl_total=0
+    for n in {{ns}}; do
+      while read -r nm r d; do
+        [ "$r" = "<none>" ] && r=0
+        wl_total=$((wl_total+1))
+        { [ "${r:-0}" -ge "${d:-1}" ] && [ "${d:-0}" -ge 1 ]; } 2>/dev/null && wl_ready=$((wl_ready+1))
+      done < <(kubectl -n "$n" get deploy,statefulset -o custom-columns=N:.metadata.name,R:.status.readyReplicas,D:.spec.replicas --no-headers 2>/dev/null)
+    done
+    echo
+    ui_subtle "$wl_ready/$wl_total workloads ready"
+    if [ "$hc_ok" = "$hc_total" ]; then ui_ok "all $hc_total checks healthy"; else ui_fail "$((hc_total-hc_ok)) of $hc_total checks failing"; fi
 
 # Turn ON — the whole app (default) or one service
 start service="all":
     #!/usr/bin/env bash
     set -uo pipefail
-    kubectl get ns >/dev/null 2>&1 || { echo ">> Kubernetes isn't reachable — start OrbStack / enable Kubernetes first."; exit 1; }
+    . scripts/ui.sh
+    if ! kubectl get ns >/dev/null 2>&1; then
+      ui_fail "Kubernetes isn't reachable — start OrbStack / enable Kubernetes first."
+      exit 1
+    fi
     if [ "{{service}}" = all ]; then
+      ui_header "Starting Hivebook"
+      # Scale everything up first (fast), and un-taint our daemonsets.
       for n in {{ns}}; do
         kubectl -n "$n" scale deploy,statefulset --all --replicas=1 >/dev/null 2>&1 || true
         for ds in $(kubectl -n "$n" get ds -o name 2>/dev/null); do
           kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":null}}}}}' >/dev/null 2>&1 || true
         done
       done
-      echo ">> ON. 'just status' to watch."
+      # Then watch all workloads come up together, live.
+      if ui_progress {{ns}}; then
+        ui_ok "all workloads ready"
+        ui_info "'just urls' for links & logins"
+      else
+        ui_info "some workloads are still coming up — 'just status' to watch."
+      fi
     else
-      n=$(just _ns {{service}}) || { echo "unknown service '{{service}}'"; exit 1; }
-      kubectl -n "$n" scale deploy/{{service}} --replicas=1 2>/dev/null || kubectl -n "$n" scale statefulset/{{service}} --replicas=1
-      echo ">> started {{service}}."
+      n=$(just _ns {{service}}) || { ui_fail "unknown service '{{service}}'"; exit 1; }
+      kubectl -n "$n" scale deploy/{{service}} --replicas=1 >/dev/null 2>&1 || kubectl -n "$n" scale statefulset/{{service}} --replicas=1 >/dev/null 2>&1
+      if ui_step "starting {{service}}" bash -c "kubectl -n '$n' rollout status deploy/{{service}} --timeout=180s 2>/dev/null || kubectl -n '$n' rollout status statefulset/{{service}} --timeout=180s"; then
+        ui_ok "{{service}} is up  ($n)"
+      else
+        ui_fail "{{service}} — still starting"
+      fi
     fi
 
 # Turn OFF — the whole app (default) or one service. Only our workloads; OrbStack
@@ -66,47 +141,93 @@ start service="all":
 stop service="all":
     #!/usr/bin/env bash
     set -uo pipefail
-    kubectl get ns >/dev/null 2>&1 || { echo ">> Kubernetes isn't reachable (nothing to stop)."; exit 0; }
+    . scripts/ui.sh
+    if ! kubectl get ns >/dev/null 2>&1; then
+      ui_info "Kubernetes isn't reachable (nothing to stop)."
+      exit 0
+    fi
+    scale_down() {
+      for n in {{ns}}; do
+        kubectl -n "$n" scale deploy,statefulset --all --replicas=0 >/dev/null 2>&1 || true
+        for ds in $(kubectl -n "$n" get ds -o name 2>/dev/null); do
+          kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":"true"}}}}}' >/dev/null 2>&1 || true
+        done
+      done
+    }
+    sweep_terminal_pods() {  # remove Completed/Failed one-shot pods (e.g. helm-hook Jobs)
+      for n in {{ns}}; do
+        kubectl -n "$n" delete pod --field-selector=status.phase=Succeeded >/dev/null 2>&1 || true
+        kubectl -n "$n" delete pod --field-selector=status.phase=Failed >/dev/null 2>&1 || true
+      done
+    }
     if [ "{{service}}" = all ]; then
+      ui_header "Stopping Hivebook"
       # Two passes: the first stops everything (incl. operators); after operators
       # are down the second re-scales anything they revived so it stays at zero.
-      for pass in 1 2; do
-        for n in {{ns}}; do
-          kubectl -n "$n" scale deploy,statefulset --all --replicas=0 >/dev/null 2>&1 || true
-          for ds in $(kubectl -n "$n" get ds -o name 2>/dev/null); do
-            kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":"true"}}}}}' >/dev/null 2>&1 || true
-          done
-        done
-        [ "$pass" = 1 ] && sleep 5
-      done
-      echo ">> OFF (all workloads scaled to zero; data preserved). OrbStack left running."
+      scale_down
+      ui_step "letting operators settle" sleep 5
+      scale_down
+      sweep_terminal_pods
+      ui_ok "all workloads scaled to zero"
+      ui_box "Stopped — data preserved, OrbStack left running." "Run 'just start' to bring it back up."
     else
-      n=$(just _ns {{service}}) || { echo "unknown service '{{service}}'"; exit 1; }
-      kubectl -n "$n" scale deploy/{{service}} --replicas=0 2>/dev/null || kubectl -n "$n" scale statefulset/{{service}} --replicas=0
-      echo ">> stopped {{service}}."
+      n=$(just _ns {{service}}) || { ui_fail "unknown service '{{service}}'"; exit 1; }
+      kubectl -n "$n" scale deploy/{{service}} --replicas=0 >/dev/null 2>&1 || kubectl -n "$n" scale statefulset/{{service}} --replicas=0 >/dev/null 2>&1
+      ui_ok "{{service}} stopped  ($n)"
     fi
 
 # Logs — follow one service, or recent lines from everything
 logs service="all":
     #!/usr/bin/env bash
     set -uo pipefail
+    . scripts/ui.sh
     if [ "{{service}}" = all ]; then
+      ui_header "Recent logs"
       for n in {{ns}}; do
         for d in $(kubectl -n "$n" get deploy,statefulset -o name 2>/dev/null); do
-          echo "==== $n/$d ===="; kubectl -n "$n" logs "$d" --tail=20 2>/dev/null || true
+          ui_section "$n / ${d##*/}"
+          kubectl -n "$n" logs "$d" --tail=20 2>/dev/null || true
         done
       done
     else
-      n=$(just _ns {{service}}) || { echo "unknown service '{{service}}'"; exit 1; }
+      n=$(just _ns {{service}}) || { ui_fail "unknown service '{{service}}'"; exit 1; }
+      ui_section "logs: {{service}}  ($n)  — following"
       kubectl -n "$n" logs deploy/{{service}} --tail=200 -f 2>/dev/null || kubectl -n "$n" logs statefulset/{{service}} --tail=200 -f
     fi
 
 # What's running — all, or one service
 status service="all":
     #!/usr/bin/env bash
-    f="^(traefik|cert-manager|zitadel|hivebook|observability) "
-    [ "{{service}}" != all ] && f="{{service}}"
-    kubectl get pods -A 2>/dev/null | grep -E "NAMESPACE|$f" || echo ">> cluster unreachable — run 'just start'."
+    set -uo pipefail
+    . scripts/ui.sh
+    if ! kubectl get ns >/dev/null 2>&1; then
+      ui_fail "cluster unreachable — run 'just start' (or start OrbStack)."
+      exit 1
+    fi
+    show() {  # ns, pod, ready, status
+      case "$3" in
+        Running)             if [ "${2%/*}" = "${2#*/}" ]; then ui_ok "$1  ($2)"; else ui_fail "$1  ($2)  not ready"; fi ;;
+        Completed|Succeeded) ui_info "$1  ($3)" ;;
+        *)                   ui_fail "$1  ($2)  $3" ;;
+      esac
+    }
+    if [ "{{service}}" = all ]; then
+      ui_header "Hivebook status"
+      any=0
+      for n in {{ns}}; do
+        pods=$(kubectl -n "$n" get pods --no-headers 2>/dev/null)
+        [ -z "$pods" ] && continue
+        any=1
+        ui_section "$n"
+        echo "$pods" | while read -r pod ready status _rest; do show "$pod" "$ready" "$status"; done
+      done
+      [ "$any" = 1 ] || ui_info "nothing running — 'just start' to bring it up."
+    else
+      ui_header "{{service}}"
+      pods=$(kubectl get pods -A --no-headers 2>/dev/null | grep -E "[[:space:]]{{service}}|{{service}}-" || true)
+      [ -z "$pods" ] && { ui_info "no pods matching '{{service}}'."; exit 0; }
+      echo "$pods" | while read -r ns pod ready status _rest; do show "$ns/$pod" "$ready" "$status"; done
+    fi
 
 # ========================================================================
 # Hidden helpers + install/deploy recipes (no git backup, so kept here).
@@ -122,18 +243,32 @@ _ns service:
     echo "$n"
 
 [private]
-install: infra coredns auth provision api web observability
-    @echo ">> installed. (ZITADEL provisioned automatically — see docs/auth-setup.adoc)"
+install: infra coredns auth provision api web docs observability
+    #!/usr/bin/env bash
+    . scripts/ui.sh
+    ui_logo
+    ui_header "Hivebook installed"
+    ui_box \
+      "Web app   https://app.hivebook.localhost" \
+      "Docs      https://docs.hivebook.localhost" \
+      "Auth      https://id.hivebook.localhost      admin@hivebook.localhost / Password1!" \
+      "API       https://api.hivebook.localhost" \
+      "Grafana   https://grafana.hivebook.localhost   admin / password1234"
+    ui_info "ZITADEL provisioned automatically — see docs/operations/auth.adoc"
 
 # Idempotent ZITADEL provisioning: project + web/api apps + hivebook-oidc secret.
 [private]
 provision:
+    @bash -c '. scripts/ui.sh && ui_header "Provisioning ZITADEL (OIDC project + apps)"'
     bash scripts/provision-zitadel.sh
+    @bash -c '. scripts/ui.sh && ui_ok "OIDC provisioned"'
 
 [private]
 destroy:
     #!/usr/bin/env bash
     set -uo pipefail
+    . scripts/ui.sh
+    ui_header "Destroying Hivebook"
     helm -n observability uninstall vector vm victoria-logs kube-prometheus-stack 2>/dev/null || true
     helm -n zitadel uninstall zitadel 2>/dev/null || true
     helm -n traefik uninstall traefik 2>/dev/null || true
@@ -143,10 +278,11 @@ destroy:
     kubectl delete -f namespaces.yaml 2>/dev/null || true
     kubectl get crd -o name 2>/dev/null | grep -E 'cert-manager\.io|traefik\.io|victoriametrics\.com|monitoring\.coreos\.com' | xargs -r kubectl delete 2>/dev/null || true
     kubectl delete mutatingwebhookconfiguration,validatingwebhookconfiguration -l app.kubernetes.io/instance=cert-manager 2>/dev/null || true
-    echo ">> destroyed."
+    ui_ok "destroyed (namespaces, charts, CRDs, webhooks removed)"
 
 [private]
 repos:
+    @bash -c '. scripts/ui.sh && ui_info "updating helm repos…"'
     helm repo add jetstack https://charts.jetstack.io
     helm repo add traefik https://traefik.github.io/charts
     helm repo add zitadel https://charts.zitadel.com
@@ -156,23 +292,29 @@ repos:
 
 [private]
 infra: repos
+    @bash -c '. scripts/ui.sh && ui_header "Infra · cert-manager + Traefik + wildcard cert"'
     kubectl apply -f namespaces.yaml
     kubectl -n cert-manager create secret tls mkcert-root --cert="{{caroot}}/rootCA.pem" --key="{{caroot}}/rootCA-key.pem" --dry-run=client -o yaml | kubectl apply -f -
     helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --set crds.enabled=true --wait
     kubectl apply -f cert-manager/clusterissuer-mkcert.yaml
     helm upgrade --install traefik traefik/traefik --namespace traefik --values helm-values/traefik.yaml --wait
     kubectl apply -f cert-manager/certificate-wildcard.yaml
+    @bash -c '. scripts/ui.sh && ui_ok "infra ready"'
 
 [private]
 coredns:
+    @bash -c '. scripts/ui.sh && ui_header "CoreDNS · in-cluster issuer rewrite"'
     kubectl apply -f coredns/rewrite-patch.yaml
     kubectl -n kube-system rollout restart deployment/coredns
     kubectl -n kube-system rollout status deployment/coredns
+    @bash -c '. scripts/ui.sh && ui_ok "coredns patched"'
 
 [private]
 auth: repos
     #!/usr/bin/env bash
     set -uo pipefail
+    . scripts/ui.sh
+    ui_header "Auth · ZITADEL (Postgres + helm + ingress)"
     kubectl get ns zitadel >/dev/null 2>&1 || kubectl create ns zitadel
     # DB credentials from .env (not committed)
     kubectl -n zitadel create secret generic zitadel-db \
@@ -187,11 +329,14 @@ auth: repos
       --set zitadel.configmapConfig.Database.Postgres.User.Password="$ZITADEL_DB_PASSWORD" \
       --set zitadel.configmapConfig.Database.Postgres.Admin.Password="$ZITADEL_DB_PASSWORD"
     kubectl apply -f zitadel/ingressroute.yaml
+    ui_ok "ZITADEL up on https://id.hivebook.localhost"
 
 [private]
 api:
     #!/usr/bin/env bash
     set -uo pipefail
+    . scripts/ui.sh
+    ui_header "Deploy · API (Go)"
     docker build -t hivebook-api:dev ../api
     kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
     # App DB credentials from .env (not committed)
@@ -202,17 +347,32 @@ api:
     kubectl apply -f postgres/
     kubectl apply -f api/
     kubectl -n hivebook rollout restart deployment/api
+    ui_ok "API deployed on https://api.hivebook.localhost"
 
 [private]
 web:
+    @bash -c '. scripts/ui.sh && ui_header "Deploy · web (Next.js)"'
     docker build -t hivebook-web:dev ../web --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://id.hivebook.localhost --build-arg NEXT_PUBLIC_API_BASE=https://api.hivebook.localhost --build-arg NEXT_PUBLIC_OIDC_CLIENT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.WEB_CLIENT_ID}' | base64 -d)" --build-arg NEXT_PUBLIC_OIDC_PROJECT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.PROJECT_ID}' | base64 -d)"
     kubectl apply -f web/
     kubectl -n hivebook rollout restart deployment/web
+    @bash -c '. scripts/ui.sh && ui_ok "web deployed on https://app.hivebook.localhost"'
+
+# Build the Antora docs site image and deploy it (https://docs.hivebook.localhost).
+[private]
+docs:
+    @bash -c '. scripts/ui.sh && ui_header "Deploy · docs (Antora)"'
+    docker build -t hivebook-docs:dev -f ../docs/Dockerfile ..
+    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
+    kubectl apply -f docs/
+    kubectl -n hivebook rollout restart deployment/docs
+    @bash -c '. scripts/ui.sh && ui_ok "docs deployed on https://docs.hivebook.localhost"'
 
 [private]
 observability: repos
     #!/usr/bin/env bash
     set -uo pipefail
+    . scripts/ui.sh
+    ui_header "Observability · VictoriaMetrics + VictoriaLogs + Grafana"
     helm -n observability uninstall kube-prometheus-stack 2>/dev/null || true
     helm upgrade --install victoria-logs victoriametrics/victoria-logs-single --namespace observability --values helm-values/victoria-logs.yaml --wait
     helm upgrade --install vm victoriametrics/victoria-metrics-k8s-stack --namespace observability --values helm-values/victoria-metrics-k8s-stack.yaml --wait --timeout 15m --set grafana.adminPassword="$GRAFANA_ADMIN_PASSWORD"
@@ -233,3 +393,4 @@ observability: repos
         kubectl -n observability annotate configmap "$name" grafana_folder="$folder" --overwrite
       done
     done
+    ui_ok "observability up — Grafana on https://grafana.hivebook.localhost"

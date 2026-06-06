@@ -1,0 +1,130 @@
+= Corpus and Book Index
+:status: living
+:last-reviewed: 2026-06-06
+
+Knowledge lives in two strata (xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001]):
+
+[arabic]
+. *Raw corpus* — every ingested artifact, verbatim, with metadata. The
+append-only source of truth for citations.
+. *Book index* — a per-customer hierarchical organization of the corpus
+into navigable summaries. Derived, regeneratable, and continuously
+redesigned by the system as content arrives.
+
+== The book index
+
+A fixed three-level hierarchy (xref:ROOT:adrs/0002-three-level-hierarchy.adoc[ADR-0002]), modeled on a reference book's
+table of contents:
+
+[d2]
+----
+direction: down
+chapter: "Chapter\nbroad domain — e.g. Operations"
+topic: "Topic\nspecific area — e.g. Refunds & adjustments"
+subtopic: "Sub-topic\na single concept or decision point\ne.g. EU VAT refunds over €500"
+chapter -> topic -> subtopic
+----
+
+____
+"Chapter / topic / sub-topic" is the working vocabulary; final
+user-facing naming is open. See xref:ROOT:reference/glossary.adoc[].
+____
+
+== The hierarchy invariant
+
+*Citations live only at the sub-topic level* (xref:ROOT:adrs/0003-hierarchy-invariant.adoc[ADR-0003]):
+
+[d2]
+----
+direction: right
+cs: Chapter summary
+ts: Topic summaries
+ss: Sub-topic summaries
+ra: Raw artifacts
+cs -> ts: cites
+ts -> ss: cites
+ss -> ra: cites
+----
+
+The rebuild graph has fixed depth 3: a structural change anywhere
+affects at most three derived summaries (see
+xref:ROOT:design-docs/0002-mark-and-defer-for-structural-changes.adoc[]).
+
+== Per entry: the summary doc
+
+Every index entry has a summary with:
+
+* *Title* — user-facing name (mutable)
+* *Stable ID* — never changes after creation
+* *Summary* — LLM-generated prose
+* *Status* — `current ++|++ stale ++|++ building`
+* *Last-rebuilt* timestamp
+* *Evidence content hash* — for idempotent rebuilds
+* *Citations* — sub-topic: source spans in raw artifacts; topic: child
+sub-topic IDs; chapter: child topic IDs
+
+== Per-customer
+
+Each customer has its own book; there is no cross-customer index. See
+xref:ROOT:architecture/tenancy-and-acl.adoc[] for the access model within a customer.
+
+== Bootstrapping
+
+The book is not bootstrapped from customer data. Every customer starts
+from a thin generic chapter skeleton; topics and sub-topics begin empty
+and the filing pipeline designs the structure to fit real data
+(xref:ROOT:adrs/0004-continuous-structure-design.adoc[ADR-0004]; xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[]).
+
+== Editability
+
+Admins can *move* entries — a sub-topic to another topic, a topic to
+another chapter — and *rename* any entry (title only; stable ID is
+preserved).
+
+Admins cannot split, merge, create, delete, or author summaries. The
+system owns structural creation and consolidation, performed by the
+filing pipeline and the maintenance loop. Admin moves are structural
+changes that follow mark-and-defer (xref:ROOT:adrs/0006-mark-and-defer.adoc[ADR-0006]).
+
+== Metadata layer
+
+Every entry carries cheap-to-maintain metadata that the maintenance
+loop reads instead of re-reading artifacts:
+
+* doc count (sub-topic) / child count (topic, chapter)
+* contributor / author distribution
+* source distribution
+* entity overlap (distinct canonical entities mentioned)
+* coherence score (embedding variance around the entry's centroid)
+* recency profile
+* last-touched, last-summarized timestamps
+* evidence content hash
+
+Metadata updates incrementally on ingest (counters, deltas); coherence
+is recomputed on a periodic sample.
+
+== Maintenance loop
+
+A periodic per-tenant job (daily by default, off-peak per region):
+
+* Processes the unfiled bucket and the structural proposals queued
+below the high-confidence threshold.
+* Triggers rebuilds for stale summaries (xref:ROOT:adrs/0006-mark-and-defer.adoc[ADR-0006]).
+* Proposes splits for sub-topics with high doc count and low coherence.
+* Proposes merges for sub-topics with low doc count and high pairwise
+similarity.
+* Consolidates duplicate-shaped proposals from prior batches.
+* Cleans up the entity store (unused entities, stale aliases).
+
+All changes it applies follow mark-and-defer.
+
+== Stable IDs
+
+Topic and sub-topic IDs survive renames, moves, splits, and merges:
+
+* a rename does not change the ID
+* a split produces new child IDs; the parent ID survives as a redirect
+* a merge keeps one ID; the others become redirects
+
+External references — audit entries, future skills, API references —
+use IDs, not titles, so they survive editorial change.

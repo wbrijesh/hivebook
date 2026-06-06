@@ -1,0 +1,75 @@
+= Architecture Overview
+:status: living
+:last-reviewed: 2026-06-06
+
+Hivebook is a layered system. Each layer has one responsibility and a
+stable interface to the layers above and below it.
+
+[d2]
+----
+direction: down
+
+system: Hivebook {
+  qs: "Query surfaces\nUI · API · agent runtime"
+  sl: "Summary lifecycle\nlazy · query-driven · maintenance"
+  bi: "Book index\n3-level hierarchy of summaries"
+  rt: "Retrieval\nhybrid: vector + BM25"
+  rc: "Raw corpus\nverbatim content + metadata"
+  ing: "Ingestion pipeline\nnormalize, segment"
+  con: "Connectors\nper source: OAuth, sync"
+  qs -> sl -> bi -> rt -> rc -> ing -> con
+}
+
+cp: "Enterprise control plane\nauth · audit · tenancy · metering" {
+  style.stroke-dash: 4
+}
+tenants: Customer tenants
+
+cp -> system: cross-cutting
+cp -> tenants
+----
+
+== Layer responsibilities
+
+* *Connectors* — talk to source systems (Slack, Google Workspace,
+Notion, GitHub, …): OAuth, incremental sync, watermarking. See
+xref:ROOT:architecture/ingestion.adoc[].
+* *Ingestion pipeline* — light normalization (stable ID, source,
+author, timestamps, embeddings) and segmentation. Semantic decisions
+happen downstream. See xref:ROOT:architecture/ingestion.adoc[].
+* *Raw corpus* — verbatim storage of every artifact; the source of
+truth for citations (xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001]). See xref:ROOT:architecture/corpus-and-index.adoc[].
+* *Retrieval* — one hybrid index serving query time and ingest time
+(xref:ROOT:adrs/0007-hybrid-retrieval.adoc[ADR-0007]). See xref:ROOT:architecture/retrieval.adoc[].
+* *Book index* — the per-customer three-level hierarchy of summaries
+(xref:ROOT:adrs/0002-three-level-hierarchy.adoc[ADR-0002]). See xref:ROOT:architecture/corpus-and-index.adoc[].
+* *Summary lifecycle* — decides when each summary is generated and
+refreshed. Lazy by default; driven by query pressure and the
+maintenance loop. See xref:ROOT:architecture/summary-lifecycle.adoc[].
+* *Query surfaces* — how humans and agents consume the brain. UI for
+browsing, API for programmatic access, agent runtime for skills (skills
+are deferred).
+* *Enterprise control plane* — cross-cutting: SSO, audit, tenancy,
+metering, residency (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]). See xref:ROOT:architecture/tenancy-and-acl.adoc[] and
+xref:ROOT:architecture/enterprise-controls.adoc[].
+
+== Read and write paths
+
+Two read paths:
+
+[arabic]
+. *Drill-down* — navigate the book index chapter → topic → sub-topic,
+read the summary, drill into cited source spans only if the summary is
+insufficient.
+. *Ad-hoc search* — hybrid retrieval directly over the raw corpus for
+queries that fit no known topic ("did anyone mention the Acme outage
+this week?").
+
+Two write paths (see xref:ROOT:architecture/ingestion.adoc[] and
+xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[]):
+
+[arabic]
+. *Fast path* — novel content with low similarity to any topic parks in
+an unfiled bucket for periodic filing.
+. *Slow path* — content similar to existing topics triggers an LLM
+diff-and-merge to decide which topics it updates.

@@ -1,0 +1,32 @@
+= 0001 — Two strata: raw corpus and derived book index
+:adr-id: 0001
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+Knowledge arrives from many sources and must be both verbatim-citable
+and navigable. Those are different storage needs.
+
+== Decision
+
+Store knowledge in two strata: an *append-only raw corpus* of verbatim
+artifacts (the source of truth for citations) and a *derived book
+index* of per-customer summaries. The index is never the source of
+truth; it is regenerated from the corpus.
+
+== Alternatives considered
+
+* *Summaries only, no raw store* — loses citation fidelity and
+auditability.
+* *Index as source of truth* — drift becomes unrecoverable; nothing to
+regenerate from.
+
+== Consequences
+
+Citations always resolve to verbatim evidence. The index can be rebuilt
+or restructured freely (see xref:ROOT:adrs/0006-mark-and-defer.adoc[ADR-0006]). Cost: storage duplication, and
+the index must be kept consistent with the corpus.

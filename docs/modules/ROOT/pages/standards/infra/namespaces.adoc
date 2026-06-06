@@ -1,0 +1,30 @@
+= Infra · Namespaces
+:status: living
+:last-reviewed: 2026-06-06
+
+One namespace per platform concern. These are Kubernetes _deployment_ namespaces
+— unrelated to per-customer `tenant_id`
+(xref:ROOT:architecture/tenancy-and-acl.adoc[tenancy]).
+
+[width="100%",cols="22%,78%",options="header"]
+|===
+|Namespace |Holds
+
+|`traefik` |Ingress controller — TLS termination, routing
+|`cert-manager` |Cert issuance from the mkcert CA
+|`zitadel` |Identity: ZITADEL + its own Postgres
+|`observability` |VictoriaMetrics, VictoriaLogs, Vector, Grafana
+|`hivebook` |All app workloads — api, web, docs, app Postgres
+|===
+
+== Rules
+
+. *New app workloads go in `hivebook`* — don't spin a namespace per service.
+. *Platform components get their own namespace* when they own distinct
+operational state (their own DB, operator, or lifecycle).
+. *Each namespace that terminates TLS has its own wildcard `Certificate`*
+producing `hivebook-wildcard-tls` — Traefik resolves `tls.secretName` in the
+route's own namespace.
+. *Manifests mirror the component* under `infra/<component>/` (`infra/api/`,
+`infra/zitadel/`…), applied by the matching `just` recipe.
+. *`infra/namespaces.yaml` is the source of truth* for which namespaces exist.

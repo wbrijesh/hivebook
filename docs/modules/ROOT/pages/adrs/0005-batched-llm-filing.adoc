@@ -1,0 +1,31 @@
+= 0005 — Batched LLM-driven filing
+:adr-id: 0005
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0001-continuous-ingestion-and-filing.adoc
+
+== Context
+
+Every artifact must be filed into the book and may trigger structural
+change. Per-artifact LLM calls are economically unviable at the volumes
+a customer ingests.
+
+== Decision
+
+Filing, structural decisions, and entity resolution run in *batched LLM
+calls* — one call per `(source, container)` batch — not per artifact.
+
+== Alternatives considered
+
+* *Per-artifact LLM call* — highest quality, infeasible cost.
+* *Embedding-only filing* — too unreliable for structural choices; only
+defers cost into the maintenance loop.
+
+== Consequences
+
+LLM cost drops by roughly an order of magnitude while the LLM still
+makes every consequential decision. Cost: per-batch filing latency —
+artifacts wait up to the batch window. Batch-trigger constants are
+tunable defaults (xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]).

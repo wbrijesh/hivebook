@@ -1,0 +1,17 @@
+# Docs site on https://docs.hivebook.localhost.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: docs
+  namespace: hivebook
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`docs.hivebook.localhost`)
+      kind: Rule
+      services:
+        - name: docs
+          port: 80
+  tls:
+    secretName: hivebook-wildcard-tls

@@ -1,0 +1,30 @@
+= 0002 — Fixed three-level book hierarchy
+:adr-id: 0002
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+The corpus needs a navigable structure. Its depth is a design choice
+that shapes navigation, LLM reasoning, and rebuild cost.
+
+== Decision
+
+The book index is a *fixed three-level hierarchy*: chapter → topic →
+sub-topic.
+
+== Alternatives considered
+
+* *Unbounded depth* — harder navigation and maintenance; rebuild
+cascades are unbounded.
+* *Two levels* — too coarse for the domains we have considered.
+
+== Consequences
+
+Any structural change affects at most three derived summaries; the
+rebuild graph has fixed depth 3 (pairs with xref:ROOT:adrs/0003-hierarchy-invariant.adoc[ADR-0003]). Navigation and
+maintenance stay bounded. Cost: domains that want finer nesting are
+flattened into sub-topics.

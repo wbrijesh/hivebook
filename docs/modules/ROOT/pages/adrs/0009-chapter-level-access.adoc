@@ -1,0 +1,34 @@
+= 0009 — Admin-managed chapter-level access, no source-ACL inheritance
+:adr-id: 0009
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+Access control can inherit source-system ACLs or be managed in
+Hivebook. Summaries aggregate across many artifacts with heterogeneous
+source permissions.
+
+== Decision
+
+Access is *admin-managed at the chapter level*. Hivebook does not
+inherit source ACLs and does not propagate source permissions through
+derived summaries.
+
+== Alternatives considered
+
+* *Inherit and propagate source ACLs* — fragile across heterogeneous
+sources, segmentation, entity resolution, and aggregation; a large body
+of work that breaks in practice.
+* *Per-sub-topic ACLs* — configuration overhead without clear benefit
+at this stage.
+
+== Consequences
+
+One coherent access model and no per-source identity mapping. Admins own
+access configuration. Default is org-wide chapter visibility — the brain
+is a shared organizational asset. Cost: source-level restrictions are
+not reflected automatically.

@@ -1,0 +1,69 @@
+= v0.1
+:status: draft
+:last-reviewed: 2026-05-24
+
+Working sketch. Specifics will be tightened by design docs and by
+what we learn from the first design partners.
+
+== Goal of v0.1
+
+Demonstrate to a small number of design partners that Hivebook can
+ingest their fragmented knowledge and produce a navigable, accurate,
+source-cited book of how their organization actually works —
+covering at least three load-bearing operational areas (e.g.,
+refunds, incident response, onboarding).
+
+This goal does *not* include exposing the brain as a runtime API
+for agents, producing skills artifacts, or shipping the MCP server.
+Those come later. v0.1 is about proving the brain is real, legible,
+and trustable.
+
+== In scope for v0.1
+
+* Per-customer tenant with full isolation
+* SSO (SAML / OIDC) with at least one identity provider
+* Onboarding flow with entity seed form
+* Metering primitives supporting prepaid and postpaid contracts
+* The v0.1 connector set (see xref:ROOT:reference/connector-catalog.adoc[])
+* Admin-managed chapter-level access control with templates
+* Raw corpus storage with citation support
+* Hybrid retrieval (vector {plus} BM25)
+* Thin generic chapter skeleton with LLM-driven continuous
+structure design (see
+xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[])
+* Mark-and-defer summary lifecycle (see
+xref:ROOT:design-docs/0002-mark-and-defer-for-structural-changes.adoc[])
+* Entity reconciliation pipeline with ambiguity queue (see
+xref:ROOT:design-docs/0003-entity-reconciliation.adoc[])
+* Tunable-default parameters from config (see
+xref:ROOT:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[])
+* Admin reorganization UI (move {plus} rename only)
+* Basic audit log (queryable, not exportable)
+* Internal browse UI for the book
+* Suspension with default 3-month archive
+
+== Out of scope for v0.1
+
+* Skills layer
+* Agent runtime API and MCP server
+* Customer-managed keys
+* Region pinning beyond the default clusters we operate
+* VPC / PrivateLink
+* SCIM (manual provisioning is acceptable for pilots)
+* Dynamic computation of tunable parameters (constants from config
+only)
+* Audit log export
+* Per-source variable batch frequency
+* Public API surface
+
+== Major open questions blocking concrete planning
+
+* Mid-market vs. true enterprise positioning (see
+xref:ROOT:vision/audience.adoc[])
+* Build vs. integrate for connectors (see
+xref:ROOT:architecture/ingestion.adoc[])
+* Build vs. buy for auth — Zitadel vs. WorkOS vs. hand-built (see
+xref:ROOT:architecture/enterprise-controls.adoc[])
+* Notion vs. Confluence as the wiki connector
+* Which ticketing tool first
+* Which meeting recorder, if any, in v0.1

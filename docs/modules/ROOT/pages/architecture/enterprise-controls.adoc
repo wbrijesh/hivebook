@@ -1,0 +1,83 @@
+= Enterprise Controls
+:status: living
+:last-reviewed: 2026-06-06
+
+Hivebook is sold B2B via negotiated contracts. Enterprise controls shape
+the data model from day one (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]). This document defines what lands
+when.
+
+== Day-zero (before any customer ingests)
+
+These are catastrophic to retrofit and ~free to design in (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]):
+
+* *Hard tenant isolation* — `tenant++_++id` on every record; every query
+filters by it; storage partitioned by tenant.
+* *Region tagging* — every record carries a `region`.
+* *BYOK-ready encryption* — a key-derivation path swappable for a
+customer-managed key without re-encrypting the world.
+* *Audit primitives* — every read/write emits an audit event.
+* *Metering primitives* — per-tenant token, storage, and connector
+usage.
+
+== Pre-GA (before any logo customer beyond design partners)
+
+* *SSO* — SAML and OIDC. Mandatory before paid customers.
+* *Audit log surface* — admins see and export the day-zero events.
+* *Admin roles* — owner, admin, member, viewer. No custom roles yet.
+* *SCIM* — may lag the first paid customer by a quarter; pilots tolerate
+manual provisioning.
+
+== Post-GA (enterprise tier, sold separately)
+
+* *Region pinning* beyond default clusters — bespoke residency.
+* *Customer-managed keys (CMK)* — customer holds the KMS key.
+* *VPC / PrivateLink* — connector and API traffic stays on the
+customer's private network.
+* *Fine-grained policy engine* — OPA-style policies beyond chapter ACLs.
+* *DLP and retention integration*.
+* *On-prem inference* — for customers who cannot ship content to a
+multi-tenant endpoint. In-scope-at-all is an open question; see
+xref:ROOT:vision/audience.adoc[].
+
+== Hosted vs. self-hosted
+
+Hivebook runs on Kubernetes.
+
+* *Hosted* — we operate clusters in major regions (US, EU, Asia,
+expanding by demand). Customers pick a cluster at onboarding.
+* *Self-hosted* — customers deploy on their own infrastructure in any
+region. Usage limits still apply; metering enforcement is part of the
+offering.
+
+== Metering and pricing
+
+Pricing is contract-based, not self-serve. Two billing modes:
+
+* *Prepaid* — customers buy credits granting a usage limit.
+* *Postpaid* — customers set upper-bound limits; actual usage is billed
+at contract rate.
+
+Metered dimensions: per-tenant LLM token usage, storage (corpus,
+embeddings, summaries), and connector activity (artifacts ingested,
+source API calls). Early customers may run on an effectively-unlimited
+limit, especially self-hosted.
+
+== Suspension and deletion
+
+On suspension (contract breach, payment failure, customer request), the
+default:
+
+* *Archive* the tenant's data for a default period (3 months,
+admin-configurable).
+* *No new ingestion or queries* during the archive period.
+* *Restoration* is one-click within the archive period.
+* *Hard delete* at the end of the period.
+
+Customers may opt for immediate hard delete. Export is available any
+time before hard delete.
+
+== Open: auth build-vs-buy
+
+The auth provider choice (Zitadel vs. WorkOS vs. hand-built) is deferred
+to build time. Whichever wins must support SAML, OIDC, and per-user
+audit-log views for admins.

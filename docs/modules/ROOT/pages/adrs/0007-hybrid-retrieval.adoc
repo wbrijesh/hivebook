@@ -1,0 +1,31 @@
+= 0007 — Hybrid retrieval over one shared index
+:adr-id: 0007
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+Retrieval serves two callers: query time (answer a question) and ingest
+time (find topics an incoming artifact might update). Both semantic
+similarity and exact-term recall matter.
+
+== Decision
+
+One *hybrid index* (vector + BM25) over the raw corpus, serving both
+callers.
+
+== Alternatives considered
+
+* *Vector only* — blurs proper nouns, identifiers, and error codes that
+exact-term recall catches.
+* *Separate indexes per caller* — a larger system with no compounding
+quality gains.
+
+== Consequences
+
+Retrieval-quality improvements compound across both paths and the system
+stays smaller. Retrieval indexes everything in the tenant; ACL filtering
+applies post-retrieval, above this layer (xref:ROOT:adrs/0009-chapter-level-access.adoc[ADR-0009]).

@@ -1,0 +1,38 @@
+= 0010 — Day-zero tenant isolation and enterprise primitives
+:adr-id: 0010
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc:
+
+== Context
+
+Hivebook is sold B2B to security-conscious buyers. Tenant isolation,
+residency, encryption, audit, and metering are catastrophic to retrofit
+once customer data exists.
+
+== Decision
+
+These primitives are in the data model *day-zero*, before any customer
+ingests:
+
+* *Hard tenant isolation* — `tenant_id` on every record; every read
+filters by it; storage partitioned by tenant.
+* *Region tagging* — every record carries a `region`.
+* *BYOK-ready encryption* — a key-derivation path swappable for a
+customer-managed key without re-encrypting the world.
+* *Audit primitives* — every read/write emits an audit event.
+* *Metering primitives* — per-tenant token, storage, and connector
+usage captured.
+
+== Alternatives considered
+
+* *Add enterprise controls when the first enterprise customer signs* —
+requires re-encrypting and re-partitioning live data; isolation gaps
+become data leaks.
+
+== Consequences
+
+Higher day-zero data-model cost, near-zero retrofit cost later. SSO, the
+audit-log surface, and SCIM layer on top pre-GA with no schema change.

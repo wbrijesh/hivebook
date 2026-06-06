@@ -1,0 +1,27 @@
+= Frontend · State Management
+:status: draft
+:last-reviewed: 2026-06-06
+
+Keep client state small; let the server and the URL hold most of it.
+
+== Rules
+
+. *Server state lives on the server.* Fetch in Server Components / route handlers
+against the Go API (`NEXT_PUBLIC_API_BASE`); don't mirror it into a global client
+store.
+. *Client state is local first* — `useState` / `useReducer` in the component
+that owns it. Lift only when shared; reach for context before any global store.
+. *URL is state.* Filters, tabs, and selection live in the query string so views
+are linkable and refresh-safe.
+. *Auth/session is the `userManager()` singleton* (`lib/auth.ts`,
+oidc-client-ts): Authorization Code + PKCE against ZITADEL, tokens in
+`localStorage`. Don't build a parallel auth store.
+. *Telemetry is `track()`* (`lib/telemetry.ts`) — fire-and-forget, never throws,
+never blocks the UI.
+. *Public config is build-time* `NEXT_PUBLIC_*`, baked by the Dockerfile build
+args; there is no runtime config endpoint.
+
+== Open question
+
+A data-fetching / cache library (e.g. TanStack Query) is not yet chosen — the app
+is too small to need one. Decide via a design doc when a real data layer lands.

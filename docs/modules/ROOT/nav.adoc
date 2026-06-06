@@ -1,0 +1,73 @@
+* xref:index.adoc[Home]
+* xref:style-guide.adoc[Style guide]
+
+.Vision
+* xref:vision/problem.adoc[Problem]
+* xref:vision/principles.adoc[Principles]
+* xref:vision/audience.adoc[Audience]
+
+.Architecture
+* xref:architecture/overview.adoc[Overview]
+* xref:architecture/corpus-and-index.adoc[Corpus & book index]
+* xref:architecture/ingestion.adoc[Ingestion]
+* xref:architecture/retrieval.adoc[Retrieval]
+* xref:architecture/summary-lifecycle.adoc[Summary lifecycle]
+* xref:architecture/tenancy-and-acl.adoc[Tenancy & access control]
+* xref:architecture/enterprise-controls.adoc[Enterprise controls]
+
+.Design docs
+* xref:design-docs/index.adoc[About design docs]
+* xref:design-docs/0001-continuous-ingestion-and-filing.adoc[0001 · Continuous ingestion & filing]
+* xref:design-docs/0002-mark-and-defer-for-structural-changes.adoc[0002 · Mark-and-defer]
+* xref:design-docs/0003-entity-reconciliation.adoc[0003 · Entity reconciliation]
+* xref:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[0004 · Tunable defaults]
+* xref:design-docs/0000-template.adoc[Template]
+
+.Decision records (ADRs)
+* xref:adrs/index.adoc[About ADRs]
+* xref:adrs/0001-corpus-and-index-strata.adoc[0001 · Corpus & index strata]
+* xref:adrs/0002-three-level-hierarchy.adoc[0002 · Three-level hierarchy]
+* xref:adrs/0003-hierarchy-invariant.adoc[0003 · Hierarchy invariant]
+* xref:adrs/0004-continuous-structure-design.adoc[0004 · Continuous structure design]
+* xref:adrs/0005-batched-llm-filing.adoc[0005 · Batched LLM filing]
+* xref:adrs/0006-mark-and-defer.adoc[0006 · Mark-and-defer]
+* xref:adrs/0007-hybrid-retrieval.adoc[0007 · Hybrid retrieval]
+* xref:adrs/0008-entity-reconciliation-in-filing.adoc[0008 · Entity reconciliation in filing]
+* xref:adrs/0009-chapter-level-access.adoc[0009 · Chapter-level access]
+* xref:adrs/0010-day-zero-enterprise-primitives.adoc[0010 · Day-zero enterprise primitives]
+* xref:adrs/0011-constants-first-tunables.adoc[0011 · Constants-first tunables]
+* xref:adrs/0000-template.adoc[Template]
+
+.Standards
+* xref:standards/index.adoc[Overview]
+* Go
+** xref:standards/go/package-layout.adoc[Package layout]
+** xref:standards/go/errors.adoc[Errors & responses]
+** xref:standards/go/logging.adoc[Logging]
+** xref:standards/go/testing.adoc[Testing]
+* Frontend
+** xref:standards/frontend/component-patterns.adoc[Component patterns]
+** xref:standards/frontend/state-management.adoc[State management]
+* Infra
+** xref:standards/infra/namespaces.adoc[Namespaces]
+** xref:standards/infra/labels.adoc[Labels & naming]
+* Docs
+** xref:standards/docs/adr-process.adoc[ADR process]
+** xref:standards/docs/design-doc-process.adoc[Design-doc process]
+
+.Design language
+* xref:design/design-language.adoc[Apex]
+
+.Reference
+* xref:reference/glossary.adoc[Glossary]
+* xref:reference/connector-catalog.adoc[Connector catalog]
+* xref:reference/schemas/index.adoc[Schemas]
+
+.Roadmap
+* xref:roadmap/v0.1.adoc[v0.1]
+* xref:roadmap/milestones.adoc[Milestones]
+
+.Operations
+* xref:operations/infrastructure.adoc[Infrastructure]
+* xref:operations/auth.adoc[Auth]
+* xref:operations/api.adoc[API]

@@ -1,0 +1,24 @@
+= Docs · ADR Process
+:status: stable
+:last-reviewed: 2026-06-06
+
+How we record architectural decisions. Full context:
+xref:ROOT:adrs/index.adoc[the ADR section].
+
+== When to write one
+
+A decision that is hard or expensive to reverse, defines a contract other
+components rely on, or locks in a vendor / format / dependency. Reversible
+details (a name, a library bump) don't need one.
+
+== The process
+
+. Copy xref:ROOT:adrs/0000-template.adoc[the template] to `NNNN-kebab-title.adoc`
+(next number).
+. One decision per ADR. Two decisions → two ADRs.
+. Keep it short — context, decision, alternatives, consequences. Status flows
+`proposed → accepted`.
+. *Accepted ADRs are immutable.* A changed decision is a _new_ ADR that
+`supersedes` the old one; the old one's status becomes `superseded`, with a link.
+. Architecture docs reference ADRs by number (`ADR-0009`) and never restate the
+rationale (xref:ROOT:style-guide.adoc[state it once]).

@@ -1,0 +1,48 @@
+= Hivebook
+
+*Hivebook is a company brain.* It pulls a company's operational
+knowledge out of the fragmented systems where it lives — Slack, email,
+docs, tickets, code, meeting recordings — and turns it into a single,
+structured, source-cited corpus that both people and AI agents can
+trust. The thesis: model capability is no longer the blocker to AI
+automation; *domain knowledge is*, and every company will need one
+stable, auditable source of operational truth. See
+xref:ROOT:vision/problem.adoc[].
+
+Sold B2B. Production domain: `hivebook.co`.
+
+== How the system fits together
+
+* *Raw corpus* — every artifact stored verbatim; the source of truth
+for citations.
+* *Book index* — a per-customer three-level hierarchy (chapter → topic
+→ sub-topic) of LLM-generated summaries, where every claim cites its
+evidence.
+* *Continuous LLM filing* — batched LLM calls file each artifact and
+evolve the book structure to fit the customer's real data.
+* *Lazy summaries* — generated and refreshed on demand, kept consistent
+by mark-and-defer.
+* *Admin-managed access* — chapter-level ACLs, hard tenant isolation,
+enterprise controls designed in day-zero.
+
+Start with xref:ROOT:architecture/overview.adoc[] for the layer model.
+
+== This documentation
+
+These docs are the design and decision record. Content lands here after
+a decision is reached, not as scratch notes. Read xref:ROOT:style-guide.adoc[]
+before contributing — it defines what goes where and how to write it.
+
+* *Vision* holds the product-level why.
+* *Architecture* states what is, and links to an ADR for the why.
+* *Design docs* carry the argument while it is still being made; on
+acceptance their decisions graduate into *ADRs* (immutable).
+* *Standards* are the conventions everyone follows so independent
+decisions converge — Go, frontend, infra, docs.
+* *Reference*, *roadmap*, and *operations* are lookup, sequencing, and
+running the system.
+
+Use the navigation on the left to browse. Good entry points:
+xref:ROOT:vision/problem.adoc[the problem],
+xref:ROOT:architecture/overview.adoc[the architecture overview], and
+xref:ROOT:roadmap/v0.1.adoc[what v0.1 covers].

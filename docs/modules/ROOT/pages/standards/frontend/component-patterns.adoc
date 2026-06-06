@@ -1,0 +1,31 @@
+= Frontend · Component Patterns
+:status: draft
+:last-reviewed: 2026-06-06
+
+Next.js (App Router) + TypeScript + shadcn/ui, styled entirely through the
+xref:ROOT:design/design-language.adoc[Apex] token system. The web app is early;
+these rules set the shape before drift sets in.
+
+[NOTE]
+====
+This Next.js is a custom build with breaking changes from upstream — read the
+bundled guide (`web/AGENTS.md`) before writing Next-specific code.
+====
+
+== Rules
+
+. *Server Components by default.* Add `"use client"` only for interactivity,
+browser APIs, or hooks (see `lib/auth.ts`, `lib/telemetry.ts`). Keep the client
+boundary as low in the tree as possible.
+. *Two component layers.* shadcn/ui primitives live in `components/ui` (added
+via `npx shadcn add`); app-specific components live in `components/`. One
+component per file.
+. *Style only with semantic tokens.* Use the Apex tokens from `app/globals.css`
+(`bg-card`, `text-muted-foreground`, `--spine`…), never raw Tailwind palette
+classes (`bg-gray-800`). Merge classes with `cn()` (`lib/utils.ts`).
+. *Import via the `@/` alias*, not deep relative paths.
+. *TypeScript is strict* — no `any` in app code; type props explicitly.
+. *Formatting is Prettier* (`.prettierrc`), linting is the flat ESLint config
+(`eslint.config.mjs`) — don't hand-format.
+. *Fonts and theme come from the root layout* (Inter sans, Geist Mono, the
+`ThemeProvider`); components consume tokens, they don't import fonts.

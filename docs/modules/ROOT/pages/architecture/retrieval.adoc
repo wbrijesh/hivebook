@@ -1,0 +1,54 @@
+= Retrieval
+:status: living
+:last-reviewed: 2026-06-06
+
+One hybrid index (vector + BM25) over the raw corpus serves two callers
+(xref:ROOT:adrs/0007-hybrid-retrieval.adoc[ADR-0007]):
+
+[arabic]
+. *Query time* — surfaces candidate spans from the corpus and candidate
+entries from the book index for a user or agent question.
+. *Ingest time* — surfaces candidate existing topics an incoming
+artifact might update, gating the slow vs. fast write path (see
+xref:ROOT:architecture/ingestion.adoc[]).
+
+== Why hybrid
+
+* *Vector search* captures semantic similarity ("refund" matches "money
+back").
+* *BM25* captures exact-term recall for proper nouns, product names,
+identifiers, error codes, and rare terms that embeddings blur.
+
+A learned or hand-tuned reranker combines them.
+
+== The query path
+
+[arabic]
+. *Hybrid retrieve* over the raw corpus and the book index.
+. *Navigate the book index* — if a topic summary is a strong match,
+start there. It may answer the question without touching the corpus.
+. *Drill down* — if the summary is insufficient, the LLM pulls its
+cited source spans (and optionally more from retrieval) and reasons over
+them.
+. *Cite* — the answer cites the same spans, plus any pulled during
+drill-down.
+
+For queries that map to no known topic, the flow degenerates to plain
+RAG over the raw corpus. Acceptable, but not the common case.
+
+== The ingest path
+
+[arabic]
+. Hybrid retrieve over the book index (not the corpus) — topic matches,
+not document matches.
+. If top-K similarity is below threshold: fast path, park in unfiled.
+. If above threshold: slow path, hand the topic summaries and the new
+artifact to an LLM to decide which topics it updates.
+
+== What retrieval does not do
+
+* It does not produce final answers — the LLM does.
+* It does not decide what is canonical — the summary lifecycle does.
+* It does not filter by ACL. Retrieval indexes everything in the
+tenant; ACL filtering applies post-retrieval, above this layer
+(xref:ROOT:architecture/tenancy-and-acl.adoc[]).

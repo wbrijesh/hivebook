@@ -1,0 +1,36 @@
+= Go · Logging
+:status: living
+:last-reviewed: 2026-06-06
+
+Structured JSON via `log/slog`, one event per line, shipped by Vector to
+VictoriaLogs where every field is queryable. One logging style, not five.
+
+`main` installs a JSON slog handler to stdout once:
+
+[source,go]
+----
+slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+----
+
+== Rules
+
+. *The message is the event name; fields carry the data.*
+`slog.Info("http_request", "status", 200, "route", "/api/me")` — not a
+formatted sentence. Event names are `snake_case` nouns (`http_request`,
+`web_event`).
+. *Field keys are `snake_case` and stable* (`request_id`, `duration_ms`,
+`route`) so queries don't churn.
+. *Every request-scoped log carries `request_id`* (`middleware.GetReqID`).
+. *One access-log line per request* comes from the `structuredLogger`
+middleware (`internal/server/logging.go`); handlers don't re-log the request.
+. *`log.Printf` is only for process lifecycle* — startup, shutdown, background
+discovery (see `main`, `internal/auth`). Everything request-related is slog.
+. *Never log secrets* — tokens, passwords, raw `Authorization` headers, PII.
+
+== Metrics, not logs, for counting
+
+To count a rate or total, add a Prometheus metric via `promauto` — don't grep
+logs. Names are `hivebook_<area>_<thing>_<unit>` (`hivebook_http_requests_total`,
+`hivebook_http_request_duration_seconds`) with bounded-cardinality labels (the
+matched chi route pattern, never the raw path). See `internal/server/metrics.go`
+and xref:ROOT:standards/infra/labels.adoc[naming].

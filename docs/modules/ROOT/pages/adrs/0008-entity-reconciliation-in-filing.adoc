@@ -1,0 +1,31 @@
+= 0008 — Entity reconciliation inside the filing call
+:adr-id: 0008
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0003-entity-reconciliation.adoc
+
+== Context
+
+Filing and queries must operate on entity-level, not string-level,
+truth. The context needed to resolve an artifact's entities is the same
+context needed to file it.
+
+== Decision
+
+Entity reconciliation runs *inside the batched filing LLM call*
+(xref:ROOT:adrs/0005-batched-llm-filing.adoc[ADR-0005]), not as a separate upstream stage.
+
+== Alternatives considered
+
+* *Separate pre-batch resolution call* — pays for the same context
+twice with no quality gain.
+* *Symbolic-only resolution* — fails on subject drift, coreference, and
+implicit context.
+
+== Consequences
+
+No additional model calls; marginal cost is the input tokens for entity
+context. Subject-drift handling depends on the per-container
+recent-resolution window, a tunable default (xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]).

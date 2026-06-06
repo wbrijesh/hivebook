@@ -1,0 +1,36 @@
+= Problem
+:status: stable
+:last-reviewed: 2026-06-06
+
+The blocker to AI automation of companies is no longer model
+capability — it is *domain knowledge*. Models have crossed the
+necessary threshold; the operational know-how they need has not been
+made available to them.
+
+Every company's critical know-how is scattered: in people's heads, old
+email, Slack threads, support tickets, databases, dashboards, runbooks,
+and meeting recordings. Companies work because humans vaguely remember
+where it lives and how to apply it. AI agents cannot operate that way.
+
+== The missing primitive: a company brain
+
+A company brain is a system that:
+
+[arabic]
+. Pulls knowledge out of the fragmented sources where it lives today.
+. Structures it into a legible, navigable form.
+. Keeps it current as the company changes.
+. Exposes it in a form AI systems can use to do real work, safely and
+consistently.
+
+It is not company-wide search and not a chatbot over documents. It is a
+*living map of how a company actually works* — how refunds get handled,
+how pricing exceptions get decided, how engineers respond to incidents,
+how a deal moves from qualified to closed.
+
+== Why it is the missing layer
+
+Without a company brain, every AI deployment re-derives the same context
+from scratch, gets it wrong inconsistently, and cannot be trusted with
+autonomous action. With one, AI systems have a stable, auditable source
+of operational truth. Every company will need one.

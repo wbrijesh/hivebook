@@ -1,0 +1,34 @@
+= 0006 — Mark-and-defer for derived summaries
+:adr-id: 0006
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0002-mark-and-defer-for-structural-changes.adoc
+
+== Context
+
+Structural changes happen continuously and must not block the requester
+or cost a rebuild each. Always-stale derived state is also unacceptable.
+
+== Decision
+
+*Mark-and-defer.* Every structural change synchronously marks affected
+summaries and their ancestors stale (O(1); at most 4 entries), then
+returns. Rebuilds happen lazily — on read pressure or in the
+maintenance loop — and are idempotent, keyed by the evidence content
+hash.
+
+== Alternatives considered
+
+* *Eager rebuild* — unaffordable, slow admin operations, thundering
+cascades.
+* *No staleness signal* — readers cannot tell what to trust.
+* *Periodic full rebuild* — wasteful and slow to freshen.
+
+== Consequences
+
+Structural changes are fast and synchronous; staleness is visible to
+readers; cost concentrates in the off-peak, batched maintenance loop.
+Worst-case staleness is bounded by `MAX_STALE_AGE`, a tunable default
+(xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]).

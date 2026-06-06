@@ -1,0 +1,35 @@
+= Infra · Labels & Naming
+:status: living
+:last-reviewed: 2026-06-06
+
+Predictable names so selectors, routes, and recipes line up without thinking.
+
+== Workload labels
+
+* Every Deployment / StatefulSet / Service / Pod carries `app: <name>` — the one
+selector everything keys on (`app: api`, `app: web`, `app: docs`).
+* Custom labels and annotations use the `hivebook.io/` prefix (e.g.
+`hivebook.io/stopped`, set on daemonsets when `just stop` parks them).
+
+== Names
+
+[width="100%",cols="30%,70%",options="header"]
+|===
+|Thing |Convention
+
+|Local image |`hivebook-<svc>:dev` (built by `just <svc>`, `imagePullPolicy: IfNotPresent`)
+|Ingress host |`<svc>.hivebook.localhost` (one wildcard cert covers all)
+|Secret |`<purpose>` — `hivebook-oidc`, `hivebook-db`, `hivebook-wildcard-tls`
+|ConfigMap |`<purpose>` — `api-config`; dashboards `dash-<folder>-<name>`
+|Env var (app) |`HIVEBOOK_*` — `HIVEBOOK_OIDC_ISSUER`, `HIVEBOOK_DB_*`
+|Metric |`hivebook_<area>_<thing>_<unit>` (xref:ROOT:standards/go/logging.adoc[see Go logging])
+|===
+
+== Rules
+
+. *Route with Traefik `IngressRoute` (CRD), not core `Ingress`* — h2c backends,
+path rules, and the wildcard TLS secret all live there.
+. *Every container sets resource `requests` and `limits`* (cpu, memory).
+. *Grafana dashboards are ConfigMaps* labeled `grafana_dashboard=1` with a
+`grafana_folder` annotation; the JSON under `infra/observability/dashboards/` is
+the source, applied by `just observability`.

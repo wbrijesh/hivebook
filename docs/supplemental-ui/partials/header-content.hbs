@@ -1,0 +1,53 @@
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="{{{or site.url siteRootPath}}}">{{site.title}}</a>
+      {{#if env.SITE_SEARCH_PROVIDER}}
+      <div class="navbar-item search hide-for-print">
+        <div id="search-field" class="field">
+          <input id="search-input" type="text" placeholder="Search the docs"{{#if page.home}} autofocus{{/if}}>
+        </div>
+      </div>
+      {{/if}}
+      <button class="navbar-burger" aria-controls="topbar-nav" aria-expanded="false" aria-label="Toggle main menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/index.html">Home</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="{{{siteRootPath}}}/hivebook/index.html">Docs</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/vision/problem.html">Vision</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/architecture/overview.html">Architecture</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/design-docs/index.html">Design docs</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/adrs/index.html">Decision records (ADRs)</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/design/design-language.html">Design language</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/reference/glossary.html">Reference</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/roadmap/v0.1.html">Roadmap</a>
+            <a class="navbar-item" href="{{{siteRootPath}}}/hivebook/operations/infrastructure.html">Operations</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Services</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="https://app.hivebook.localhost" target="_blank" rel="noopener">Web app</a>
+            <a class="navbar-item" href="https://api.hivebook.localhost" target="_blank" rel="noopener">API</a>
+            <a class="navbar-item" href="https://docs.hivebook.localhost" target="_blank" rel="noopener">Docs</a>
+            <a class="navbar-item" href="https://id.hivebook.localhost" target="_blank" rel="noopener">Auth (ZITADEL)</a>
+            <a class="navbar-item" href="https://grafana.hivebook.localhost" target="_blank" rel="noopener">Grafana</a>
+          </div>
+        </div>
+        <a class="navbar-item" href="https://github.com/wbrijesh/hivebook" target="_blank" rel="noopener">GitHub</a>
+        <div class="navbar-item">
+          <span class="control">
+            <a class="button is-primary" href="{{{siteRootPath}}}/hivebook/operations/infrastructure.html">Get started</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>

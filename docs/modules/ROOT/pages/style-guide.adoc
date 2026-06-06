@@ -1,0 +1,143 @@
+= Documentation Style Guide
+:status: stable
+:last-reviewed: 2026-06-06
+
+How Hivebook docs are written and organized. Every doc is measured
+against this. The voice mirrors Apex (xref:ROOT:design/design-language.adoc[]):
+terse, exact, addressed to a competent reader.
+
+== What goes where
+
+The docs are an Antora component. Every page lives under
+`docs/modules/ROOT/pages/`; the directories below are relative to that
+root. Authoring happens in those directories; the site is generated and
+served separately (see _Layout and serving_).
+
+[width="100%",cols="18%,82%",options="header",]
+|===
+|Directory |Holds
+
+|`vision/` |What we are building and why it must exist. Product-level.
+Slow-moving.
+|`architecture/` |How the system is built. States what _is_ — present
+tense, no justification inline. Living.
+|`design-docs/` |Proposals, written before building. Carry the full
+argument: alternatives, tradeoffs, open questions. Numbered, with a
+lifecycle.
+|`adrs/` |Recorded decisions. One decision each, with its rationale and
+consequences. Immutable once accepted.
+|`standards/` |Conventions everyone follows so independent decisions
+converge — Go, frontend, infra, docs. Prescriptive and terse.
+|`design/` |The design language (Apex): voice, tokens, surfaces. The
+reference every UI decision is checked against.
+|`operations/` |Running the system: infrastructure, auth, the apps.
+|`reference/` |Lookup material: glossary, catalogs, schemas.
+|`roadmap/` |Sequencing and milestones.
+|===
+
+== Where the "why" lives
+
+Each decision has exactly one home for its rationale. Do not re-argue a
+decision in a doc that merely depends on it.
+
+* *`architecture/` states the decision, not the case for it.* "Access
+is granted at the chapter level." Not "The reason is operational:
+maintaining ACL propagation across heterogeneous sources is fragile, so
+access is granted at the chapter level."
+* *The case for it lives in an ADR.* Every load-bearing,
+hard-to-reverse decision gets an ADR recording alternatives and
+consequences. Architecture docs link to it: `See ADR-0009.`
+* *Design docs hold the argument while it is still being made.* On
+acceptance, their decisions graduate into ADRs; the design doc remains
+as the long-form reasoning.
+* *`vision/` is the one place product-level "why" belongs* — the
+problem, the thesis, the principles.
+
+== Writing rules
+
+. *Lead with the decision.* The first sentence of a section states what
+is true. Context, if any, follows — it never precedes.
+. *Present tense, declarative.* "The pipeline files each artifact." Not
+"will file," not "we decided it should file."
+. *State it once.* A fact has one home. Everywhere else links to it
+(`See corpus-and-index.adoc`). When you feel the urge to re-explain
+mark-and-defer, link instead.
+. *Cut the hedge.* Delete "it's worth noting," "the reason is,"
+"importantly," "essentially," and adjectives that add no constraint. If
+a sentence survives deletion without loss, delete it.
+. *Mark the unknown.* Anything undecided is an explicit *Open
+question*, never silently inferred. Anything aspirational is labelled
+as future, not described as if it exists.
+. *Terms come from the glossary.* xref:ROOT:reference/glossary.adoc[] wins ties.
+Fix drift; don't let synonyms accumulate.
+
+Density is the point, not length. Docs are read, not skimmed.
+
+== Frontmatter and numbering
+
+* Vision, architecture, design, and roadmap docs carry `:status:` and
+`:last-reviewed:`. `status` is one of `stable`, `living`, or `draft`.
+* Design docs and ADRs are numbered `NNNN-kebab-title.adoc` from
+`0001-`, using the frontmatter in their `0000-template.adoc`.
+* Design-doc lifecycle: `draft → in-review → accepted → implemented →
+superseded` (or `rejected`).
+* ADR lifecycle: `proposed → accepted → superseded`. An accepted ADR is
+never edited; a changed decision is a new ADR that supersedes the old.
+
+== Cross-references
+
+Link with an Antora xref using the page's path relative to the `pages`
+root, qualified with the module so it resolves from anywhere:
+
+[source,asciidoc]
+----
+xref:ROOT:architecture/overview.adoc[]      # link text = the page title
+xref:ROOT:adrs/0006-mark-and-defer.adoc[ADR-0006]   # explicit link text
+----
+
+Reference by path and number, never by title — titles change, paths and
+IDs do not. A broken xref fails the site build (`failure_level: warn`),
+so links stay honest.
+
+== Layout and serving
+
+....
+docs/
+├── antora.yml                  component descriptor (name, nav)
+└── modules/ROOT/
+    ├── nav.adoc                the left-hand navigation
+    └── pages/                  every .adoc page (the tree above)
+antora-playbook.yml             site build config (repo root)
+docs/Dockerfile                 Antora build → nginx image
+infra/docs/                     k8s Deployment, Service, IngressRoute, nginx.conf
+....
+
+Each page is a single `=` doctitle followed by its attributes, then `==`
+sections. Add a new page by dropping the `.adoc` under `pages/` and
+adding an `xref` line to `nav.adoc`.
+
+Build and deploy the site image with `just docs`; it serves at
+https://docs.hivebook.localhost. The default Antora UI is used; a
+custom Apex-themed UI bundle is future work.
+
+== Diagrams
+
+Write diagrams as https://d2lang.com[D2] in a `[d2]` block — never as
+ASCII art. Kroki renders them to SVG at build time
+(`kroki-fetch-diagram` bakes the SVG into the site, so served pages
+never call Kroki).
+
+[source,asciidoc]
+----
+[d2]
+....
+a: Connectors
+b: Ingestion
+a -> b
+....
+----
+
+Keep diagrams minimal — nodes and edges that carry meaning, no
+decoration (the Apex rule applies to diagrams too). Directory and file
+trees are the exception: leave those as literal `....` blocks; a
+rendered box diagram of a folder listing reads worse than monospace.

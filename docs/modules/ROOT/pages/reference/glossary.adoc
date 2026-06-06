@@ -1,0 +1,118 @@
+= Glossary
+
+Canonical terms used across Hivebook. When in doubt, this file
+wins. If a term in code or docs drifts from the definition here,
+fix the term or update this file — do not let synonyms accumulate.
+
+____
+*Naming caveat.* The user-facing names for the three index
+levels ("`chapter / topic / sub-topic`") are working terms. Final
+product naming is open. Internal code should use stable
+identifiers that don’t bake the names in.
+____
+
+== Index structure
+
+* *Book* — the entire per-customer hierarchical organization of
+their corpus.
+* *Chapter* — the top level of the book. Broad domain.
+* *Topic* — middle level. Specific area within a chapter.
+* *Sub-topic* — bottom level. A single concept or decision point.
+* *Index entry* — a generic term for any of chapter / topic /
+sub-topic.
+* *Hierarchy invariant* — the rule that citations live only at
+the sub-topic level: sub-topic summaries cite raw artifacts;
+topic summaries cite child sub-topic summaries; chapter
+summaries cite child topic summaries.
+
+== Content
+
+* *Raw corpus* — every ingested artifact, stored verbatim. The
+source of truth for citations.
+* *Artifact* — a single ingested unit (a Slack message, a Google
+Doc, a Jira ticket, an email).
+* *Segment* — a coherent portion of an artifact (e.g., one
+sub-thread of a longer Slack thread). Segmentation runs before
+entity tagging and filing.
+* *Source span* — a specific cited range within a specific
+artifact.
+* *Summary* — the LLM-generated prose attached to an index entry.
+* *Evidence content hash* — hash over an entry’s cited evidence
+used to detect when a summary needs rebuilding and to
+short-circuit idempotent rebuilds.
+
+== Filing pipeline
+
+* *Filing pipeline* — the batched LLM-driven process that places
+newly ingested artifacts into sub-topics and proposes structural
+changes to the book. Described in `design-docs/0001`.
+* *Batch window* — the time-or-count window during which
+artifacts accumulate before the filing LLM call runs (v0.1
+default: 15 min or 20 artifacts, whichever first).
+* *Filing decision* — the per-artifact output of the filing
+pipeline: which sub-topic the artifact lands in.
+* *Structural change* — a creation, split, merge, rename, or
+move of an index entry initiated by the filing pipeline,
+maintenance loop, or an administrator.
+* *Unfiled bucket* — staging area for low-confidence filings
+awaiting maintenance-loop review.
+
+== Summary lifecycle
+
+* *Stale summary* — a summary whose evidence has changed since
+it was last built. The summary continues to render with a
+visible staleness indicator until rebuilt.
+* *Mark-and-defer* — the principle that every structural change
+synchronously marks affected summaries stale, with rebuilds
+happening lazily. Described in `design-docs/0002`.
+* *Idempotent rebuild* — a rebuild that short-circuits when the
+evidence content hash matches the previous build.
+* *Maintenance loop* — the periodic per-tenant job that processes
+unfiled artifacts, rebuilds stale summaries, applies queued
+structural proposals, and consolidates the book.
+
+== Entity reconciliation
+
+* *Canonical entity* — a thing the customer cares about (product,
+customer, project, person, internal tool). Lives in the
+per-tenant entity store with aliases.
+* *Entity mention* — a reference to a canonical entity inside a
+specific artifact, with confidence and resolution method.
+* *Container* — a logical grouping inside a source (Slack
+channel, Drive folder, GitHub repo, ticket queue).
+* *Container prior* — a default-entity hint attached to a
+`(source, container)` pair, derived automatically or set by
+admins.
+* *Recent-resolution window* — the sliding window of recently
+resolved entities per container, used as conversation-flow
+context for entity resolution (v0.1 default: 10 artifacts).
+* *Ambiguity queue* — the admin-facing queue of artifacts whose
+entity resolution the system could not confidently determine.
+Aggregates similar ambiguities for one-click resolution.
+
+== Access control
+
+* *Tenant* — one customer’s isolated environment.
+* *Chapter ACL* — the per-user or per-template set of chapters a
+user can see.
+* *Access template* — a named set of chapter accesses that can be
+applied to users to represent personas, departments, or roles.
+
+== Ingestion
+
+* *Connector* — the per-source-system component that handles auth
+and sync.
+* *Watermark* — a per-source position that lets sync resume
+incrementally.
+
+== Configuration and lifecycle
+
+* *Tunable default* — a parameter that ships as a configurable
+constant in v0.1 but is intended to become a dynamically
+computed function based on production telemetry. Described in
+`design-docs/0004`.
+
+== Other
+
+* *Skills* — executable structured procedures derived from the
+brain. Not yet designed; deferred.

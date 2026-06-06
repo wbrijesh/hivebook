@@ -1,0 +1,34 @@
+= 0011 — Constants-first tunable parameters with day-zero telemetry
+:adr-id: 0011
+:status: accepted
+:date: 2026-06-06
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0004-tunable-defaults-to-dynamic-functions.adoc
+
+== Context
+
+Several parameters would ideally be computed from production signal —
+batch frequency from source heat, window length from resolution
+confidence, staleness tolerance from read traffic. We lack the data to
+fit those functions.
+
+== Decision
+
+Ship these parameters as *configurable constants*, capture the
+telemetry needed to derive their functions later, and graduate each
+parameter individually once the data exists. Day-zero telemetry capture
+is mandatory.
+
+== Alternatives considered
+
+* *Engineer dynamic functions now* — speculative, will be wrong, hard
+to undo.
+* *Hard-code with no telemetry* — cheap now, no path to graduate.
+
+== Consequences
+
+v0.1 behavior is suboptimal but predictable. Each graduation costs a
+fit-review-ship cycle. Parameters under this pattern: batch window/size,
+recent-resolution window, max stale age, high-confidence filing
+threshold, container-learning trigger.

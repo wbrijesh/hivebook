@@ -1,0 +1,24 @@
+= Docs · Design-Doc Process
+:status: stable
+:last-reviewed: 2026-06-06
+
+How we propose before building. Full context:
+xref:ROOT:design-docs/index.adoc[the design-docs section].
+
+== When to write one
+
+The change touches multiple layers, carries a non-trivial tradeoff (perf vs.
+cost, build vs. buy), has reasonable alternatives, or has security / tenancy /
+residency implications. Small and obvious → just do it.
+
+== The process
+
+. Copy xref:ROOT:design-docs/0000-template.adoc[the template] to
+`NNNN-kebab-title.adoc`.
+. Argue the design: context, goals, *non-goals*, proposal, *at least two
+alternatives* (including "do nothing"), tradeoffs, open questions.
+. Lifecycle: `draft → in-review → accepted → implemented` (or `rejected`,
+`superseded`).
+. On acceptance, the load-bearing decisions graduate into
+xref:ROOT:standards/docs/adr-process.adoc[ADRs]; the design doc remains as the
+long-form reasoning.

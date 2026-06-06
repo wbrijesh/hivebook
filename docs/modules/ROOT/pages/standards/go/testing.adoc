@@ -1,0 +1,18 @@
+= Go · Testing
+:status: living
+:last-reviewed: 2026-06-06
+
+Standard `testing`, real dependencies over mocks.
+
+== Rules
+
+. *Standard library `testing`*, `_test.go` beside the code it tests, functions
+named `TestXxx`.
+. *HTTP handlers use `net/http/httptest`* (see `internal/server/routes_test.go`).
+. *Anything touching Postgres uses a real container via `testcontainers-go`* —
+no hand-rolled DB mocks. Start the container once per package in `TestMain` and
+share it (see `internal/database/database_test.go`).
+. *`testify` is available* for assertions; plain `t.Fatalf` / `t.Errorf` is fine
+for small tests — match the file you're in.
+. *Table-driven tests* when a function has several input cases.
+. *Run `go test ./...`* from `api/`; tests pass before a change lands.
