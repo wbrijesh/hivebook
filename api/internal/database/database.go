@@ -23,6 +23,14 @@ type Service interface {
 	// Prometheus gauges (see internal/server/dbstats.go).
 	Stats() sql.DBStats
 
+	// GetOrCreateTenant returns the tenant for a ZITADEL org id, creating an
+	// empty (un-onboarded) row the first time the org is seen.
+	GetOrCreateTenant(ctx context.Context, orgID string) (Tenant, error)
+
+	// CompleteOnboarding records the onboarding answers and marks the tenant
+	// onboarded. Idempotent; the storage region is write-once.
+	CompleteOnboarding(ctx context.Context, orgID, name, size, region string, useCases []string, useCaseOther string) (Tenant, error)
+
 	// Close terminates the database connection.
 	// It returns an error if the connection cannot be closed.
 	Close() error
@@ -47,7 +55,11 @@ func New() Service {
 	if dbInstance != nil {
 		return dbInstance
 	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, schema)
+	sch := schema
+	if sch == "" {
+		sch = "public"
+	}
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, sch)
 	db, err := sql.Open("pgx", connStr)
 	if err != nil {
 		log.Fatal(err)
@@ -55,6 +67,23 @@ func New() Service {
 	dbInstance = &service{
 		db: db,
 	}
+
+	// Apply schema migrations on startup. Postgres may not be up the instant the
+	// API starts, so retry within a bounded window before giving up.
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	for {
+		if err := dbInstance.migrate(ctx); err != nil {
+			if ctx.Err() != nil {
+				log.Fatalf("db migrate: %v", err)
+			}
+			log.Printf("db migrate failed, retrying: %v", err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		break
+	}
+
 	return dbInstance
 }
 

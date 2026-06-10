@@ -17,6 +17,9 @@ export function userManager(): UserManager {
   const projectId = process.env.NEXT_PUBLIC_OIDC_PROJECT_ID
 
   const scopes = ["openid", "profile", "email"]
+  // Reserved ZITADEL scope that exposes the user's organization (resource owner)
+  // via userinfo — that org is our tenant (design-doc 0005).
+  scopes.push("urn:zitadel:iam:user:resourceowner")
   // Reserved ZITADEL scope that adds the project (and its api app) to the access
   // token audience, so the Go API can validate the token as its intended audience.
   if (projectId) scopes.push(`urn:zitadel:iam:org:project:id:${projectId}:aud`)

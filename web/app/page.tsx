@@ -1,63 +1,53 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import type { User } from "oidc-client-ts"
+import * as React from "react"
+import { useRouter } from "next/navigation"
 
-import { userManager, API_BASE } from "@/lib/auth"
+import { userManager } from "@/lib/auth"
 import { track } from "@/lib/telemetry"
+import { Logo } from "@/components/brand/logo"
+import { Button } from "@/components/ui/button"
 
-// Intentionally unstyled — this exists to prove the end-to-end auth wiring
-// (ZITADEL login -> token -> calling the protected Go API), not to look good.
-export default function Page() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [apiResult, setApiResult] = useState<string>("")
+// Public entry. Signed-in users go straight to the app; everyone else gets a
+// single sign-in action that hands off to ZITADEL (Authorization Code + PKCE).
+export default function Home() {
+  const router = useRouter()
+  const [checked, setChecked] = React.useState(false)
 
-  useEffect(() => {
+  React.useEffect(() => {
     track("page_view", { path: "/" })
     userManager()
       .getUser()
-      .then(setUser)
-      .finally(() => setLoading(false))
-  }, [])
+      .then((u) => {
+        if (u && !u.expired) router.replace("/book")
+        else setChecked(true)
+      })
+      .catch(() => setChecked(true))
+  }, [router])
 
-  function login() {
+  if (!checked) return null
+
+  function signIn() {
     track("login_start")
     void userManager().signinRedirect()
   }
 
-  async function callApi() {
-    const u = await userManager().getUser()
-    if (!u) return
-    const res = await fetch(`${API_BASE}/api/me`, {
-      headers: { Authorization: `Bearer ${u.access_token}` },
-    })
-    track("api_call", { endpoint: "/api/me", status: res.status })
-    const body = await res.text()
-    setApiResult(`HTTP ${res.status}\n${body}`)
-  }
-
-  if (loading) return <main style={{ padding: 24 }}>Loading…</main>
-
   return (
-    <main style={{ padding: 24, fontFamily: "sans-serif", maxWidth: 720 }}>
-      <h1>Hivebook</h1>
-      {!user ? (
-        <button onClick={login}>Log in with ZITADEL</button>
-      ) : (
-        <div>
-          <p>
-            Signed in as <strong>{user.profile.preferred_username ?? user.profile.sub}</strong>
-          </p>
-          <p>
-            <button onClick={callApi}>Call GET /api/me</button>{" "}
-            <button onClick={() => userManager().signoutRedirect()}>Log out</button>
-          </p>
-          {apiResult && (
-            <pre style={{ background: "#f4f4f4", padding: 12, whiteSpace: "pre-wrap" }}>{apiResult}</pre>
-          )}
+    <main className="flex min-h-svh items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm text-center">
+        <div className="mb-6 flex justify-center">
+          <Logo size="lg" />
         </div>
-      )}
+        <h1 className="text-[18px] font-semibold tracking-tight text-foreground">
+          Sign in to Hivebook
+        </h1>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Your company&rsquo;s brain.
+        </p>
+        <Button className="mt-6 w-full" onClick={signIn}>
+          Continue with ZITADEL
+        </Button>
+      </div>
     </main>
   )
 }

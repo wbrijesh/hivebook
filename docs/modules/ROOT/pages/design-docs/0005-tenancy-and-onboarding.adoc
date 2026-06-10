@@ -1,0 +1,198 @@
+= 0005 — Tenant Model & Onboarding
+:design-id: 0005
+:status: accepted
+:date: 2026-06-07
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs:
+
+== Context
+
+ZITADEL owns *identity* — users, organizations, authentication. It does not
+hold the *application state* a customer's workspace needs: a tenant profile, a
+storage region, the areas they want their brain to cover. Onboarding is where
+that state is first written.
+
+We already commit to hard per-tenant isolation with a `tenant_id` on every
+record (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]). The
+open question this doc closes is *what a tenant is, where its data lives, and how
+onboarding produces it*. The prototype's onboarding UI (organization →
+use-case → region → complete) is a solid starting surface; this doc wires it to
+real, persisted state.
+
+== Goals
+
+* Define the tenant as a first-class, persisted entity that every downstream
+record hangs off.
+* Persist onboarding answers durably, owned by us, not the IdP.
+* Gate the application on a signed-in *and* onboarded tenant, cleanly.
+* Keep it minimal — one table, two endpoints — without ignoring isolation,
+region immutability, idempotency, or the admin-vs-member distinction.
+
+== Non-goals
+
+* The entity-seed form (products / customers / projects) from
+xref:ROOT:design-docs/0003-entity-reconciliation.adoc[0003]. It needs an entity
+store that does not exist yet; it lands as a later onboarding step.
+* A real role/permission engine. v0.1 treats the signed-in user of a single
+local org as the admin.
+* Multi-region cluster routing. The region is *recorded*; physical placement is
+later (xref:ROOT:architecture/enterprise-controls.adoc[enterprise controls]).
+* Writing any data back into ZITADEL (renaming the org, org metadata).
+
+== Proposal
+
+=== The bridge: tenant = ZITADEL org, materialized lazily
+
+A *tenant* is one ZITADEL organization, 1:1. The verified access token carries
+the org id; that is the `tenant_id` bridge. We do not maintain a separate tenant
+registry in ZITADEL — our Postgres is the system of record for tenant state.
+
+The `tenants` row is created *lazily* on the first authenticated request from an
+org we have not seen, with `onboarded_at = null`. No signup webhook, no ZITADEL
+action — the row appears the first time a real token shows up.
+
+*Onboarding runs once per tenant, not per user.* The first admin completes it;
+members who later join an already-onboarded tenant go straight to the app.
+Whether any onboarding should become per-user is deliberately left open (see
+Open questions) — for now the unit of onboarding is the tenant.
+
+=== Data model
+
+[source]
+----
+tenants
+  id              uuid        primary key         -- the tenant_id on every record
+  zitadel_org_id  text        unique not null     -- the identity bridge
+  name            text                            -- display name (organization step)
+  size            text                            -- org-size bucket (organization step)
+  region          text                            -- write-once; set at onboarding
+  use_cases       jsonb        not null default '[]' -- selected areas (use-case step)
+  use_case_other  text                            -- free text when "other" is chosen
+  onboarded_at    timestamptz                     -- null until onboarding completes
+  created_at      timestamptz not null default now()
+  updated_at      timestamptz not null default now()
+----
+
+`region` is nullable until onboarding sets it, then *immutable* — it is the
+residency anchor. `name` and `size` stay editable later from settings; `region`
+and `use_cases` are onboarding-time.
+
+Schema is applied by versioned SQL migrations embedded in the API binary and run
+on startup, tracked in a `schema_migrations` table — no external tooling for
+v0.1.
+
+=== API surface (Go API)
+
+Three endpoints, all behind the existing ZITADEL JWT middleware, all scoping
+every query by the token-derived `tenant_id`:
+
+* `GET /api/me` — the authenticated *session*: who the caller is and which
+workspace they're in, both resolved server-side. The web chrome reads identity
+(name, email) and workspace from here — never from client-side OIDC state.
++
+[source,json]
+----
+{ "user":   { "id": "...", "name": "...", "email": "..." },
+  "tenant": { "id": "...", "name": "Acme", "onboarded": true, ... } }
+----
+* `GET /api/tenant` — returns the caller's tenant and onboarding status,
+lazily creating the row if absent.
++
+[source,json]
+----
+{ "id": "...", "name": null, "size": null, "region": null,
+  "useCases": [], "useCaseOther": null, "onboarded": false }
+----
+* `POST /api/tenant/onboarding` — submit
+`{ name, size, region, useCases, useCaseOther }`, stamp `onboarded_at`, emit an
+audit event. `useCaseOther` is the free-text detail captured when the user picks
+"Something else" on the use-case step; it is stored only when "other" is among
+`useCases`. *Idempotent*: re-submitting is safe; once `region` is set it cannot
+be changed (a differing region is rejected).
+
+Identity and the `tenant_id` (the caller's org) are resolved together by the
+auth layer: it reads the token claims and, since ZITADEL access tokens are
+minimal, falls back to the *userinfo* endpoint for name, email, and the
+resource-owner org — caching the result per user. The org requires the
+`urn:zitadel:iam:user:resourceowner` scope, which the web app requests.
+
+=== Frontend wiring
+
+The prototype's onboarding UI is copied verbatim. Its local-only
+`OnboardingFlowProvider` is swapped for one that hydrates from `GET /api/tenant`
+and submits to `POST /api/tenant/onboarding` on the complete step. The gate
+that already protects the app shell
+(xref:ROOT:standards/frontend/component-patterns.adoc[RequireAuth]) is extended
+into a small state machine:
+
+[source]
+----
+signed in?        ── no ──▶ /            (sign-in)
+   │ yes
+tenant.onboarded? ── yes ─▶ /book        (the app shell)
+   │ no
+   admin?         ── yes ─▶ /onboarding
+                  └─ no ──▶ "workspace is being set up" hold
+----
+
+=== Auditing
+
+Onboarding completion is a privileged write and emits one audit event, per the
+day-zero audit primitives (ADR-0010), correlated to the tenant and the acting
+user.
+
+== Alternatives considered
+
+* *Store tenant/onboarding data as ZITADEL org metadata.* No new table, no
+bootstrap — but it couples application data to the IdP, is awkward to join
+against corpus data, and blurs "tenant profile" into "identity." Rejected: this
+is app data the corpus, book, and ACLs relate to; it belongs with them.
+* *User-level tenant for now.* Simpler locally, but diverges from the B2B
+"one company = one tenant" model and would need rework. Rejected.
+* *Eager tenant provisioning via a ZITADEL action/webhook on org creation.*
+More moving parts and an IdP→app coupling we do not need yet. Lazy
+materialization is simpler and sufficient.
+* *Build the entity-seed step now.* Requires an entity store the rest of the
+system cannot use yet. Deferred to when that store exists.
+* *Do nothing (keep onboarding local-only).* Loses every answer on refresh; no
+tenant record for anything downstream to attach to. Rejected.
+
+== Tradeoffs
+
+* Lazy tenant creation means the first request from a new org does a write —
+acceptable; it happens once.
+* `region` immutability is enforced in the API, not the schema — a deliberate
+simplicity (no DB triggers) at the cost of trusting one code path.
+* Treating the signed-in user as admin is correct for single-org local dev but
+must be replaced by real role checks before multi-user tenants.
+
+== Open questions
+
+* *Per-tenant vs. per-user onboarding.* v0.1 onboards each tenant once (the
+first admin); everyone else inherits the onboarded workspace. This is a
+deliberate choice we may revisit: some onboarding may belong to the *user* (e.g.
+personal preferences, a per-user view of entity context, a "what do you do here"
+prompt that personalises Ask). Revisit when the multi-user tenant experience is
+designed — at which point onboarding likely splits into a one-time *tenant*
+setup and an optional per-user step.
+* *Which ZITADEL claim carries the org id* used as `tenant_id` — *resolved*:
+ZITADEL access tokens are minimal, so the org (and the user's name/email) are
+read from the *userinfo* endpoint, which exposes the resource owner only when the
+`urn:zitadel:iam:user:resourceowner` scope is granted. The web app requests it;
+the API resolves and caches identity per user.
+* *Role model* — how `owner`/`admin`/`member` arrive in the token and gate the
+onboarding step. Deferred; see xref:ROOT:architecture/enterprise-controls.adoc[].
+* *When `use_cases` becomes the chapter skeleton* — the seed→chapters mapping
+(xref:ROOT:adrs/0004-continuous-structure-design.adoc[ADR-0004]) is the filing
+pipeline's job; onboarding only records the selection.
+
+== Decisions to be recorded as ADRs
+
+* Tenant = ZITADEL org (1:1); `tenant_id` materialized lazily in Postgres,
+keyed by org id.
+* Tenant/onboarding state is owned by our Postgres, not ZITADEL metadata.
+* Storage region is set once at onboarding and is immutable thereafter.
+* Embedded, startup-applied SQL migrations as the v0.1 schema strategy.

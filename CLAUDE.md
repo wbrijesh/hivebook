@@ -56,6 +56,7 @@ docs
 │           │   ├── 0002-mark-and-defer-for-structural-changes.adoc
 │           │   ├── 0003-entity-reconciliation.adoc
 │           │   ├── 0004-tunable-defaults-to-dynamic-functions.adoc
+│           │   ├── 0005-tenancy-and-onboarding.adoc
 │           │   └── index.adoc
 │           ├── index.adoc
 │           ├── operations
@@ -76,6 +77,7 @@ docs
 │           │   │   └── design-doc-process.adoc
 │           │   ├── frontend
 │           │   │   ├── component-patterns.adoc
+│           │   │   ├── data-fetching.adoc
 │           │   │   └── state-management.adoc
 │           │   ├── go
 │           │   │   ├── errors.adoc
@@ -139,8 +141,12 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 
 - Dev cluster: `just start` · `just stop` · `just status` · `just health` · `just urls`
 - API tests: `cd api && go test ./...`
-- Build + deploy one service: `just api` · `just web` · `just docs`
+- After changing code, rebuild + roll out: `just update <service...>` (e.g.
+  `just update web api`) — builds the named services in parallel, zero-downtime.
 - Full local install: `just install`
+
+For logs and metrics use Grafana (`just urls`), not `just logs` — `just logs` is
+only a quick live tail. Run `just` for the full panel and day-to-day guidance.
 
 Everything runs on local OrbStack Kubernetes at `*.hivebook.localhost` over
 mkcert TLS. Details: `operations/infrastructure.adoc`.

@@ -1,0 +1,17 @@
+# Prototype app on https://prototype.hivebook.localhost.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prototype
+  namespace: hivebook
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`prototype.hivebook.localhost`)
+      kind: Rule
+      services:
+        - name: prototype
+          port: 3000
+  tls:
+    secretName: hivebook-wildcard-tls

@@ -16,6 +16,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"golang.org/x/oauth2"
 )
 
 // verifications counts token-verification outcomes on protected routes.
@@ -42,15 +44,30 @@ const claimsKey ctxKey = iota
 type Authenticator struct {
 	issuer   string
 	audience string
+	hc       *http.Client
+	idCache  *identityCache
+	provider atomic.Pointer[oidc.Provider]
 	verifier atomic.Pointer[oidc.IDTokenVerifier]
 }
+
+// Identity cache sizing (constants-first, ADR-0011). Bounded so the process
+// can't grow without limit; the TTL re-resolves a user after org changes.
+const (
+	identityCacheSize = 4096
+	identityCacheTTL  = 30 * time.Minute
+)
 
 // New starts an Authenticator and kicks off provider discovery in the
 // background. caFile, if set, is appended to the system cert pool so the issuer's
 // mkcert-signed TLS is trusted in-cluster.
 func New(issuer, audience, caFile string) *Authenticator {
-	a := &Authenticator{issuer: issuer, audience: audience}
-	go a.discover(buildHTTPClient(caFile))
+	a := &Authenticator{
+		issuer:   issuer,
+		audience: audience,
+		hc:       buildHTTPClient(caFile),
+		idCache:  newIdentityCache(identityCacheSize, identityCacheTTL),
+	}
+	go a.discover(a.hc)
 	return a
 }
 
@@ -73,6 +90,7 @@ func (a *Authenticator) discover(hc *http.Client) {
 			cfg.SkipClientIDCheck = true
 			log.Printf("auth: no HIVEBOOK_OIDC_AUDIENCE set — skipping audience check")
 		}
+		a.provider.Store(provider)
 		a.verifier.Store(provider.Verifier(cfg))
 		log.Printf("auth: OIDC provider ready (issuer=%s audience=%q)", a.issuer, a.audience)
 		return
@@ -117,6 +135,110 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 func Claims(r *http.Request) (map[string]any, bool) {
 	c, ok := r.Context().Value(claimsKey).(map[string]any)
 	return c, ok
+}
+
+// Identity is the caller's resolved profile: who they are (sub/name/email) and
+// which ZITADEL organization owns them (our tenant id, design-doc 0005).
+type Identity struct {
+	Sub   string
+	Name  string
+	Email string
+	Org   string
+}
+
+func strClaim(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func orgFromClaims(m map[string]any) string {
+	for _, k := range []string{
+		"urn:zitadel:iam:user:resourceowner:id",
+		"urn:zitadel:iam:org:id",
+	} {
+		if v := strClaim(m, k); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func nameFromClaims(m map[string]any) string {
+	if v := strClaim(m, "name"); v != "" {
+		return v
+	}
+	return strClaim(m, "preferred_username")
+}
+
+// Identity resolves the caller's profile and organization. It prefers the token
+// claims, and otherwise fetches them from the userinfo endpoint — ZITADEL's
+// access tokens are minimal, exposing name/email and the resource-owner org only
+// at userinfo (and only with the scopes the web app requests). Cached per user.
+func (a *Authenticator) Identity(ctx context.Context, r *http.Request) (Identity, error) {
+	claims, _ := Claims(r)
+	sub, _ := claims["sub"].(string)
+
+	if sub != "" {
+		if id, ok := a.idCache.get(sub); ok {
+			return id, nil
+		}
+	}
+
+	id := Identity{
+		Sub:   sub,
+		Name:  nameFromClaims(claims),
+		Email: strClaim(claims, "email"),
+		Org:   orgFromClaims(claims),
+	}
+
+	// Fill any gaps from userinfo (one call covers org, name and email).
+	if id.Org == "" || id.Name == "" || id.Email == "" {
+		info, err := a.userInfo(ctx, r)
+		if err != nil {
+			return Identity{}, err
+		}
+		if id.Org == "" {
+			id.Org = orgFromClaims(info)
+		}
+		if id.Name == "" {
+			id.Name = nameFromClaims(info)
+		}
+		if id.Email == "" {
+			id.Email = strClaim(info, "email")
+		}
+	}
+
+	if id.Org == "" {
+		return Identity{}, errors.New("no organization in userinfo (missing resourceowner scope?)")
+	}
+	if sub != "" {
+		a.idCache.add(sub, id)
+	}
+	return id, nil
+}
+
+// userInfo calls the issuer's userinfo endpoint with the request's bearer token.
+func (a *Authenticator) userInfo(ctx context.Context, r *http.Request) (map[string]any, error) {
+	p := a.provider.Load()
+	if p == nil {
+		return nil, errors.New("auth provider not ready")
+	}
+	raw, err := bearerToken(r)
+	if err != nil {
+		return nil, err
+	}
+	ui, err := p.UserInfo(oidc.ClientContext(ctx, a.hc),
+		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: raw}))
+	if err != nil {
+		return nil, fmt.Errorf("userinfo: %w", err)
+	}
+	var info map[string]any
+	if err := ui.Claims(&info); err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 func bearerToken(r *http.Request) (string, error) {

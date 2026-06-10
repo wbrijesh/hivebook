@@ -6,9 +6,10 @@ Keep client state small; let the server and the URL hold most of it.
 
 == Rules
 
-. *Server state lives on the server.* Fetch in Server Components / route handlers
-against the Go API (`NEXT_PUBLIC_API_BASE`); don't mirror it into a global client
-store.
+. *Server state goes through the data layer, not components.* Every Go API read
+and write uses the API layer + TanStack Query
+(xref:ROOT:standards/frontend/data-fetching.adoc[]). Don't fetch in components or
+mirror server state into a global store.
 . *Client state is local first* — `useState` / `useReducer` in the component
 that owns it. Lift only when shared; reach for context before any global store.
 . *URL is state.* Filters, tabs, and selection live in the query string so views
@@ -21,7 +22,7 @@ never blocks the UI.
 . *Public config is build-time* `NEXT_PUBLIC_*`, baked by the Dockerfile build
 args; there is no runtime config endpoint.
 
-== Open question
+== Data fetching
 
-A data-fetching / cache library (e.g. TanStack Query) is not yet chosen — the app
-is too small to need one. Decide via a design doc when a real data layer lands.
+Server state flows through one API layer + TanStack Query — see
+xref:ROOT:standards/frontend/data-fetching.adoc[].

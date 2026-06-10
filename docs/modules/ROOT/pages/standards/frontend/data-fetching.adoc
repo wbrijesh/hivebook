@@ -1,0 +1,71 @@
+= Frontend · Data Fetching
+:status: draft
+:last-reviewed: 2026-06-07
+
+All server state flows through one API layer and TanStack Query. No component
+calls `fetch`, builds a URL, attaches a token, or holds loading state by hand.
+
+== Rules
+
+. *One API layer.* Every call to the Go API goes through a typed function in
+`lib/api/` — one module per resource (`lib/api/tenant.ts`). Each function builds
+the URL, attaches the bearer token, parses the response, and returns typed data
+or throws. Nothing outside `lib/api/` calls `fetch` against the API.
+. *TanStack Query owns server state.* Components read with `useQuery` and write
+with `useMutation` (`@tanstack/react-query`). Caching, loading, error, and
+refetch are Query's job — never a hand-rolled `useEffect` + `useState` fetch.
+. *Bind queries in one place per resource.* `lib/queries/<resource>.ts` exports
+hooks (`useTenant()`, `useOnboard()`) that pair a stable query key with an API
+function. Usage sites call the hook, not `useQuery` inline.
+. *Query keys are structured and shared.* Arrays namespaced by resource —
+`["tenant"]`, `["book", id]` — defined once per resource so they don't drift. A
+mutation invalidates the keys it affects.
+. *One QueryClient at the root.* A single `QueryClientProvider` in the root
+layout; defaults (`staleTime`, `retry`) are set once there.
+. *Errors throw; Query surfaces them.* API functions throw a typed `ApiError`
+(status + message) on a non-2xx response. Components render Query's `error`, not
+their own `try/catch`.
+. *The API layer is the only place that knows the API* — base URL
+(`NEXT_PUBLIC_API_BASE`), the bearer token (from `lib/auth.ts`), status codes,
+and error shape. Swapping transport or auth touches one layer, not every caller.
+
+== Shape
+
+[source,tsx]
+----
+// lib/api/tenant.ts — transport only, no React
+export async function getTenant(): Promise<Tenant> {
+  return apiGet<Tenant>("/api/tenant")
+}
+export async function onboard(input: OnboardingInput): Promise<Tenant> {
+  return apiPost<Tenant>("/api/tenant/onboarding", input)
+}
+
+// lib/queries/tenant.ts — Query bindings, one place per resource
+export const tenantKeys = { all: ["tenant"] as const }
+
+export function useTenant() {
+  return useQuery({ queryKey: tenantKeys.all, queryFn: getTenant })
+}
+export function useOnboard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: onboard,
+    onSuccess: () => qc.invalidateQueries({ queryKey: tenantKeys.all }),
+  })
+}
+
+// a component — usage only
+const { data: tenant, isPending, error } = useTenant()
+----
+
+== Boundaries
+
+* *Fire-and-forget telemetry is not server state.* `track()`
+(xref:ROOT:standards/frontend/state-management.adoc[]) posts a beacon and never
+reads back — it stays a direct call, not a query.
+* *Auth stays in `lib/auth.ts`.* The API layer pulls the access token from the
+OIDC `userManager`; it does not own the session.
+* *Server Components may fetch directly* where used, but the app is
+client-rendered (OIDC tokens live in the browser), so most data flows through
+Query on the client.

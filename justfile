@@ -23,16 +23,25 @@ help:
     . scripts/ui.sh
     ui_logo
     ui_subtle "local dev control panel · OrbStack Kubernetes (run from anywhere in the repo)"
+    ui_subtle "the intended interface for working here — for humans and coding agents alike"
     echo
     ui_section "Commands"
     ui_box \
-      "just start  [service]   turn ON  — everything, or one service" \
-      "just stop   [service]   turn OFF — everything, or one service" \
-      "just status [service]   what's running (pod readiness)" \
-      "just health             real health checks across services" \
-      "just logs   [service]   follow one service, or recent from all" \
-      "just urls               service URLs & logins"
-    ui_subtle "services: api · web · docs · postgres · zitadel · zitadel-db · zitadel-login"
+      "just start  [service]      turn ON  — everything, or one service" \
+      "just stop   [service]      turn OFF — everything, or one service" \
+      "just update [service...]   rebuild image(s) & roll out — after code changes" \
+      "just status [service]      what's running (pod readiness)" \
+      "just health                real health checks across services" \
+      "just logs   [service]      follow one service's live log" \
+      "just urls                  service URLs & logins"
+    echo
+    ui_section "Working in the repo"
+    ui_info "Changed code   →  just update web api   rebuilds the image(s) & rolls out — in parallel, zero-downtime."
+    ui_info "Bring it up    →  just start, then just health to confirm everything's green."
+    ui_info "Inspect state  →  just status (pod readiness) · just health (live endpoint + DB checks)."
+    ui_info "Logs & metrics →  Grafana (just urls) is the observability surface — search, dashboards, history."
+    ui_info "                  just logs is only a quick live tail of one service, not for investigating."
+    ui_subtle "buildable: api · web · prototype · docs    ·    full set also: postgres · zitadel · zitadel-db · zitadel-login"
 
 # Service URLs & logins
 urls:
@@ -41,6 +50,7 @@ urls:
     ui_section "URLs & logins  (HTTPS via mkcert · local creds, never reuse)"
     ui_box \
       "Web app   https://app.hivebook.localhost" \
+      "Prototype https://prototype.hivebook.localhost  UI prototype (mock data, no login)" \
       "Docs      https://docs.hivebook.localhost       Antora site (no login)" \
       "Auth      https://id.hivebook.localhost         admin@hivebook.localhost / Password1!" \
       "API       https://api.hivebook.localhost        /health · /metrics · /api/me" \
@@ -79,6 +89,7 @@ health:
     ui_section "Hivebook"
     check "API" "/health 200" http "https://api.hivebook.localhost/health"
     check "Web" "HTTP 200" http "https://app.hivebook.localhost/"
+    check "Prototype" "HTTP 200" http "https://prototype.hivebook.localhost/"
     check "Docs" "HTTP 200" http "https://docs.hivebook.localhost/"
     check "Postgres" "pg_isready" kubectl -n hivebook exec statefulset/postgres -- pg_isready -q
 
@@ -229,11 +240,110 @@ status service="all":
       echo "$pods" | while read -r ns pod ready status _rest; do show "$ns/$pod" "$ready" "$status"; done
     fi
 
+# The day-to-day "I changed code" command. Defaults to all app services; pass any
+# subset (`just update web api`). Targets build and roll out in parallel — no waiting
+# on one before the next — and each rollout is zero-downtime.
+# Rebuild image(s) & roll out — parallel across the named services
+update *services:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    . scripts/ui.sh
+    if ! kubectl get ns >/dev/null 2>&1; then
+      ui_fail "Kubernetes isn't reachable — run 'just start' first."
+      exit 1
+    fi
+    buildable="api web prototype docs"
+    targets="{{services}}"; [ -z "${targets// /}" ] && targets="$buildable"
+    for s in $targets; do
+      case " $buildable " in *" $s "*) ;; *) ui_fail "can't build '$s' — buildable: $buildable"; exit 1 ;; esac
+    done
+
+    ui_header "Rebuild & deploy"
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+    svcs=(); for s in $targets; do svcs+=("$s"); done
+    for s in "${svcs[@]}"; do
+      ( just _build "$s" >"$tmp/$s.log" 2>&1; echo $? >"$tmp/$s.rc" ) &
+    done
+
+    # Live, all-at-once status block: one row per service, redrawn in place.
+    spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; frame=0; first=1; total=${#svcs[@]}
+    OK=$'\033[38;5;42m'; RUN=$'\033[38;5;208m'; ERR=$'\033[38;5;196m'; DIM=$'\033[38;5;244m'; OFF=$'\033[0m'
+    while :; do
+      [ "$first" = 1 ] || printf '\033[%dA' "$total"; first=0
+      done_n=0; sp=${spin:frame:1}
+      for s in "${svcs[@]}"; do
+        if [ -f "$tmp/$s.rc" ]; then
+          done_n=$((done_n+1))
+          if [ "$(cat "$tmp/$s.rc")" = 0 ]; then printf '\033[K  %s✓%s %-10s deployed\n' "$OK" "$OFF" "$s"
+          else printf '\033[K  %s✗%s %-10s failed\n' "$ERR" "$OFF" "$s"; fi
+        else
+          printf '\033[K  %s%s%s %-10s %sbuilding & rolling out…%s\n' "$RUN" "$sp" "$OFF" "$s" "$DIM" "$OFF"
+        fi
+      done
+      [ "$done_n" = "$total" ] && break
+      frame=$(((frame+1)%10)); sleep 0.15
+    done
+    wait
+
+    fails=0
+    for s in "${svcs[@]}"; do
+      [ "$(cat "$tmp/$s.rc" 2>/dev/null || echo 1)" = 0 ] && continue
+      fails=$((fails+1))
+      ui_section "$s — build/deploy log (tail)"
+      tail -n 25 "$tmp/$s.log" 2>/dev/null
+    done
+    if [ "$fails" = 0 ]; then ui_ok "updated: ${svcs[*]}"; else ui_fail "$fails of $total failed — logs above"; exit 1; fi
+
 # ========================================================================
 # Hidden helpers + install/deploy recipes (no git backup, so kept here).
 # Runnable (e.g. `just install`, `just api`) but not shown in `just`.
 # We'll surface these as real commands if/when we need them.
 # ========================================================================
+
+# Build one service's image, apply its manifests, and roll it out (waiting for
+# readiness). Single source of truth for per-service deploy — used by `update`
+# and by the install/wrapper recipes below.
+[private]
+_build service:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
+    case "{{service}}" in
+      api)
+        docker build -t hivebook-api:dev ../api
+        kubectl -n hivebook create secret generic hivebook-db \
+          --from-literal=POSTGRES_DB=hivebook --from-literal=POSTGRES_USER=hivebook \
+          --from-literal=POSTGRES_PASSWORD="$HIVEBOOK_DB_PASSWORD" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl apply -f postgres/
+        kubectl apply -f api/
+        kubectl -n hivebook rollout restart deployment/api
+        kubectl -n hivebook rollout status deployment/api --timeout=180s
+        ;;
+      web)
+        docker build -t hivebook-web:dev ../web \
+          --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://id.hivebook.localhost \
+          --build-arg NEXT_PUBLIC_API_BASE=https://api.hivebook.localhost \
+          --build-arg NEXT_PUBLIC_OIDC_CLIENT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.WEB_CLIENT_ID}' | base64 -d)" \
+          --build-arg NEXT_PUBLIC_OIDC_PROJECT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.PROJECT_ID}' | base64 -d)"
+        kubectl apply -f web/
+        kubectl -n hivebook rollout restart deployment/web
+        kubectl -n hivebook rollout status deployment/web --timeout=180s
+        ;;
+      prototype)
+        docker build -t hivebook-prototype:dev ../prototype
+        kubectl apply -f prototype/
+        kubectl -n hivebook rollout restart deployment/prototype
+        kubectl -n hivebook rollout status deployment/prototype --timeout=180s
+        ;;
+      docs)
+        docker build -t hivebook-docs:dev -f ../docs/Dockerfile ..
+        kubectl apply -f docs/
+        kubectl -n hivebook rollout restart deployment/docs
+        kubectl -n hivebook rollout status deployment/docs --timeout=180s
+        ;;
+      *) echo "unknown buildable service: {{service}}" >&2; exit 1 ;;
+    esac
 
 [private]
 _ns service:
@@ -243,13 +353,14 @@ _ns service:
     echo "$n"
 
 [private]
-install: infra coredns auth provision api web docs observability
+install: infra coredns auth provision api web prototype docs observability
     #!/usr/bin/env bash
     . scripts/ui.sh
     ui_logo
     ui_header "Hivebook installed"
     ui_box \
       "Web app   https://app.hivebook.localhost" \
+      "Prototype https://prototype.hivebook.localhost" \
       "Docs      https://docs.hivebook.localhost" \
       "Auth      https://id.hivebook.localhost      admin@hivebook.localhost / Password1!" \
       "API       https://api.hivebook.localhost" \
@@ -331,40 +442,31 @@ auth: repos
     kubectl apply -f zitadel/ingressroute.yaml
     ui_ok "ZITADEL up on https://id.hivebook.localhost"
 
+# Install-time wrappers: build + deploy one service with a gum header/footer.
+# All real build logic lives in `_build` (the single source of truth, shared with
+# `update`). Day-to-day, prefer `just update <svc...>`.
 [private]
 api:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    . scripts/ui.sh
-    ui_header "Deploy · API (Go)"
-    docker build -t hivebook-api:dev ../api
-    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
-    # App DB credentials from .env (not committed)
-    kubectl -n hivebook create secret generic hivebook-db \
-      --from-literal=POSTGRES_DB=hivebook --from-literal=POSTGRES_USER=hivebook \
-      --from-literal=POSTGRES_PASSWORD="$HIVEBOOK_DB_PASSWORD" \
-      --dry-run=client -o yaml | kubectl apply -f -
-    kubectl apply -f postgres/
-    kubectl apply -f api/
-    kubectl -n hivebook rollout restart deployment/api
-    ui_ok "API deployed on https://api.hivebook.localhost"
+    @bash -c '. scripts/ui.sh && ui_header "Deploy · API (Go)"'
+    just _build api
+    @bash -c '. scripts/ui.sh && ui_ok "API deployed on https://api.hivebook.localhost"'
 
 [private]
 web:
     @bash -c '. scripts/ui.sh && ui_header "Deploy · web (Next.js)"'
-    docker build -t hivebook-web:dev ../web --build-arg NEXT_PUBLIC_OIDC_ISSUER=https://id.hivebook.localhost --build-arg NEXT_PUBLIC_API_BASE=https://api.hivebook.localhost --build-arg NEXT_PUBLIC_OIDC_CLIENT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.WEB_CLIENT_ID}' | base64 -d)" --build-arg NEXT_PUBLIC_OIDC_PROJECT_ID="$(kubectl -n hivebook get secret hivebook-oidc -o jsonpath='{.data.PROJECT_ID}' | base64 -d)"
-    kubectl apply -f web/
-    kubectl -n hivebook rollout restart deployment/web
+    just _build web
     @bash -c '. scripts/ui.sh && ui_ok "web deployed on https://app.hivebook.localhost"'
 
-# Build the Antora docs site image and deploy it (https://docs.hivebook.localhost).
+[private]
+prototype:
+    @bash -c '. scripts/ui.sh && ui_header "Deploy · prototype (Next.js)"'
+    just _build prototype
+    @bash -c '. scripts/ui.sh && ui_ok "prototype deployed on https://prototype.hivebook.localhost"'
+
 [private]
 docs:
     @bash -c '. scripts/ui.sh && ui_header "Deploy · docs (Antora)"'
-    docker build -t hivebook-docs:dev -f ../docs/Dockerfile ..
-    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
-    kubectl apply -f docs/
-    kubectl -n hivebook rollout restart deployment/docs
+    just _build docs
     @bash -c '. scripts/ui.sh && ui_ok "docs deployed on https://docs.hivebook.localhost"'
 
 [private]

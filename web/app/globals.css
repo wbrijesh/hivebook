@@ -5,128 +5,187 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-subtle-foreground: var(--brand-subtle-foreground);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-subtle-foreground: var(--success-subtle-foreground);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-subtle-foreground: var(--warning-subtle-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* Spine — the third plane: the dark system frame (icon rail). */
+  --color-spine: var(--spine);
+  --color-spine-foreground: var(--spine-foreground);
+  --color-spine-muted: var(--spine-muted);
+  --color-spine-accent: var(--spine-accent);
+  --color-spine-border: var(--spine-border);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.45rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+  /* Neutrals: Spectrum gray (pure neutral, no hue). */
+  --background: #f8f8f8; /* gray-100 — page sits below the white card */
+  --foreground: #222222; /* gray-800 */
+  --card: #ffffff; /* gray-50  — card lifts off the page */
+  --card-foreground: #222222;
+  --popover: #ffffff;
+  --popover-foreground: #222222;
+  /* Primary = accent (Adobe Spectrum Cyan-900). These brand tokens are the
+       single brand source — change the accent here and in .dark to rebrand. */
+  --primary: #00719f;
+  --primary-foreground: #ffffff;
+  --primary-hover: #005d89; /* cyan-1000 (one step darker) */
+  --secondary: #f8f8f8; /* gray-100 */
+  --secondary-foreground: #222222;
+  --muted: #f8f8f8;
+  --muted-foreground: #5f5f5f; /* between gray-600/700 — ~5.4:1, buys contrast margin on small text */
+  --accent: #f8f8f8; /* neutral hover surface (shadcn "accent") */
+  --accent-foreground: #222222;
+  --destructive: #d31510; /* red-900 */
+  --destructive-foreground: #ffffff;
+  --border: #d5d5d5; /* gray-300 */
+  --input: #b1b1b1; /* gray-400 — clearly visible field edges */
+  --ring: #00719f; /* cyan-900 */
+  --brand: #00719f;
+  --brand-foreground: #ffffff;
+  --brand-subtle: #c5f8ff; /* cyan-100 */
+  --brand-subtle-foreground: #005d89; /* cyan-1000 */
+  --success: #007a4d; /* green-900 */
+  --success-subtle: #cef8e0; /* green-100 */
+  --success-subtle-foreground: #00653e; /* green-1000 */
+  --warning: #856600; /* yellow-900 (distinct from orange accent) */
+  --warning-subtle: #fbf198; /* yellow-100 */
+  --warning-subtle-foreground: #5b4300; /* yellow-1100 */
+  --chart-1: #00719f;
+  --chart-2: #0086b4;
+  --chart-3: #6d6d6d;
+  --chart-4: #b1b1b1;
+  --chart-5: #464646;
+  --radius: 0.45rem;
+  /* UI typeface (loaded in app/layout.tsx). */
+  --font-sans: var(--font-inter);
+  --sidebar: #fdfdfd;
+  --sidebar-foreground: #222222;
+  --sidebar-primary: #00719f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f8f8f8;
+  --sidebar-accent-foreground: #222222;
+  --sidebar-border: #e6e6e6;
+  --sidebar-ring: #00719f;
+  /* Spine — dark in BOTH themes; the system frame reads the same in light
+       and dark. Icons sit muted, lift to foreground on hover, accent when active. */
+  --spine: #1c1c1c; /* near-black neutral rail */
+  --spine-foreground: #f2f2f2; /* active / hovered icon + label */
+  --spine-muted: #8c8c8c; /* idle icon — ~4.7:1 on the rail */
+  --spine-accent: #2c2c2c; /* hover / active pill background */
+  --spine-border: #2c2c2c; /* hairline against the app plane */
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+  /* Neutrals: Spectrum gray (dark theme). */
+  --background: #1d1d1d; /* gray-50  */
+  --foreground: #ebebeb; /* gray-800 */
+  --card: #262626; /* gray-75  */
+  --card-foreground: #ebebeb;
+  --popover: #262626;
+  --popover-foreground: #ebebeb;
+  /* Primary = accent (Adobe Spectrum Cyan-900, dark) — bright, so dark text on it. */
+  --primary: #2cc1e6;
+  --primary-foreground: #1d1d1d;
+  --primary-hover: #54d3f1; /* cyan-1000 (one step) */
+  --secondary: #323232; /* gray-100 */
+  --secondary-foreground: #ebebeb;
+  --muted: #323232;
+  --muted-foreground: #b2b2b2; /* gray-600 */
+  --accent: #323232;
+  --accent-foreground: #ebebeb;
+  --destructive: #f65843; /* red-700 (dark) */
+  --destructive-foreground: #1d1d1d;
+  --border: #3f3f3f; /* gray-200 */
+  --input: #545454; /* gray-300 */
+  --ring: #2cc1e6; /* cyan-900 (dark) */
+  --brand: #2cc1e6;
+  --brand-foreground: #1d1d1d;
+  --brand-subtle: #003d62; /* cyan-100 (dark) */
+  --brand-subtle-foreground: #7fe4f9; /* cyan-1100 (dark) */
+  --success: #43c78f; /* green-900 (dark) */
+  --success-subtle: #044329; /* green-100 (dark) */
+  --success-subtle-foreground: #81e9b8; /* green-1100 (dark) */
+  --warning: #d3ae00; /* yellow-900 (dark, distinct from orange accent) */
+  --warning-subtle: #4c3600; /* yellow-100 (dark) */
+  --warning-subtle-foreground: #f4d500; /* yellow-1100 (dark) */
+  --chart-1: #2cc1e6;
+  --chart-2: #0eadd7;
+  --chart-3: #b2b2b2;
+  --chart-4: #707070;
+  --chart-5: #d1d1d1;
+  --sidebar: #262626;
+  --sidebar-foreground: #ebebeb;
+  --sidebar-primary: #2cc1e6;
+  --sidebar-primary-foreground: #1d1d1d;
+  --sidebar-accent: #323232;
+  --sidebar-accent-foreground: #ebebeb;
+  --sidebar-border: #3f3f3f;
+  --sidebar-ring: #2cc1e6;
+  /* Spine — slightly deeper than the dark page so the rail still reads as a
+       distinct plane below the app surface. */
+  --spine: #141414;
+  --spine-foreground: #f2f2f2;
+  --spine-muted: #8c8c8c;
+  --spine-accent: #2c2c2c;
+  --spine-border: #000000;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
-  button:not(:disabled), [role="button"]:not(:disabled) {
-    cursor: pointer;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }

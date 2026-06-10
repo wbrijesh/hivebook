@@ -12,7 +12,6 @@ import {
   RiLogoutBoxRLine,
   RiNodeTree,
   RiNotification3Fill,
-  RiSearchLine,
   RiSettings3Fill,
   RiShieldKeyholeFill,
   RiSidebarFoldLine,
@@ -21,9 +20,7 @@ import {
   RiTeamFill,
 } from "@remixicon/react"
 
-import { useCommandMenu } from "@/components/app/command-menu"
 import { Logo } from "@/components/brand/logo"
-import { Kbd } from "@/components/ui/kbd"
 import { mockUser, mockTenants } from "@/lib/mock-data"
 import {
   Tooltip,
@@ -123,7 +120,6 @@ const MANAGE: Item[] = [
 
 export function AppSpine() {
   const pathname = usePathname()
-  const cmd = useCommandMenu()
   const { expanded } = useSpine()
   const isActive = (href: string) =>
     href === "/book" ? pathname.startsWith("/book") : pathname.startsWith(href)
@@ -141,13 +137,6 @@ export function AppSpine() {
 
         <Divider />
 
-        <SpineAction
-          label="Search"
-          kbd="⌘K"
-          icon={RiSearchLine}
-          onClick={cmd.open}
-          className="border border-spine-border bg-spine-accent/40 text-spine-muted hover:bg-spine-accent hover:text-spine-foreground"
-        />
         {KNOWLEDGE.map((item) => (
           <SpineLink key={item.href} item={item} active={isActive(item.href)} />
         ))}
@@ -216,51 +205,6 @@ function SpineLink({ item, active }: { item: Item; active: boolean }) {
       </TooltipTrigger>
       <TooltipContent side="right" hidden={expanded}>
         {item.label}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
-function SpineAction({
-  label,
-  kbd,
-  icon: Icon,
-  onClick,
-  className,
-}: {
-  label: string
-  kbd?: string
-  icon: React.ElementType
-  onClick: () => void
-  className?: string
-}) {
-  const { expanded } = useSpine()
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={onClick}
-          className={cn(
-            rowBase,
-            "text-spine-muted hover:bg-spine-accent/60 hover:text-spine-foreground",
-            className
-          )}
-        >
-          <Glyph>
-            <Icon className="size-4.5" />
-          </Glyph>
-          <Label>{label}</Label>
-          {kbd && (
-            <Kbd className="shrink-0 border border-spine-muted/40 bg-transparent text-spine-muted group-data-[state=collapsed]/spine:hidden">
-              {kbd}
-            </Kbd>
-          )}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right" className="gap-2" hidden={expanded}>
-        {label}
-        {kbd && <Kbd>{kbd}</Kbd>}
       </TooltipContent>
     </Tooltip>
   )

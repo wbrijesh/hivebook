@@ -19,6 +19,7 @@ import {
 } from "@remixicon/react"
 
 import { StylePicker } from "@/components/brand/style-picker"
+import { AppSearch } from "@/components/app/app-search"
 import { ChromeActionHost } from "@/components/app/chrome"
 import { pathOf } from "@/lib/mock-book"
 
@@ -107,6 +108,7 @@ export function AppContextBar() {
       </nav>
 
       <ChromeActionHost className="flex shrink-0 items-center gap-1.5" />
+      <AppSearch />
       <StylePicker />
     </header>
   )

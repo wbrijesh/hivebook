@@ -10,8 +10,6 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"api/internal/auth"
 )
 
 func (s *Server) RegisterRoutes() http.Handler {
@@ -41,6 +39,8 @@ func (s *Server) RegisterRoutes() http.Handler {
 	r.Group(func(pr chi.Router) {
 		pr.Use(s.auth.Middleware)
 		pr.Get("/api/me", s.meHandler)
+		pr.Get("/api/tenant", s.tenantHandler)
+		pr.Post("/api/tenant/onboarding", s.onboardingHandler)
 	})
 
 	return r
@@ -63,13 +63,32 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(jsonResp)
 }
 
-// meHandler returns the verified token's claims for the authenticated caller.
+type meUser struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type meResponse struct {
+	User   meUser         `json:"user"`
+	Tenant tenantResponse `json:"tenant"`
+}
+
+// meHandler returns the authenticated caller's identity and tenant — both
+// resolved server-side from the token/userinfo and the database, never trusted
+// from the client (design-doc 0005). This is the chrome's single source for who
+// the user is and which workspace they're in.
 func (s *Server) meHandler(w http.ResponseWriter, r *http.Request) {
-	claims, ok := auth.Claims(r)
+	id, ok := s.callerFromRequest(w, r)
 	if !ok {
-		http.Error(w, "no claims", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(claims)
+	t, ok := s.tenantForCaller(w, r, id.Org)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, meResponse{
+		User:   meUser{ID: id.Sub, Name: id.Name, Email: id.Email},
+		Tenant: toTenantResponse(t),
+	})
 }

@@ -17,7 +17,9 @@ export default function Callback() {
         window.location.href = "/"
       })
       .catch((e: unknown) => {
-        track("login_error", { message: e instanceof Error ? e.message : String(e) })
+        track("login_error", {
+          message: e instanceof Error ? e.message : String(e),
+        })
         setMsg(`Sign-in failed: ${e instanceof Error ? e.message : String(e)}`)
       })
   }, [])

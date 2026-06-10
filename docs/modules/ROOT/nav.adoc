@@ -21,6 +21,7 @@
 * xref:design-docs/0002-mark-and-defer-for-structural-changes.adoc[0002 · Mark-and-defer]
 * xref:design-docs/0003-entity-reconciliation.adoc[0003 · Entity reconciliation]
 * xref:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[0004 · Tunable defaults]
+* xref:design-docs/0005-tenancy-and-onboarding.adoc[0005 · Tenant model & onboarding]
 * xref:design-docs/0000-template.adoc[Template]
 
 .Decision records (ADRs)
@@ -48,6 +49,7 @@
 * Frontend
 ** xref:standards/frontend/component-patterns.adoc[Component patterns]
 ** xref:standards/frontend/state-management.adoc[State management]
+** xref:standards/frontend/data-fetching.adoc[Data fetching]
 * Infra
 ** xref:standards/infra/namespaces.adoc[Namespaces]
 ** xref:standards/infra/labels.adoc[Labels & naming]

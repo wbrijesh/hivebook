@@ -1,15 +1,21 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Inter } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
+// The UI typeface (Inter) and the mono face. Each exposes a CSS variable that
+// the design tokens read (--font-sans → --font-inter; see app/globals.css).
+const fontInter = Inter({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-inter",
+  display: "swap",
 })
+const fontMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
+
+const fontVariables = [fontInter.variable, fontMono.variable]
 
 export default function RootLayout({
   children,
@@ -20,10 +26,13 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable)}
+      className={cn("antialiased", "font-sans", ...fontVariables)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
+          <Toaster position="bottom-center" />
+        </ThemeProvider>
       </body>
     </html>
   )
