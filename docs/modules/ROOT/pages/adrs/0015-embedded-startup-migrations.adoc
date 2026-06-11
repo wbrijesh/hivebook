@@ -1,0 +1,30 @@
+= 0015 — Embedded, startup-applied SQL migrations
+:adr-id: 0015
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+The schema needs to evolve, and the API must not run against an out-of-date
+database. v0.1 is a single API talking to one Postgres.
+
+== Decision
+
+Migrations are versioned SQL files embedded in the API binary and applied on
+startup, in filename order, each in its own transaction, tracked in a
+`schema_migrations` table. No external migration tool.
+
+== Alternatives considered
+
+* *An external migration tool* (goose, golang-migrate) — another binary and step
+to operate for no benefit at this size.
+* *ORM auto-migrate* — implicit and hard to review; we want explicit SQL.
+
+== Consequences
+
+Zero-ops schema evolution; the running binary is always paired with its schema.
+Ordering is by filename, so versions are named deliberately. Not suited to
+multi-writer or zero-downtime coordination at scale — revisit if that arrives.

@@ -10,7 +10,7 @@ import { submitOnboarding } from "@/lib/tenant"
 import { track } from "@/lib/telemetry"
 
 // What comes after setup. None of these are built yet, so they're shown as a
-// preview of what's next — present but disabled, never a dead link.
+// static preview of what's next — inert rows with a "Soon" tag, never controls.
 const NEXT = [
   {
     title: "Connect your first source",
@@ -87,7 +87,6 @@ export default function CompletePage() {
           {NEXT.map((n) => (
             <div
               key={n.title}
-              aria-disabled
               className="flex items-center gap-3 px-4 py-3 opacity-55"
             >
               <div className="min-w-0 flex-1">

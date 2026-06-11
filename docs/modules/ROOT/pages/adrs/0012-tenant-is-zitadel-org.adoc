@@ -1,0 +1,31 @@
+= 0012 — Tenant is one ZITADEL organization
+:adr-id: 0012
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+ZITADEL owns identity — users and organizations. The product needs a stable
+`tenant_id` to hang every record off (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]),
+and a bridge from the verified token to that id.
+
+== Decision
+
+A tenant is one ZITADEL organization, 1:1. The token's resource-owner org is the
+`tenant_id`. The `tenants` row is materialized lazily in Postgres on the first
+authenticated request from an org we have not seen.
+
+== Alternatives considered
+
+* *User-level tenant* — simpler locally, but diverges from the B2B "`one company =
+one tenant`" model and would need rework.
+* *Eager provisioning via a ZITADEL action/webhook* — more moving parts and an
+IdP→app coupling we don't need; lazy materialization is sufficient.
+
+== Consequences
+
+The first request from a new org does a write (once). The org→tenant mapping is
+fixed. No signup webhook to operate. Onboarding runs once per tenant, not per user.

@@ -1,0 +1,45 @@
+= 0016 — Configuration layering, kept minimal
+:adr-id: 0016
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0007-configuration-pattern.adoc
+
+== Context
+
+Every service needs configuration, and without a stated home for each kind it
+sprawls. Configuration is also a liability — a surface to drift, mis-set, and
+audit.
+
+== Decision
+
+Configuration is layered, each kind with one home, and a value earns a place only
+with a strong reason:
+
+* *Secrets* → env, from Kubernetes secrets sourced from `infra/.env`. Never in
+code or committed manifests.
+* *Env-specific values* (URLs, issuer, audience) → env; the web bakes
+`NEXT_PUBLIC_*` at build.
+* *Constants / tunables* → code (Go constants-first,
+xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]).
+* *Brand* → design tokens in `web/app/globals.css`.
+* *Externalized config* that must be edited outside code → a minimal,
+schema-validated per-service *YAML* file — and only with a strong justification.
+
+The default is to add nothing. Nothing meets the YAML bar yet.
+
+== Alternatives considered
+
+* *Typed code modules for the externalized layer* — wrong surface for config
+meant to be edited outside code; we keep code for constants, not config.
+* *Everything in YAML* — invites sprawl; most values are secrets or constants
+that don't belong in a hand-edited file.
+* *A central config service / remote flags* — infrastructure we don't need yet.
+
+== Consequences
+
+A clear answer to "`where does this value go?`" and a small config surface. YAML
+exists as the escape hatch but stays empty until something genuinely needs it
+(likely the shared onboarding vocabulary once the API validates it too). Brand is
+not readable from TypeScript until, and unless, a real need moves it.

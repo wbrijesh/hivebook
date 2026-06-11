@@ -1,0 +1,48 @@
+= Checks & CI
+:status: living
+:last-reviewed: 2026-06-11
+
+One gate, one definition, run the same way everywhere. The checks are *code*
+(a Dagger module in `.dagger/`), not shell scripts or CI YAML — so they run
+identically on a laptop and in CI, in clean pinned containers.
+
+== The gate
+
+[source,bash]
+----
+just check        # the gate — what CI runs
+dagger call check # the same thing, directly
+----
+
+`check` runs two suites in parallel, each in its own container:
+
+* *web* — `prettier --check`, `eslint`, `tsc --noEmit` (Node, pnpm).
+* *api* — `go build`, `go vet`, and the *full* `go test ./...`, including the
+testcontainers integration tests (a Docker-in-Docker engine is bound for them).
+
+Toolchain images are pinned to match the service Dockerfiles, so the checks and
+the shipped images agree on versions.
+
+== Where it lives
+
+* `.dagger/main.go` — the pipeline. Add or change a check here, in Go.
+* `dagger.json` — module + pinned engine version.
+* `.github/workflows/ci.yml` — a few lines that install Dagger and run
+`dagger call check`. All real logic is in the module, not the YAML.
+
+The generated SDK bindings (`.dagger/internal`, `dagger.gen.go`) are gitignored
+and regenerated automatically by `dagger call` / `dagger develop`.
+
+== Local use
+
+* `just check` before pushing — it is the same pipeline as CI.
+* `just format` fixes web formatting (Prettier). The containerized equivalent is
+`dagger call format export --path=web`.
+* Requires a running container engine (OrbStack locally; `just start` brings the
+cluster up, OrbStack itself provides the engine).
+
+== Adding a check
+
+Add an exported method to the `Hivebook` type in `.dagger/main.go` and, if it
+should gate merges, call it from `Check`. Functions are invocable immediately as
+`dagger call <name>` (CamelCase → kebab-case). No SDK or YAML changes needed.

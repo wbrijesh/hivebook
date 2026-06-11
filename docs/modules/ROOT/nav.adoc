@@ -22,6 +22,8 @@
 * xref:design-docs/0003-entity-reconciliation.adoc[0003 · Entity reconciliation]
 * xref:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[0004 · Tunable defaults]
 * xref:design-docs/0005-tenancy-and-onboarding.adoc[0005 · Tenant model & onboarding]
+* xref:design-docs/0006-api-transport-and-contract.adoc[0006 · API transport & contract]
+* xref:design-docs/0007-configuration-pattern.adoc[0007 · Configuration pattern]
 * xref:design-docs/0000-template.adoc[Template]
 
 .Decision records (ADRs)
@@ -37,10 +39,17 @@
 * xref:adrs/0009-chapter-level-access.adoc[0009 · Chapter-level access]
 * xref:adrs/0010-day-zero-enterprise-primitives.adoc[0010 · Day-zero enterprise primitives]
 * xref:adrs/0011-constants-first-tunables.adoc[0011 · Constants-first tunables]
+* xref:adrs/0012-tenant-is-zitadel-org.adoc[0012 · Tenant = ZITADEL org]
+* xref:adrs/0013-tenant-state-in-postgres.adoc[0013 · Tenant state in Postgres]
+* xref:adrs/0014-region-write-once.adoc[0014 · Region write-once]
+* xref:adrs/0015-embedded-startup-migrations.adoc[0015 · Embedded startup migrations]
+* xref:adrs/0016-configuration-layering.adoc[0016 · Configuration layering]
 * xref:adrs/0000-template.adoc[Template]
 
 .Standards
 * xref:standards/index.adoc[Overview]
+* xref:standards/ci.adoc[Checks & CI]
+* xref:standards/git.adoc[Git & commits]
 * Go
 ** xref:standards/go/package-layout.adoc[Package layout]
 ** xref:standards/go/errors.adoc[Errors & responses]

@@ -88,16 +88,17 @@ Not a robot, not a friend.
 
 == Visual system
 
-Tokens live in `prototype/app/globals.css`. Never use raw Tailwind palette
-classes; always the semantic tokens. (See the project memory on the color
-system.)
+Tokens live in `web/app/globals.css` (the prototype carries its own copy). Never
+use raw Tailwind palette classes; always the semantic tokens. The token file is
+also the single brand source (xref:ROOT:design-docs/0007-configuration-pattern.adoc[design-doc 0007]).
 
 === Color
 
 * *Neutrals:* pure Adobe Spectrum gray (no hue tint).
 * *Accent:* one hue, used sparingly — primary buttons, focus rings, links,
-selected state. Carries meaning; never decorative. (Currently orange; the
-accent is configurable while we settle it.)
+selected state. Carries meaning; never decorative. *Cyan* (Adobe Spectrum
+cyan-900), fixed; change it in `web/app/globals.css`. (The live accent/font
+picker is a `prototype/`-only dev tool, not shipped in the app.)
 * *Status:* `success` (green), `warning` (yellow — kept distinct from the
 accent), `destructive` (red). Each has a `++*++-subtle` background {plus} foreground
 pair for badges and callouts.
@@ -221,6 +222,5 @@ for its own sake · a template · a toy.
 
 == Open questions
 
-* *Accent hue.* Configurable for now; needs a final commit.
 * *Density ceiling.* How dense the corpus/admin surfaces go before "`calm
 density`" tips into cramped — decide against the first real book-browse screen.

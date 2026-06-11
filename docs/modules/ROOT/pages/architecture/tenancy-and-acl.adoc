@@ -44,9 +44,13 @@ onboarding the book has no chapters to restrict.
 
 User identity comes from the tenant's SSO provider via the auth layer
 (see xref:ROOT:architecture/enterprise-controls.adoc[]). There is no per-source identity
-mapping — a consequence of not using source ACLs. The auth provider
-build-vs-buy choice (Zitadel, WorkOS, hand-built) is deferred to build
-time.
+mapping — a consequence of not using source ACLs.
+
+The provider is *ZITADEL*. A tenant is one ZITADEL organization, 1:1: the
+verified token's resource-owner org is the `tenant++_++id`, and the `tenants` row
+is materialized lazily on first authenticated request. Full design and the
+onboarding that fills the tenant in:
+xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005].
 
 == Query-time enforcement
 

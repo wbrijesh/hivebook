@@ -1,0 +1,97 @@
+= 0007 — Configuration Pattern
+:design-id: 0007
+:status: accepted
+:date: 2026-06-10
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs: adrs/0016-configuration-layering.adoc
+
+== Context
+
+Every service — backend and frontend — needs configuration, and right now each
+reaches for whatever is nearest: secrets live in `infra/.env` injected as
+Kubernetes secrets; the web app's public values are `NEXT_PUBLIC_*` build args;
+Go tunables are constants (xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]);
+and the brand (accent, font) was, until just now, a runtime experiment baked
+back into `web/app/globals.css`. There is no stated pattern for *which kind of
+config goes where*, so as services multiply the answer will drift.
+
+This doc names the layers and the one pattern. The guiding rule is *minimalism*:
+configuration is a liability, so a value earns a place in it only with a very good
+reason — otherwise it stays a constant in code, an env var, or a design token.
+
+== Goals
+
+* A layered config model every service follows, so "`where does this value go?`"
+has one answer.
+* Type-safety where config is engineer-edited; secrets never in code or committed
+manifests.
+* Extensible to many services without a per-service bespoke scheme.
+
+== Non-goals
+
+* A runtime config service or dynamic feature-flag platform.
+* Live editing by non-engineers / ops without a deploy (possible later; not now).
+* Re-deciding secret handling — `infra/.env` → k8s secrets is unchanged
+(xref:ROOT:operations/infrastructure.adoc[]).
+
+== Proposal
+
+Config splits into four layers, each with one home:
+
+[cols="1,3",options="header"]
+|===
+|Layer |Home
+|*Secrets* |`infra/.env` (gitignored, template `infra/.env.example`) → k8s secrets. Never in code or committed manifests.
+|*Env-specific values* (URLs, issuer, audience) |Environment. The web bakes `NEXT_PUBLIC_*` at build time (xref:ROOT:standards/frontend/state-management.adoc[]); the API reads env at startup.
+|*App constants / tunables* (not env-specific) |Constants in code, per service. Go: constants-first (xref:ROOT:adrs/0011-constants-first-tunables.adoc[ADR-0011]) — e.g. the auth identity-cache sizing. Frontend: a small typed module only when a constant is shared across files.
+|*Brand* (accent, shades, font) |Design tokens in `web/app/globals.css` — the single brand source (xref:ROOT:design/design-language.adoc[]). Stays there; not duplicated into config.
+|*Externalized config* (must be editable outside code, with a strong reason) |A minimal per-service YAML file, schema-validated on load. Nothing qualifies yet.
+|===
+
+The rule of thumb: *secret → env; differs per environment → env; a constant →
+code; a design token → the token file; needs editing outside code (rare, and
+justified) → a minimal YAML.* The default is to add nothing.
+
+=== Brand stays in the design tokens
+
+The brand is fixed to cyan + Inter as the design tokens in `web/app/globals.css`.
+That file *is* the brand source — tokens are the natural home, it is already a
+single editable place, and nothing reads brand values from TypeScript. A separate
+`config/brand.ts` (or a YAML applier) would be machinery for no current gain, so
+it does not happen until a real need appears (e.g. non-engineer theming).
+
+== Alternatives considered
+
+* *Typed code modules for the file layer:* type-safe and no loader, but for
+config genuinely meant to be edited outside code, a code file is the wrong
+surface. We keep code for *constants*, not for *config*.
+* *Everything in YAML from the start:* uniform, but most values are constants or
+secrets that don't belong in a hand-edited file — it would invite sprawl, the
+opposite of the goal.
+* *Central config service / remote flags:* powerful, but an infrastructure and
+runtime dependency we do not need at this size. Deferred.
+
+== Tradeoffs
+
+* YAML config is editable without a rebuild but loses compile-time safety, so it
+is reserved for the rare value that truly needs external editing.
+* Brand-in-CSS is a single source but not a TS object; if TS ever needs brand
+values, that is the trigger to revisit — not now.
+
+== Open questions
+
+* *The first real YAML value.* Nothing crosses the bar yet. The shared onboarding
+vocabulary (regions, sizes, use-cases), once the API validates it too, is the
+likeliest first candidate — decide then, with
+xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[0006].
+* Relationship to *dynamic tunables*
+(xref:ROOT:design-docs/0004-tunable-defaults-to-dynamic-functions.adoc[0004]):
+constants that later become telemetry-driven functions.
+
+== Decisions to be recorded as ADRs
+
+* The config layering and the minimalism bar — recorded as
+xref:ROOT:adrs/0016-configuration-layering.adoc[ADR-0016].

@@ -78,12 +78,21 @@ Keys:
 
 [source,sh]
 ----
-make -C infra web    # bakes WEB_CLIENT_ID/PROJECT_ID into the web image, deploys
-make -C infra api    # redeploys api so it picks up PROJECT_ID as the audience
+just update web    # bakes WEB_CLIENT_ID/PROJECT_ID into the web image, deploys
+just update api    # redeploys api so it picks up PROJECT_ID as the audience
 ----
 
-Then visit https://app.hivebook.localhost, log in, and click *Call
-GET /api/me* — you should see the token claims returned by the Go API.
+Then visit https://app.hivebook.localhost, log in, and exercise `GET /api/me` —
+the Go API returns the caller's identity and tenant
+(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005]).
+
+== Identity → tenant
+
+ZITADEL access tokens are minimal, so the API resolves the caller's name, email,
+and *organization* from the userinfo endpoint, caching the result per user. That
+organization is the tenant id (1:1). It is exposed only when the web app requests
+the `urn:zitadel:iam:user:resourceowner` scope, which it does. Full design:
+xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005].
 
 '''''
 

@@ -1,0 +1,30 @@
+= 0014 — Storage region is write-once
+:adr-id: 0014
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+Region is the data-residency anchor (xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]).
+Once data exists in a region, silently moving it is a residency violation.
+
+== Decision
+
+A tenant's region is set once, at onboarding, and is immutable thereafter.
+Enforced in the API: a submission with a different region is rejected; the same
+(or first) region is accepted, so onboarding stays idempotent.
+
+== Alternatives considered
+
+* *Mutable region* — invites accidental residency changes with no data migration.
+* *Enforce with a DB trigger* — more machinery; the app is the only writer, so a
+single guarded code path is enough for v0.1.
+
+== Consequences
+
+The residency anchor is stable. Enforcement trusts one code path (no DB-level
+guarantee yet). A genuine region change becomes an explicit, tooled migration,
+not an `UPDATE`.

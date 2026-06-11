@@ -5,6 +5,15 @@
 One response shape, one error path. The page that stops "four error formats"
 before it starts.
 
+[NOTE]
+====
+The API is moving to Connect, whose error model
+(`CodeInvalidArgument`, …) will replace `http.Error` + HTTP status codes
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
+This page is rewritten when that lands; the REST guidance below is accurate for
+the current code.
+====
+
 == Success responses
 
 Set `Content-Type: application/json` explicitly, then write JSON — through one

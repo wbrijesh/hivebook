@@ -1,12 +1,12 @@
 = 0005 — Tenant Model & Onboarding
 :design-id: 0005
-:status: accepted
+:status: implemented
 :date: 2026-06-07
 :authors:
 //   - Brijesh <google@brijesh.dev>
 :supersedes:
 :superseded-by:
-:related-adrs:
+:related-adrs: adrs/0012-tenant-is-zitadel-org.adoc, adrs/0013-tenant-state-in-postgres.adoc, adrs/0014-region-write-once.adoc, adrs/0015-embedded-startup-migrations.adoc
 
 == Context
 
@@ -87,7 +87,9 @@ v0.1.
 === API surface (Go API)
 
 Three endpoints, all behind the existing ZITADEL JWT middleware, all scoping
-every query by the token-derived `tenant_id`:
+every query by the token-derived `tenant_id`. (These are REST today; the
+transport moves to Connect, proto-first — the surface is unchanged —
+xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006].)
 
 * `GET /api/me` — the authenticated *session*: who the caller is and which
 workspace they're in, both resolved server-side. The web chrome reads identity
@@ -116,7 +118,8 @@ be changed (a differing region is rejected).
 Identity and the `tenant_id` (the caller's org) are resolved together by the
 auth layer: it reads the token claims and, since ZITADEL access tokens are
 minimal, falls back to the *userinfo* endpoint for name, email, and the
-resource-owner org — caching the result per user. The org requires the
+resource-owner org — caching the result per user in a bounded LRU with a TTL
+(the TTL re-resolves a user after an org change). The org requires the
 `urn:zitadel:iam:user:resourceowner` scope, which the web app requests.
 
 === Frontend wiring

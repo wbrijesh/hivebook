@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 
 import { userManager } from "@/lib/auth"
 import { fetchTenant } from "@/lib/tenant"
+import { LoadingScreen } from "@/components/brand/loading-screen"
 
 // Gates the application shell: render it only for a signed-in AND onboarded
 // tenant. Signed-out → "/"; signed-in but not onboarded → "/onboarding"
@@ -44,6 +45,6 @@ export function AppGate({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
-  if (!ready) return null
+  if (!ready) return <LoadingScreen />
   return <>{children}</>
 }

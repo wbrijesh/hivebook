@@ -30,12 +30,14 @@ help:
       "just start  [service]      turn ON  — everything, or one service" \
       "just stop   [service]      turn OFF — everything, or one service" \
       "just update [service...]   rebuild image(s) & roll out — after code changes" \
+      "just check                 run all checks (web + api) via Dagger — the gate" \
       "just status [service]      what's running (pod readiness)" \
       "just health                real health checks across services" \
       "just logs   [service]      follow one service's live log" \
       "just urls                  service URLs & logins"
     echo
     ui_section "Working in the repo"
+    ui_info "Before pushing →  just check   runs the same Dagger gate as CI (web: prettier/eslint/tsc · api: build/vet/test)."
     ui_info "Changed code   →  just update web api   rebuilds the image(s) & rolls out — in parallel, zero-downtime."
     ui_info "Bring it up    →  just start, then just health to confirm everything's green."
     ui_info "Inspect state  →  just status (pod readiness) · just health (live endpoint + DB checks)."
@@ -293,6 +295,20 @@ update *services:
       tail -n 25 "$tmp/$s.log" 2>/dev/null
     done
     if [ "$fails" = 0 ]; then ui_ok "updated: ${svcs[*]}"; else ui_fail "$fails of $total failed — logs above"; exit 1; fi
+
+# The enforcement gate: web (prettier, eslint, tsc) + api (build, vet, test),
+# each in a clean pinned container, in parallel. Same pipeline runs in CI.
+# Logic lives in Dagger (.dagger/), not shell — see docs/standards/ci.adoc.
+check:
+    @bash -c '. scripts/ui.sh && ui_header "Checks · Dagger"'
+    cd .. && dagger call check
+
+# Auto-fix web formatting (Prettier). Fast and local; the same prettier the
+# `check` gate verifies. (Containerized equivalent: dagger call format export --path=web)
+format:
+    @bash -c '. scripts/ui.sh && ui_header "Format · web"'
+    pnpm --dir ../web run format
+    @bash -c '. scripts/ui.sh && ui_ok "formatted web/"'
 
 # ========================================================================
 # Hidden helpers + install/deploy recipes (no git backup, so kept here).

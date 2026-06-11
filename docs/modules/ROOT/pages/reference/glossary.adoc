@@ -92,7 +92,8 @@ Aggregates similar ambiguities for one-click resolution.
 
 == Access control
 
-* *Tenant* — one customer’s isolated environment.
+* *Tenant* — one customer’s isolated environment; one ZITADEL organization,
+1:1, materialized lazily in Postgres (`design-docs/0005`).
 * *Chapter ACL* — the per-user or per-template set of chapters a
 user can see.
 * *Access template* — a named set of chapter accesses that can be
@@ -107,6 +108,9 @@ incrementally.
 
 == Configuration and lifecycle
 
+* *Onboarding* — the one-time, per-tenant flow that first writes the tenant
+profile (name, size, region, use-cases). Runs once per tenant, not per user
+(`design-docs/0005`).
 * *Tunable default* — a parameter that ships as a configurable
 constant in v0.1 but is intended to become a dynamically
 computed function based on production telemetry. Described in

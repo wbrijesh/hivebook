@@ -1,18 +1,39 @@
 = Hivebook API
 
-The Go API (chi router, pgx/Postgres). Verifies ZITADEL JWT access
-tokens and exposes `/health`, `/metrics`, and the protected `/api/me`.
+The Go API (chi router, pgx/Postgres). Verifies ZITADEL JWT access tokens and
+resolves the caller's identity and tenant server-side
+(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005]).
+
+== Endpoints
+
+* *Public:* `/health`, `/metrics`, `POST /events` (browser telemetry beacon).
+* *Protected* (require a valid ZITADEL access token):
+** `GET /api/me` — the session: caller identity + tenant.
+** `GET /api/tenant` — the tenant and onboarding status (row created lazily).
+** `POST /api/tenant/onboarding` — record onboarding answers; idempotent, region
+write-once.
+
+Schema migrations are embedded in the binary and applied on startup
+(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[0005]).
+
+[NOTE]
+====
+The transport is moving to Connect (proto-first)
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
+These REST routes are the current surface.
+====
 
 == Build / deploy / test
 
-Build and deploy into the cluster from the repo root:
+After a code change, rebuild the image and roll it out from the repo root:
 
 [source,bash]
 ----
-just api          # build hivebook-api:dev + deploy to Kubernetes
+just update api      # rebuild hivebook-api:dev + zero-downtime rollout
 ----
 
-Run the Go tests directly (from `api/`):
+Run the Go tests directly (from `api/`; the DB tests need Docker/OrbStack for
+testcontainers):
 
 [source,bash]
 ----

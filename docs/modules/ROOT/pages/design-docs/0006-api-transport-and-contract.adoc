@@ -1,0 +1,162 @@
+= 0006 — API Transport & Contract (Connect, proto-first)
+:design-id: 0006
+:status: accepted
+:date: 2026-06-10
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs:
+
+== Context
+
+The Go API is REST/JSON today: chi routes, `http.Error` + `writeJSON`, and
+hand-written request/response structs
+(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[0005] added the first few
+endpoints this way). The web app is the only consumer right now, but the system
+is about to grow more services, and the same types need to exist — correctly and
+in sync — on the Go side, the browser side, and eventually between Go services.
+
+Hand-maintaining types and validation on each side drifts the moment there is
+more than one consumer. We want *one contract* that generates types and
+validation for every consumer, over a transport that works from the browser
+*and* service-to-service. The API surface is still small (a handful of
+endpoints) — the cheapest moment to set the contract is now, before it grows.
+
+== Goals
+
+* One source of truth for request/response types *and* validation, generating
+both the Go side and the TypeScript side — no hand-kept mirrors.
+* A transport that is browser-native *and* speaks real gRPC for future
+service-to-service calls.
+* Preserve the existing HTTP middleware and observability investment
+(structured access log, Prometheus metrics, CORS, request-id, ZITADEL JWT).
+* Typed clients are generated, not hand-written; contract drift is caught by
+tooling, not review.
+
+== Non-goals
+
+* Replacing the identity provider, the cluster, or the auth model — unchanged.
+* A public, RESTful, curl-friendly resource API (partners, webhooks) *now*. The
+internal app talks to its own backend; REST transcoding is a later add if needed.
+* A full microservice mesh now. This sets the contract so the *next* service is
+cheap, not to split the monolith today.
+* Replacing TanStack Query. Connect-Query sits *on* it
+(xref:ROOT:standards/frontend/data-fetching.adoc[data-fetching]).
+
+== Proposal
+
+=== Connect, not raw gRPC
+
+Use *Connect* (connectrpc.com, from the Buf project) as the API layer.
+
+Browsers cannot speak native gRPC — it needs HTTP/2 framing and trailers that
+browser `fetch` cannot produce. The only browser-capable options are gRPC-Web
+behind a translating proxy, or Connect. Connect serves gRPC, gRPC-Web, *and* its
+own Connect protocol (plain HTTP, browser-native, no proxy) — *all three from one
+handler*. The browser gets the Connect/gRPC-Web protocol; future Go services get
+real gRPC; one definition, one server.
+
+=== Proto-first contract
+
+A `.proto` per service is the single source of truth. The `buf` toolchain
+(`buf lint`, breaking-change detection, `buf generate`) drives codegen:
+
+[source]
+----
+proto/hivebook/<area>/v1/*.proto      single source of truth
+   │  buf generate  (wired into the justfile)
+   ├─▶ api/internal/gen/...            Go types + Connect server stubs
+   └─▶ web/lib/gen/...                 TS types + Connect client + connect-query
+----
+
+This collapses two earlier open questions — *how do client and server types stay
+in sync* and *where does validation live* — into one answer: the proto.
+
+=== Validation: protovalidate
+
+Field constraints are declared on the proto with *protovalidate* (CEL
+expressions) and enforced server-side by a Connect interceptor. The constraints
+are defined once and available to the client too. This *replaces* the
+hand-written Go `Validate()` layer and the client-side Zod schemas we would
+otherwise dual-maintain. Stateful rules that a field constraint cannot express —
+e.g. region write-once
+(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[0005]) — stay in
+application code.
+
+=== It mounts on the existing server
+
+A Connect service is an `http.Handler`, registered on the existing chi mux. The
+current middleware *keeps wrapping it* — `structuredLogger`, metrics, CORS,
+request-id, and ZITADEL JWT verification all carry over unchanged, and `/health`,
+`/metrics`, and the `/events` telemetry beacon stay as plain handlers alongside
+the Connect handlers. The server layer is extended, not rewritten.
+
+=== Frontend
+
+`@connectrpc/connect-query` generates TanStack Query hooks from the proto. The
+xref:ROOT:standards/frontend/data-fetching.adoc[data-fetching standard] holds:
+one API layer (now generated), TanStack owns cache/loading/error; Connect *is*
+the API layer.
+
+=== Error model
+
+Connect's error model (`CodeInvalidArgument`, `CodeNotFound`,
+`CodeUnauthenticated`, …) replaces `http.Error` + HTTP status codes.
+xref:ROOT:standards/go/errors.adoc[standards/go/errors] is rewritten on
+implementation; until then the REST guidance there is accurate for the current
+code.
+
+== Alternatives considered
+
+* *Raw gRPC.* No browser support without a proxy, so it cannot be the frontend's
+API; it would force a gRPC-Web/Envoy proxy in front of everything. Rejected —
+Connect gives us gRPC *and* the browser without the proxy.
+* *gRPC-Web + a proxy.* Works in the browser, but needs a translating proxy
+(Envoy or grpc-web) as standing infrastructure. Connect subsumes this with no
+proxy. Rejected.
+* *REST + OpenAPI codegen.* Keeps REST ergonomics and can generate both sides
+from a spec, but it is a second contract runtime (separate from any future
+service-to-service gRPC), and OpenAPI's Go server-codegen story is weaker. We
+don't need RESTful resource URLs internally. Considered; Connect chosen for the
+unified browser+service story.
+* *REST + hand-written DTOs + Zod (the status quo / earlier plan).* No
+toolchain, but types and validation are dual-maintained and drift as soon as a
+second service exists — exactly the failure this doc avoids. Rejected as the
+long-term contract.
+* *Do nothing — stay REST.* Loses the single-contract benefit; every new service
+re-hand-writes the types. Rejected.
+
+== Tradeoffs
+
+* A real toolchain (`buf` + `protoc-gen-go` + `protoc-gen-connect-go` +
+`protoc-gen-es` + `protoc-gen-connect-query`) wired into the justfile — against
+the minimalism elsewhere (hand-rolled migrate, constants-first), but `buf` lint
+and breaking-change detection are worth it.
+* The API becomes RPC-shaped (`POST /hivebook.tenant.v1.TenantService/GetTenant`),
+not RESTful resource URLs. Fine internally; Connect even supports GET for
+cacheable, side-effect-free methods. A public REST API later needs transcoding
+(vanguard / grpc-gateway).
+* `standards/go/errors.adoc` is rewritten — a standards change, not a no-op.
+* Generated code enters the tree (or the build). One more thing to keep current.
+
+== Open questions
+
+* *Auth placement.* JWT verification as a Connect interceptor, or keep the
+existing outer HTTP middleware and pass claims via context. Both work.
+* *Generated code: committed vs build-time only.* Commit `gen/` for diff-ability
+and zero-toolchain builds, or generate during the image build.
+* *Versioning.* Package-version (`v1`) discipline and how breaking changes are
+gated by `buf` in CI.
+* *REST transcoding.* If/when an external curl/webhook API is needed, add
+transcoding rather than a parallel REST surface.
+
+== Decisions to be recorded as ADRs
+
+* Connect (not raw gRPC) is the API layer for both the browser and
+service-to-service calls.
+* The API contract is proto-first, generated with `buf`.
+* protovalidate (on the proto) is the validation source of truth; stateful rules
+stay in application code.
+* The Connect error model supersedes the REST error shape
+(xref:ROOT:standards/go/errors.adoc[]).

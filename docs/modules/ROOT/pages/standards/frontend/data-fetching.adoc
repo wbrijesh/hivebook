@@ -1,71 +1,70 @@
 = Frontend · Data Fetching
 :status: draft
-:last-reviewed: 2026-06-07
+:last-reviewed: 2026-06-10
 
-All server state flows through one API layer and TanStack Query. No component
-calls `fetch`, builds a URL, attaches a token, or holds loading state by hand.
+All server state flows through the generated Connect client and TanStack Query.
+No component calls `fetch`, builds a URL, attaches a token, or holds loading
+state by hand.
+
+[NOTE]
+====
+The API contract is proto-first over Connect
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
+The client below is *generated*, not hand-written. Until the generated clients
+land, this is the target every new data path is built toward — do not hand-roll a
+`fetch` layer in the meantime.
+====
 
 == Rules
 
-. *One API layer.* Every call to the Go API goes through a typed function in
-`lib/api/` — one module per resource (`lib/api/tenant.ts`). Each function builds
-the URL, attaches the bearer token, parses the response, and returns typed data
-or throws. Nothing outside `lib/api/` calls `fetch` against the API.
-. *TanStack Query owns server state.* Components read with `useQuery` and write
-with `useMutation` (`@tanstack/react-query`). Caching, loading, error, and
-refetch are Query's job — never a hand-rolled `useEffect` + `useState` fetch.
-. *Bind queries in one place per resource.* `lib/queries/<resource>.ts` exports
-hooks (`useTenant()`, `useOnboard()`) that pair a stable query key with an API
-function. Usage sites call the hook, not `useQuery` inline.
-. *Query keys are structured and shared.* Arrays namespaced by resource —
-`["tenant"]`, `["book", id]` — defined once per resource so they don't drift. A
-mutation invalidates the keys it affects.
+. *One API layer — the generated client.* Every call to the Go API goes through
+the Connect client generated from the proto (`web/lib/gen/...`). The client owns
+the URL, the bearer token (via an interceptor that reads `lib/auth.ts`), and the
+wire format. Nothing else calls the API directly.
+. *TanStack Query owns server state.* Components read and write through
+`@connectrpc/connect-query` hooks (`useQuery`, `useMutation`) bound to generated
+service methods. Caching, loading, error, and refetch are Query's job — never a
+hand-rolled `useEffect` + `useState` fetch.
+. *Query keys come from the method.* Connect-Query derives a stable key from the
+service method and the request message; a mutation invalidates the keys it
+affects. Don't invent ad-hoc key strings.
 . *One QueryClient at the root.* A single `QueryClientProvider` in the root
 layout; defaults (`staleTime`, `retry`) are set once there.
-. *Errors throw; Query surfaces them.* API functions throw a typed `ApiError`
-(status + message) on a non-2xx response. Components render Query's `error`, not
-their own `try/catch`.
-. *The API layer is the only place that knows the API* — base URL
-(`NEXT_PUBLIC_API_BASE`), the bearer token (from `lib/auth.ts`), status codes,
-and error shape. Swapping transport or auth touches one layer, not every caller.
+. *Errors are `ConnectError`; Query surfaces them.* The transport throws a typed
+`ConnectError` (with a `Code`) on failure; components render Query's `error`, not
+their own `try/catch`. Field validation comes from protovalidate on the proto
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[0006]).
+. *Only the API layer knows the API* — base URL (`NEXT_PUBLIC_API_BASE`), the
+bearer token, and the error model live in the client/interceptor, not at call
+sites. Swapping transport or auth touches one layer.
 
 == Shape
 
 [source,tsx]
 ----
-// lib/api/tenant.ts — transport only, no React
-export async function getTenant(): Promise<Tenant> {
-  return apiGet<Tenant>("/api/tenant")
+// lib/api/client.ts — the transport: one client, token via interceptor
+const authInterceptor: Interceptor = (next) => async (req) => {
+  const token = await accessToken()        // from lib/auth.ts
+  if (token) req.header.set("Authorization", `Bearer ${token}`)
+  return next(req)
 }
-export async function onboard(input: OnboardingInput): Promise<Tenant> {
-  return apiPost<Tenant>("/api/tenant/onboarding", input)
-}
+export const transport = createConnectTransport({
+  baseUrl: process.env.NEXT_PUBLIC_API_BASE!,
+  interceptors: [authInterceptor],
+})
 
-// lib/queries/tenant.ts — Query bindings, one place per resource
-export const tenantKeys = { all: ["tenant"] as const }
-
-export function useTenant() {
-  return useQuery({ queryKey: tenantKeys.all, queryFn: getTenant })
-}
-export function useOnboard() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: onboard,
-    onSuccess: () => qc.invalidateQueries({ queryKey: tenantKeys.all }),
-  })
-}
-
-// a component — usage only
-const { data: tenant, isPending, error } = useTenant()
+// a component — usage only, hooks generated from the proto by connect-query
+const { data, isPending, error } = useQuery(getTenant)
+const onboard = useMutation(completeOnboarding, {
+  onSuccess: () => queryClient.invalidateQueries(),
+})
 ----
 
 == Boundaries
 
 * *Fire-and-forget telemetry is not server state.* `track()`
-(xref:ROOT:standards/frontend/state-management.adoc[]) posts a beacon and never
-reads back — it stays a direct call, not a query.
-* *Auth stays in `lib/auth.ts`.* The API layer pulls the access token from the
-OIDC `userManager`; it does not own the session.
-* *Server Components may fetch directly* where used, but the app is
-client-rendered (OIDC tokens live in the browser), so most data flows through
-Query on the client.
+(xref:ROOT:standards/frontend/state-management.adoc[]) posts a beacon to
+`/events` and never reads back — it stays a direct call, not a query, and is not
+part of the Connect surface.
+* *Auth stays in `lib/auth.ts`.* The transport interceptor pulls the access token
+from the OIDC `userManager`; it does not own the session.

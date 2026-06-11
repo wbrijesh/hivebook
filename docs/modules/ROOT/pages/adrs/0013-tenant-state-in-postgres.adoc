@@ -1,0 +1,29 @@
+= 0013 — Tenant state lives in Postgres, not the IdP
+:adr-id: 0013
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+A tenant carries application state beyond identity — profile, storage region,
+onboarding answers, and everything the corpus, book, and ACLs relate to. ZITADEL
+could hold some of it as organization metadata.
+
+== Decision
+
+Our Postgres is the system of record for tenant and onboarding state. ZITADEL
+stays identity-only; we write no application data back into it.
+
+== Alternatives considered
+
+* *Store tenant/onboarding data as ZITADEL org metadata* — no new table, but it
+couples application data to the IdP, is awkward to join against corpus data, and
+blurs "`tenant profile`" into "`identity`".
+
+== Consequences
+
+Tenant state joins naturally with corpus data and is ours to evolve. The IdP
+boundary stays clean. One more table to own and migrate.

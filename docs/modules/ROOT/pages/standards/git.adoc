@@ -1,0 +1,50 @@
+= Git & Commits
+:status: living
+:last-reviewed: 2026-06-11
+
+How we write commits. The history is read; a commit is a unit of reasoning, not a
+save point.
+
+== Subject
+
+`<type>: <summary>` — lowercase, terse, imperative, no trailing period.
+
+Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `ci`.
+
+The summary names *what* changed, specifically — "`rename project from trenches to
+hivebook`", not "`updates`".
+
+== Body
+
+Optional for small, obvious changes; expected for anything with moving parts.
+
+* A blank line after the subject.
+* Group related changes under a short, capitalized heading line (no bullet) —
+e.g. `Fixes`, `Secrets / config`, `Dev tooling (justfile)`.
+* Under each heading, `-` bullets; nest with deeper indent for detail.
+* Past tense in the body ("`Added`", "`Removed`", "`Moved`"). State what changed
+and why it matters — specifics over adjectives, em-dashes for the aside. The house
+voice (xref:ROOT:style-guide.adoc[]) applies.
+
+== Rules
+
+* One logical change per commit. If the body needs an "`and also`", it is two
+commits.
+* No attribution trailers — no `Co-authored-by`, no tool or agent credit.
+* Reference decisions by their home (`design-doc 0006`, `ADR-0010`); don't
+re-argue them in the message.
+
+== Example
+
+[source]
+----
+docs: record the API-transport and config decisions
+
+New design docs
+        - 0006 API transport & contract: Connect (not raw gRPC); proto-first; protovalidate as the validation source
+        - 0007 Configuration pattern: YAML for the file layer, kept minimal
+
+Reconciled with what shipped
+        - design-doc 0005 → status implemented; notes the bounded identity cache
+        - operations/api.adoc → real endpoint list; just update api
+----

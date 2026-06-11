@@ -39,6 +39,11 @@ docs
 │           │   ├── 0009-chapter-level-access.adoc
 │           │   ├── 0010-day-zero-enterprise-primitives.adoc
 │           │   ├── 0011-constants-first-tunables.adoc
+│           │   ├── 0012-tenant-is-zitadel-org.adoc
+│           │   ├── 0013-tenant-state-in-postgres.adoc
+│           │   ├── 0014-region-write-once.adoc
+│           │   ├── 0015-embedded-startup-migrations.adoc
+│           │   ├── 0016-configuration-layering.adoc
 │           │   └── index.adoc
 │           ├── architecture
 │           │   ├── corpus-and-index.adoc
@@ -57,6 +62,8 @@ docs
 │           │   ├── 0003-entity-reconciliation.adoc
 │           │   ├── 0004-tunable-defaults-to-dynamic-functions.adoc
 │           │   ├── 0005-tenancy-and-onboarding.adoc
+│           │   ├── 0006-api-transport-and-contract.adoc
+│           │   ├── 0007-configuration-pattern.adoc
 │           │   └── index.adoc
 │           ├── index.adoc
 │           ├── operations
@@ -72,6 +79,7 @@ docs
 │           │   ├── milestones.adoc
 │           │   └── v0.1.adoc
 │           ├── standards
+│           │   ├── ci.adoc
 │           │   ├── docs
 │           │   │   ├── adr-process.adoc
 │           │   │   └── design-doc-process.adoc
@@ -79,6 +87,7 @@ docs
 │           │   │   ├── component-patterns.adoc
 │           │   │   ├── data-fetching.adoc
 │           │   │   └── state-management.adoc
+│           │   ├── git.adoc
 │           │   ├── go
 │           │   │   ├── errors.adoc
 │           │   │   ├── logging.adoc
@@ -100,7 +109,7 @@ docs
 
 Quick map: `vision/` why · `architecture/` how-it's-built (links to ADRs) ·
 `design-docs/` proposals · `adrs/` decisions · `standards/` binding conventions
-(Go/frontend/infra/docs) · `design/` Apex UI language · `reference/` glossary &
+(ci, Go, frontend, infra, docs) · `design/` Apex UI language · `reference/` glossary &
 catalogs · `roadmap/` · `operations/` running it.
 
 ## Standards are binding
@@ -135,12 +144,16 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 - `web/` — Next.js (App Router) + shadcn/ui + Apex tokens.
 - `infra/` — Kubernetes manifests (OrbStack), one dir per component.
 - `docs/` — the Antora docs this file indexes.
+- `.dagger/` — the checks as code (Dagger, Go); the `just check` / CI gate.
 - `justfile` — the dev control panel (run `just`).
 
 ## Commands
 
 - Dev cluster: `just start` · `just stop` · `just status` · `just health` · `just urls`
-- API tests: `cd api && go test ./...`
+- Checks (the gate): `just check` — web (prettier/eslint/tsc) + api (build/vet/test),
+  in clean containers via Dagger; same pipeline as CI (`standards/ci.adoc`). Fix web
+  formatting with `just format`.
+- API tests directly: `cd api && go test ./...` (needs Docker for testcontainers).
 - After changing code, rebuild + roll out: `just update <service...>` (e.g.
   `just update web api`) — builds the named services in parallel, zero-downtime.
 - Full local install: `just install`

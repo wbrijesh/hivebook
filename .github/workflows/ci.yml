@@ -1,0 +1,18 @@
+# Thin dispatcher. All check logic lives in the Dagger module (.dagger/), so this
+# file stays a few lines and the pipeline runs identically here and via `just check`.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dagger
+        run: curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.21.4 BIN_DIR=/usr/local/bin sh
+      - name: Run checks
+        run: dagger call check

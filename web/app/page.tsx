@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { userManager } from "@/lib/auth"
 import { track } from "@/lib/telemetry"
 import { Logo } from "@/components/brand/logo"
+import { LoadingScreen } from "@/components/brand/loading-screen"
 import { Button } from "@/components/ui/button"
 
 // Public entry. Signed-in users go straight to the app; everyone else gets a
@@ -25,7 +26,7 @@ export default function Home() {
       .catch(() => setChecked(true))
   }, [router])
 
-  if (!checked) return null
+  if (!checked) return <LoadingScreen />
 
   function signIn() {
     track("login_start")
