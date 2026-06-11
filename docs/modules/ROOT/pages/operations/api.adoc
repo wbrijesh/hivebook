@@ -32,10 +32,12 @@ After a code change, rebuild the image and roll it out from the repo root:
 just update api      # rebuild hivebook-api:dev + zero-downtime rollout
 ----
 
-Run the Go tests directly (from `api/`; the DB tests need Docker/OrbStack for
-testcontainers):
+Tests run in a container via the check gate — no local Go needed:
 
 [source,bash]
 ----
-go test ./...
+just check        # web + api checks (build, vet, full test) via Dagger
 ----
+
+If you happen to have Go installed, `cd api && go test ./...` works too (the DB
+tests need Docker/OrbStack for testcontainers), but the gate is the source of truth.

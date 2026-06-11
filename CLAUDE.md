@@ -69,6 +69,7 @@ docs
 │           ├── operations
 │           │   ├── api.adoc
 │           │   ├── auth.adoc
+│           │   ├── getting-started.adoc
 │           │   └── infrastructure.adoc
 │           ├── reference
 │           │   ├── connector-catalog.adoc
@@ -149,6 +150,7 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 
 ## Commands
 
+- First-time setup (local CA + secrets + full deploy): `just setup` — idempotent.
 - Dev cluster: `just start` · `just stop` · `just status` · `just health` · `just urls`
 - Checks (the gate): `just check` — web (prettier/eslint/tsc) + api (build/vet/test),
   in clean containers via Dagger; same pipeline as CI (`standards/ci.adoc`). Fix web

@@ -1,4 +1,5 @@
 * xref:index.adoc[Home]
+* xref:operations/getting-started.adoc[Getting started]
 * xref:style-guide.adoc[Style guide]
 
 .Vision

@@ -23,11 +23,23 @@ warnings.
 
 == Prerequisites
 
-* OrbStack with Kubernetes enabled
-* `helm`, `mkcert`, `just`, `gum` (`brew install helm mkcert just gum` && `mkcert -install`)
-** `gum` powers the styled output of `just start` / `just stop`; without it
-they fall back to plain text.
-* Docker (OrbStack) — local images are used directly, no registry
+Deliberately small — toolchains run in containers, not on your machine.
+
+* OrbStack with Kubernetes enabled — provides both Docker and `kubectl`.
+* `just`, `gum`, `dagger`, `helm`, `mkcert` (`brew install just gum dagger helm mkcert`).
+** `just` is the control panel; `gum` styles its output (plain text without it);
+`dagger` runs the checks (`just check`); `helm` and `mkcert` are used by
+`just setup`.
+
+You do *not* need Go, Node, pnpm, or Antora locally: image builds run in Docker
+(`just update`), checks and tests run in Dagger (`just check`), and the docs site
+is built by its own image. Local images are used directly — no registry.
+
+== Getting started
+
+New here? xref:ROOT:operations/getting-started.adoc[Getting started] is the
+one-command setup (`just setup`). The rest of this page is the deeper reference
+for what runs and how.
 
 == `just` is the control panel
 

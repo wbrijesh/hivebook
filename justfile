@@ -27,6 +27,7 @@ help:
     echo
     ui_section "Commands"
     ui_box \
+      "just setup                 first-time setup — local CA, secrets, full install" \
       "just start  [service]      turn ON  — everything, or one service" \
       "just stop   [service]      turn OFF — everything, or one service" \
       "just update [service...]   rebuild image(s) & roll out — after code changes" \
@@ -37,6 +38,7 @@ help:
       "just urls                  service URLs & logins"
     echo
     ui_section "Working in the repo"
+    ui_info "First time?    →  just setup   trusts a local CA, writes infra/.env, deploys the whole stack."
     ui_info "Before pushing →  just check   runs the same Dagger gate as CI (web: prettier/eslint/tsc · api: build/vet/test)."
     ui_info "Changed code   →  just update web api   rebuilds the image(s) & rolls out — in parallel, zero-downtime."
     ui_info "Bring it up    →  just start, then just health to confirm everything's green."
@@ -121,6 +123,10 @@ start service="all":
     . scripts/ui.sh
     if ! kubectl get ns >/dev/null 2>&1; then
       ui_fail "Kubernetes isn't reachable — start OrbStack / enable Kubernetes first."
+      exit 1
+    fi
+    if ! kubectl get ns hivebook >/dev/null 2>&1; then
+      ui_fail "Hivebook isn't installed yet — run 'just setup' (first-time setup)."
       exit 1
     fi
     if [ "{{service}}" = all ]; then
@@ -309,6 +315,39 @@ format:
     @bash -c '. scripts/ui.sh && ui_header "Format · web"'
     pnpm --dir ../web run format
     @bash -c '. scripts/ui.sh && ui_ok "formatted web/"'
+
+# First-time setup: trust a local CA, write local secrets, deploy the whole stack.
+# Idempotent — safe to re-run to reconcile a half-broken cluster. After this,
+# `just start` / `just stop` are the day-to-day controls.
+setup:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    . scripts/ui.sh
+    ui_header "Setup · Hivebook"
+    if ! kubectl get ns >/dev/null 2>&1; then
+      ui_fail "Kubernetes isn't reachable — start OrbStack and enable Kubernetes first."
+      exit 1
+    fi
+    # 1. Local CA — cert-manager mints the *.hivebook.localhost certs from it and
+    #    your browser trusts them. Idempotent; prompts for your password only the
+    #    first time, when it adds the CA to the system trust store.
+    ui_info "ensuring the local CA is installed (mkcert)…"
+    mkcert -install || { ui_fail "mkcert -install failed"; exit 1; }
+    # 2. Local secrets — dev defaults, gitignored, written only if absent.
+    if [ -f .env ]; then
+      ui_ok "infra/.env present"
+    else
+      ui_info "writing infra/.env with local dev defaults…"
+      printf '%s\n' \
+        "# Local secret values for the Hivebook dev stack. Gitignored — never committed." \
+        "# Match the creds shown in 'just urls'. Edit to override." \
+        "HIVEBOOK_DB_PASSWORD=password1234" \
+        "ZITADEL_DB_PASSWORD=zitadel-local-pw" \
+        "ZITADEL_ADMIN_PASSWORD=Password1!" \
+        "GRAFANA_ADMIN_PASSWORD=password1234" > .env
+    fi
+    # 3. Deploy everything. A fresh `just` picks up the new .env and CA path.
+    just install
 
 # ========================================================================
 # Hidden helpers + install/deploy recipes (no git backup, so kept here).

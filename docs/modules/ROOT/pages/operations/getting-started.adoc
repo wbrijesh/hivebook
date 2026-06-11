@@ -1,0 +1,82 @@
+= Getting started
+:status: living
+:last-reviewed: 2026-06-11
+
+Bring Hivebook up locally in one command. Everything runs in a local OrbStack
+Kubernetes cluster (xref:ROOT:operations/infrastructure.adoc[the infrastructure
+reference] covers what runs and how).
+
+== Prerequisites
+
+* *OrbStack* with Kubernetes enabled — it provides Docker and `kubectl`.
+* A handful of CLIs:
++
+[source,sh]
+----
+brew install just gum dagger helm mkcert
+----
+
+Nothing else is needed locally. Go, Node, pnpm, and Antora all run in
+containers — image builds via `just update`, checks and tests via `just check`,
+the docs site via its own image.
+
+== Set it up
+
+From anywhere in the repo:
+
+[source,sh]
+----
+just setup
+----
+
+`just setup` is idempotent and does three things:
+
+. *Trusts a local CA* (`mkcert -install`) so the `*.hivebook.localhost` TLS
+certificates are trusted by your browser — no warnings. Prompts for your password
+the first time.
+. *Writes `infra/.env`* with local dev secrets (gitignored) if it is missing.
+. *Deploys the stack* — cert-manager → Traefik → ZITADEL → API → web → prototype
+→ docs → observability.
+
+Re-run it any time to reconcile a half-broken cluster.
+
+== Verify
+
+[source,sh]
+----
+just health     # live endpoint + DB checks across services
+just urls       # links and local logins
+----
+
+Then open https://app.hivebook.localhost.
+
+[cols="1,2",options="header"]
+|===
+|Surface |URL & login
+|Web app |https://app.hivebook.localhost
+|Prototype |https://prototype.hivebook.localhost (mock data, no login)
+|Docs |https://docs.hivebook.localhost
+|Auth (ZITADEL) |https://id.hivebook.localhost — `admin@hivebook.localhost` / `Password1!`
+|API |https://api.hivebook.localhost — `/health`, `/metrics`, `/api/me`
+|Grafana |https://grafana.hivebook.localhost — `admin` / `password1234`
+|===
+
+== Day to day
+
+[cols="1,2",options="header"]
+|===
+|Command |What it does
+|`just start` / `just stop` |scale the whole app up / down (data preserved)
+|`just update <svc…>` |rebuild image(s) and roll out — after code changes
+|`just check` |the gate — web + api checks in containers, same as CI
+|`just status` / `just health` |what's running / real health checks
+|`just urls` |links and logins
+|===
+
+== Troubleshooting
+
+* *"`Hivebook isn't installed yet`"* on `just start` — run `just setup` first;
+`start` only scales workloads that already exist.
+* *Browser warns on the certificates* — run `mkcert -install` (or re-run
+`just setup`), then reload.
+* *"`Kubernetes isn't reachable`"* — start OrbStack and enable Kubernetes.

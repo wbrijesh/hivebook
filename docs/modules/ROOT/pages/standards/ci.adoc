@@ -38,8 +38,9 @@ and regenerated automatically by `dagger call` / `dagger develop`.
 * `just check` before pushing — it is the same pipeline as CI.
 * `just format` fixes web formatting (Prettier). The containerized equivalent is
 `dagger call format export --path=web`.
-* Requires a running container engine (OrbStack locally; `just start` brings the
-cluster up, OrbStack itself provides the engine).
+* The only local tools the gate needs are `dagger` and a container engine
+(OrbStack) — not Go, Node, or pnpm; those run inside the containers
+(xref:ROOT:operations/infrastructure.adoc[prerequisites]).
 
 == Adding a check
 
