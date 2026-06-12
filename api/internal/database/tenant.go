@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+
+	"api/internal/database/gen"
 )
 
 // Tenant is one customer workspace — one ZITADEL organization (design-doc 0005).
@@ -19,89 +21,84 @@ type Tenant struct {
 	OnboardedAt  *string // RFC3339 timestamp, nil until onboarding completes
 }
 
-// ErrRegionImmutable is returned when onboarding tries to change an
-// already-set storage region.
+// ErrRegionImmutable is returned when onboarding tries to change an already-set
+// storage region (write-once, ADR-0014).
 var ErrRegionImmutable = errors.New("region is set and cannot be changed")
 
-const tenantCols = `id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at`
+func strPtr(s sql.NullString) *string {
+	if !s.Valid {
+		return nil
+	}
+	v := s.String
+	return &v
+}
 
-func scanTenant(row interface{ Scan(...any) error }) (Tenant, error) {
-	var (
-		t            Tenant
-		name, size   sql.NullString
-		region       sql.NullString
-		useCasesJSON []byte
-		useCaseOther sql.NullString
-		onboardedAt  sql.NullTime
-	)
-	if err := row.Scan(&t.ID, &t.OrgID, &name, &size, &region, &useCasesJSON, &useCaseOther, &onboardedAt); err != nil {
-		return Tenant{}, err
+// tenantRow is the shape both generated tenant rows share; mapping is one place.
+func toTenant(id, org string, name, size, region, useCaseOther sql.NullString, useCases json.RawMessage, onboardedAt sql.NullTime) Tenant {
+	t := Tenant{
+		ID:           id,
+		OrgID:        org,
+		Name:         strPtr(name),
+		Size:         strPtr(size),
+		Region:       strPtr(region),
+		UseCaseOther: strPtr(useCaseOther),
+		UseCases:     []string{},
 	}
-	if name.Valid {
-		t.Name = &name.String
+	if len(useCases) > 0 {
+		_ = json.Unmarshal(useCases, &t.UseCases)
 	}
-	if size.Valid {
-		t.Size = &size.String
-	}
-	if region.Valid {
-		t.Region = &region.String
-	}
-	if useCaseOther.Valid {
-		t.UseCaseOther = &useCaseOther.String
+	if t.UseCases == nil {
+		t.UseCases = []string{}
 	}
 	if onboardedAt.Valid {
 		v := onboardedAt.Time.UTC().Format("2006-01-02T15:04:05Z07:00")
 		t.OnboardedAt = &v
 	}
-	if len(useCasesJSON) > 0 {
-		_ = json.Unmarshal(useCasesJSON, &t.UseCases)
-	}
-	if t.UseCases == nil {
-		t.UseCases = []string{}
-	}
-	return t, nil
+	return t
 }
 
 // GetOrCreateTenant returns the tenant for a ZITADEL org id, creating an empty
 // (un-onboarded) row the first time an org is seen.
 func (s *service) GetOrCreateTenant(ctx context.Context, orgID string) (Tenant, error) {
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT INTO tenants (zitadel_org_id) VALUES ($1) ON CONFLICT (zitadel_org_id) DO NOTHING`,
-		orgID); err != nil {
+	if err := s.q.CreateTenantIfAbsent(ctx, orgID); err != nil {
 		return Tenant{}, err
 	}
-	row := s.db.QueryRowContext(ctx,
-		`SELECT `+tenantCols+` FROM tenants WHERE zitadel_org_id = $1`, orgID)
-	return scanTenant(row)
+	r, err := s.q.GetTenantByOrg(ctx, orgID)
+	if err != nil {
+		return Tenant{}, err
+	}
+	return toTenant(r.ID, r.ZitadelOrgID, r.Name, r.Size, r.Region, r.UseCaseOther, r.UseCases, r.OnboardedAt), nil
 }
 
 // CompleteOnboarding records the onboarding answers and stamps onboarded_at.
-// Idempotent. region is write-once: a different region is rejected; the same (or
-// first) region is accepted.
+// Idempotent. region is write-once (ADR-0014): a different region is rejected; the
+// same (or first) region is accepted.
 func (s *service) CompleteOnboarding(ctx context.Context, orgID, name, size, region string, useCases []string, useCaseOther string) (Tenant, error) {
-	var existing sql.NullString
-	err := s.db.QueryRowContext(ctx,
-		`SELECT region FROM tenants WHERE zitadel_org_id = $1`, orgID).Scan(&existing)
+	// Enforce region write-once in the app: a COALESCE in SQL would silently keep
+	// the old region instead of telling the caller it changed.
+	existing, err := s.q.GetTenantByOrg(ctx, orgID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Tenant{}, err
 	}
-	if existing.Valid && existing.String != "" && existing.String != region {
+	if err == nil && existing.Region.Valid && existing.Region.String != "" && existing.Region.String != region {
 		return Tenant{}, ErrRegionImmutable
 	}
 
+	if useCases == nil {
+		useCases = []string{}
+	}
 	useCasesJSON, _ := json.Marshal(useCases)
-	row := s.db.QueryRowContext(ctx,
-		`INSERT INTO tenants (zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), now(), now())
-		 ON CONFLICT (zitadel_org_id) DO UPDATE SET
-		     name           = EXCLUDED.name,
-		     size           = EXCLUDED.size,
-		     region         = COALESCE(tenants.region, EXCLUDED.region),
-		     use_cases      = EXCLUDED.use_cases,
-		     use_case_other = EXCLUDED.use_case_other,
-		     onboarded_at   = COALESCE(tenants.onboarded_at, now()),
-		     updated_at     = now()
-		 RETURNING `+tenantCols,
-		orgID, name, size, region, useCasesJSON, useCaseOther)
-	return scanTenant(row)
+
+	r, err := s.q.CompleteOnboarding(ctx, gen.CompleteOnboardingParams{
+		ZitadelOrgID: orgID,
+		Name:         sql.NullString{String: name, Valid: true},
+		Size:         sql.NullString{String: size, Valid: true},
+		Region:       sql.NullString{String: region, Valid: true},
+		UseCases:     useCasesJSON,
+		Column6:      useCaseOther, // NULLIF($6,'') → NULL when empty
+	})
+	if err != nil {
+		return Tenant{}, err
+	}
+	return toTenant(r.ID, r.ZitadelOrgID, r.Name, r.Size, r.Region, r.UseCaseOther, r.UseCases, r.OnboardedAt), nil
 }

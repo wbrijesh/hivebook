@@ -11,6 +11,8 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
+
+	"api/internal/database/gen"
 )
 
 // Service represents a service that interacts with a database.
@@ -38,6 +40,7 @@ type Service interface {
 
 type service struct {
 	db *sql.DB
+	q  *gen.Queries
 }
 
 var (
@@ -66,6 +69,7 @@ func New() Service {
 	}
 	dbInstance = &service{
 		db: db,
+		q:  gen.New(db),
 	}
 
 	// Apply schema migrations on startup. Postgres may not be up the instant the
@@ -73,7 +77,7 @@ func New() Service {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	for {
-		if err := dbInstance.migrate(ctx); err != nil {
+		if err := dbInstance.migrate(); err != nil {
 			if ctx.Err() != nil {
 				log.Fatalf("db migrate: %v", err)
 			}
@@ -149,5 +153,9 @@ func (s *service) Stats() sql.DBStats {
 // If an error occurs while closing the connection, it returns the error.
 func (s *service) Close() error {
 	log.Printf("Disconnected from database: %s", database)
-	return s.db.Close()
+	err := s.db.Close()
+	// Release the singleton so a later New() re-establishes the connection rather
+	// than handing back a closed one.
+	dbInstance = nil
+	return err
 }

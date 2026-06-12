@@ -316,6 +316,13 @@ format:
     pnpm --dir ../web run format
     @bash -c '. scripts/ui.sh && ui_ok "formatted web/"'
 
+# Regenerate typed query code from SQL (sqlc). Runs in Docker — no local sqlc.
+# Edit api/internal/database/queries/*.sql, run this, commit the result.
+gen:
+    @bash -c '. scripts/ui.sh && ui_header "Generate · sqlc"'
+    docker run --rm -v "{{justfile_directory()}}/api":/src -w /src sqlc/sqlc generate
+    @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/database/gen"'
+
 # First-time setup: trust a local CA, write local secrets, deploy the whole stack.
 # Idempotent — safe to re-run to reconcile a half-broken cluster. After this,
 # `just start` / `just stop` are the day-to-day controls.

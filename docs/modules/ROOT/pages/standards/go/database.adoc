@@ -1,0 +1,29 @@
+= Go · Database access
+:status: living
+:last-reviewed: 2026-06-11
+
+One place for SQL, one way to migrate
+(xref:ROOT:adrs/0017-schema-migrations-golang-migrate.adoc[ADR-0017],
+xref:ROOT:adrs/0018-sqlc-query-package.adoc[ADR-0018]).
+
+== Queries
+
+* *Every SQL statement lives in `internal/database/queries/*.sql`* with an sqlc
+`-- name:` annotation. Nothing else in the codebase writes SQL.
+* `just gen` compiles them to typed Go in `internal/database/gen` (sqlc, in
+Docker — no local sqlc). Generated code is committed; regenerate when a `.sql`
+changes.
+* The `database` package's `service` consumes the generated `Queries` and exposes
+the `Service` interface to the rest of the app. Stateful rules sqlc can't express
+(e.g. region write-once) live in the service, not the SQL.
+* sqlc targets `database/sql` over the pgx stdlib driver — the connection stays a
+`*sql.DB`.
+
+== Migrations
+
+* Versioned up/down pairs in `internal/database/migrations/`
+(`{version}_{name}.{up,down}.sql`), embedded and applied on startup with
+golang-migrate. Write *both* directions — the down is tested.
+* sqlc reads the *up* migrations as its schema, so a new column is available to
+queries as soon as its migration lands.
+* A new migration is the next-numbered up/down pair; no CLI needed.

@@ -1,0 +1,34 @@
+= 0017 — Schema migrations via golang-migrate
+:adr-id: 0017
+:status: accepted
+:date: 2026-06-11
+:supersedes: adrs/0015-embedded-startup-migrations.adoc
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+xref:ROOT:adrs/0015-embedded-startup-migrations.adoc[ADR-0015] used a hand-rolled
+embedded migration runner. As the schema grows we want versioned up/down
+migrations, reversibility, and dirty-state tracking without maintaining that
+runner ourselves.
+
+== Decision
+
+Schema migrations use *golang-migrate* as a library: up/down SQL files
+(`internal/database/migrations/{version}_{name}.{up,down}.sql`) embedded in the
+binary and applied on startup (`Up`, ignoring `ErrNoChange`) over the existing
+`*sql.DB`. Supersedes ADR-0015.
+
+== Alternatives considered
+
+* *Keep the hand-rolled runner (ADR-0015)* — no down migrations, no dirty-state
+tracking, and our code to maintain.
+* *A separate `migrate` binary / CLI step* — another tool to install and run; the
+library keeps it a single embedded, startup-applied step with no new prerequisite.
+
+== Consequences
+
+Up/down reversibility and dirty-state handling come for free; golang-migrate owns
+the `schema_migrations` bookkeeping. New migrations are hand-written up/down pairs.
+The library is a dependency, but no runtime binary is added.

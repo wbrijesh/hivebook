@@ -13,8 +13,10 @@ resolves the caller's identity and tenant server-side
 ** `POST /api/tenant/onboarding` — record onboarding answers; idempotent, region
 write-once.
 
-Schema migrations are embedded in the binary and applied on startup
-(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[0005]).
+Schema migrations are embedded and applied on startup via golang-migrate
+(xref:ROOT:adrs/0017-schema-migrations-golang-migrate.adoc[ADR-0017]); queries are
+generated from SQL by sqlc (xref:ROOT:adrs/0018-sqlc-query-package.adoc[ADR-0018],
+regenerate with `just gen`). See xref:ROOT:standards/go/database.adoc[database access].
 
 [NOTE]
 ====

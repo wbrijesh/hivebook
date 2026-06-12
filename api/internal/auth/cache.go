@@ -16,6 +16,7 @@ type identityCache struct {
 	ttl time.Duration
 	ll  *list.List               // MRU at the front, LRU at the back
 	m   map[string]*list.Element // sub -> element in ll
+	now func() time.Time         // injectable clock (tests); time.Now in production
 }
 
 type cacheEntry struct {
@@ -30,6 +31,7 @@ func newIdentityCache(max int, ttl time.Duration) *identityCache {
 		ttl: ttl,
 		ll:  list.New(),
 		m:   make(map[string]*list.Element),
+		now: time.Now,
 	}
 }
 
@@ -44,7 +46,7 @@ func (c *identityCache) get(sub string) (Identity, bool) {
 		return Identity{}, false
 	}
 	ent := el.Value.(*cacheEntry)
-	if time.Now().After(ent.expires) {
+	if c.now().After(ent.expires) {
 		c.remove(el)
 		return Identity{}, false
 	}
@@ -61,12 +63,12 @@ func (c *identityCache) add(sub string, id Identity) {
 	if el, ok := c.m[sub]; ok {
 		ent := el.Value.(*cacheEntry)
 		ent.id = id
-		ent.expires = time.Now().Add(c.ttl)
+		ent.expires = c.now().Add(c.ttl)
 		c.ll.MoveToFront(el)
 		return
 	}
 
-	el := c.ll.PushFront(&cacheEntry{sub: sub, id: id, expires: time.Now().Add(c.ttl)})
+	el := c.ll.PushFront(&cacheEntry{sub: sub, id: id, expires: c.now().Add(c.ttl)})
 	c.m[sub] = el
 	if c.ll.Len() > c.max {
 		c.remove(c.ll.Back())

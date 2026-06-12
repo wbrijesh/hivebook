@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,11 +14,19 @@ import (
 	"api/internal/database"
 )
 
+// authenticator is the slice of the auth layer the server depends on: protecting
+// routes and resolving the caller's identity. A small interface so handlers can
+// be tested with a stub. *auth.Authenticator satisfies it.
+type authenticator interface {
+	Middleware(http.Handler) http.Handler
+	Identity(context.Context, *http.Request) (auth.Identity, error)
+}
+
 type Server struct {
 	port int
 
 	db   database.Service
-	auth *auth.Authenticator
+	auth authenticator
 }
 
 func NewServer() *http.Server {

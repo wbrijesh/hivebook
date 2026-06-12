@@ -1,0 +1,35 @@
+= 0018 — SQL access via sqlc, one query package
+:adr-id: 0018
+:status: accepted
+:date: 2026-06-11
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
+
+== Context
+
+Hand-written SQL scattered across the codebase drifts from the schema and is easy
+to get subtly wrong (scan order, nullability). We want type-safe queries and one
+place where SQL lives.
+
+== Decision
+
+All Go-API SQL lives in `internal/database/queries/*.sql` and is compiled to
+type-safe Go by *sqlc* into one generated package (`internal/database/gen`). Code
+consumes the generated methods; nothing else writes SQL. sqlc targets
+`database/sql`, so the connection stays a `*sql.DB`. Stateful rules sqlc cannot
+express (e.g. region write-once, ADR-0014) live in the service layer.
+
+== Alternatives considered
+
+* *Hand-written SQL with `database/sql`* — what we had; drifts from the schema,
+no compile-time safety.
+* *An ORM (GORM, ent)* — heavier, hides the SQL, pulls a large runtime.
+* *pgx + pgxpool target* — more idiomatic, but changes the connection type and the
+stats/health plumbing; deferred.
+
+== Consequences
+
+Queries are type-checked against the schema and centralized. Adding a query means
+editing a `.sql` file and regenerating (`just gen` — sqlc in Docker, no local
+sqlc; generated code is committed). One generated package to keep current.

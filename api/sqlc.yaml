@@ -1,0 +1,18 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    # Schema is the up-migrations (applied in filename order); never the down files.
+    schema: "internal/database/migrations/*.up.sql"
+    queries: "internal/database/queries"
+    gen:
+      go:
+        package: "gen"
+        out: "internal/database/gen"
+        sql_package: "database/sql"
+        emit_json_tags: false
+        emit_interface: false
+        emit_exact_table_names: false
+        # uuid columns are plain strings everywhere in our code — no google/uuid dep.
+        overrides:
+          - db_type: "uuid"
+            go_type: "string"

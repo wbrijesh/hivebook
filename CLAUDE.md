@@ -44,6 +44,8 @@ docs
 │           │   ├── 0014-region-write-once.adoc
 │           │   ├── 0015-embedded-startup-migrations.adoc
 │           │   ├── 0016-configuration-layering.adoc
+│           │   ├── 0017-schema-migrations-golang-migrate.adoc
+│           │   ├── 0018-sqlc-query-package.adoc
 │           │   └── index.adoc
 │           ├── architecture
 │           │   ├── corpus-and-index.adoc
@@ -90,6 +92,7 @@ docs
 │           │   │   └── state-management.adoc
 │           │   ├── git.adoc
 │           │   ├── go
+│           │   │   ├── database.adoc
 │           │   │   ├── errors.adoc
 │           │   │   ├── logging.adoc
 │           │   │   ├── package-layout.adoc

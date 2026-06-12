@@ -1,9 +1,9 @@
 = 0015 — Embedded, startup-applied SQL migrations
 :adr-id: 0015
-:status: accepted
+:status: superseded
 :date: 2026-06-11
 :supersedes:
-:superseded-by:
+:superseded-by: adrs/0017-schema-migrations-golang-migrate.adoc
 :related-design-doc: design-docs/0005-tenancy-and-onboarding.adoc
 
 == Context

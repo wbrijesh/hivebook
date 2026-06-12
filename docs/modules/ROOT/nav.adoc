@@ -45,6 +45,8 @@
 * xref:adrs/0014-region-write-once.adoc[0014 · Region write-once]
 * xref:adrs/0015-embedded-startup-migrations.adoc[0015 · Embedded startup migrations]
 * xref:adrs/0016-configuration-layering.adoc[0016 · Configuration layering]
+* xref:adrs/0017-schema-migrations-golang-migrate.adoc[0017 · Migrations via golang-migrate]
+* xref:adrs/0018-sqlc-query-package.adoc[0018 · sqlc query package]
 * xref:adrs/0000-template.adoc[Template]
 
 .Standards
@@ -56,6 +58,7 @@
 ** xref:standards/go/errors.adoc[Errors & responses]
 ** xref:standards/go/logging.adoc[Logging]
 ** xref:standards/go/testing.adoc[Testing]
+** xref:standards/go/database.adoc[Database access]
 * Frontend
 ** xref:standards/frontend/component-patterns.adoc[Component patterns]
 ** xref:standards/frontend/state-management.adoc[State management]

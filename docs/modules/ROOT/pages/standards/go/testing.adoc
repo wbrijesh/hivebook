@@ -15,4 +15,10 @@ share it (see `internal/database/database_test.go`).
 . *`testify` is available* for assertions; plain `t.Fatalf` / `t.Errorf` is fine
 for small tests — match the file you're in.
 . *Table-driven tests* when a function has several input cases.
-. *Run `go test ./...`* from `api/`; tests pass before a change lands.
+. *Migrations are tested both ways* — up applies the schema, up→down→up proves the
+down files, a second up is a no-op (see `internal/database/migrate_test.go`).
+. *Handlers depend on small interfaces* (the DB `Service`, the auth resolver) so
+handler tests assert the HTTP contract — status codes, JSON, error mapping — with
+stubs; query behavior is verified separately against a real container.
+. *Run `go test ./...`* from `api/`; or `just check` to run it (and the web checks)
+in containers, the same as CI. Tests pass before a change lands.
