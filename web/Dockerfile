@@ -24,8 +24,10 @@ FROM node:22-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 # Standalone server bundles only what it needs; static assets copied alongside.
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+# Owned by the non-root node user so the runtime can write its cache.
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/public ./public
 EXPOSE 3000
+USER node
 CMD ["node", "server.js"]

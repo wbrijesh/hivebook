@@ -13,7 +13,7 @@ reference] covers what runs and how).
 +
 [source,sh]
 ----
-brew install just gum dagger helm mkcert
+brew install just gum dagger helm mkcert jq
 ----
 
 Nothing else is needed locally. Go, Node, pnpm, and Antora all run in

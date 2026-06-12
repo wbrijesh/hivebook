@@ -1,32 +1,43 @@
+// Package database is the data layer: a typed query store (sqlc, ADR-0018) over
+// Postgres, with schema migrations applied on startup (golang-migrate, ADR-0017).
 package database
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/joho/godotenv/autoload"
 
 	"api/internal/database/gen"
 )
 
-// Service represents a service that interacts with a database.
+// Connection-pool tuning and the startup migration window (constants-first, ADR-0011).
+const (
+	maxOpenConns    = 25
+	maxIdleConns    = 25
+	connMaxLifetime = 5 * time.Minute
+	connMaxIdleTime = 5 * time.Minute
+	migrateTimeout  = 90 * time.Second
+)
+
+// Service is the data layer the rest of the app depends on.
 type Service interface {
-	// Health returns a map of health status information.
-	// The keys and values in the map are service-specific.
+	// Health reports connectivity and pool stats. "status" is "up" or "down".
 	Health() map[string]string
 
-	// Stats returns the underlying connection-pool statistics, used to export
-	// Prometheus gauges (see internal/server/dbstats.go).
+	// Stats returns the connection-pool statistics, exported as Prometheus gauges
+	// (see internal/server/dbstats.go).
 	Stats() sql.DBStats
 
-	// GetOrCreateTenant returns the tenant for a ZITADEL org id, creating an
-	// empty (un-onboarded) row the first time the org is seen.
+	// GetOrCreateTenant returns the tenant for a ZITADEL org id, creating an empty
+	// (un-onboarded) row the first time the org is seen.
 	GetOrCreateTenant(ctx context.Context, orgID string) (Tenant, error)
 
 	// CompleteOnboarding records the onboarding answers and marks the tenant
@@ -34,8 +45,54 @@ type Service interface {
 	CompleteOnboarding(ctx context.Context, orgID, name, size, region string, useCases []string, useCaseOther string) (Tenant, error)
 
 	// Close terminates the database connection.
-	// It returns an error if the connection cannot be closed.
 	Close() error
+}
+
+// Config is the database connection configuration — no package globals.
+type Config struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Database string
+	Schema   string // defaults to "public"
+	SSLMode  string // defaults to "disable"
+}
+
+// ConfigFromEnv reads the HIVEBOOK_DB_* environment.
+func ConfigFromEnv() Config {
+	return Config{
+		Host:     os.Getenv("HIVEBOOK_DB_HOST"),
+		Port:     os.Getenv("HIVEBOOK_DB_PORT"),
+		User:     os.Getenv("HIVEBOOK_DB_USERNAME"),
+		Password: os.Getenv("HIVEBOOK_DB_PASSWORD"),
+		Database: os.Getenv("HIVEBOOK_DB_DATABASE"),
+		Schema:   os.Getenv("HIVEBOOK_DB_SCHEMA"),
+		SSLMode:  os.Getenv("HIVEBOOK_DB_SSLMODE"),
+	}
+}
+
+// dsn builds a libpq URL with the password percent-escaped via url.UserPassword.
+func (c Config) dsn() string {
+	schema := c.Schema
+	if schema == "" {
+		schema = "public"
+	}
+	sslmode := c.SSLMode
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   net.JoinHostPort(c.Host, c.Port),
+		Path:   "/" + c.Database,
+	}
+	q := url.Values{}
+	q.Set("sslmode", sslmode)
+	q.Set("search_path", schema)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 type service struct {
@@ -43,103 +100,54 @@ type service struct {
 	q  *gen.Queries
 }
 
-var (
-	database   = os.Getenv("HIVEBOOK_DB_DATABASE")
-	password   = os.Getenv("HIVEBOOK_DB_PASSWORD")
-	username   = os.Getenv("HIVEBOOK_DB_USERNAME")
-	port       = os.Getenv("HIVEBOOK_DB_PORT")
-	host       = os.Getenv("HIVEBOOK_DB_HOST")
-	schema     = os.Getenv("HIVEBOOK_DB_SCHEMA")
-	dbInstance *service
-)
-
-func New() Service {
-	// Reuse Connection
-	if dbInstance != nil {
-		return dbInstance
-	}
-	sch := schema
-	if sch == "" {
-		sch = "public"
-	}
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable&search_path=%s", username, password, host, port, database, sch)
-	db, err := sql.Open("pgx", connStr)
+// New opens the pool, tunes it, applies migrations (retrying within a bounded
+// window since Postgres may not be up yet), and returns the service.
+func New(cfg Config) (Service, error) {
+	db, err := sql.Open("pgx", cfg.dsn())
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("open database: %w", err)
 	}
-	dbInstance = &service{
-		db: db,
-		q:  gen.New(db),
-	}
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(connMaxLifetime)
+	db.SetConnMaxIdleTime(connMaxIdleTime)
 
-	// Apply schema migrations on startup. Postgres may not be up the instant the
-	// API starts, so retry within a bounded window before giving up.
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	s := &service{db: db, q: gen.New(db)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), migrateTimeout)
 	defer cancel()
 	for {
-		if err := dbInstance.migrate(); err != nil {
-			if ctx.Err() != nil {
-				log.Fatalf("db migrate: %v", err)
-			}
-			log.Printf("db migrate failed, retrying: %v", err)
+		if err := s.migrate(); err == nil {
+			break
+		} else if ctx.Err() != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("migrate: %w", err)
+		} else {
+			slog.Warn("db_migrate_retry", "error", err.Error())
 			time.Sleep(2 * time.Second)
-			continue
 		}
-		break
 	}
-
-	return dbInstance
+	return s, nil
 }
 
-// Health checks the health of the database connection by pinging the database.
-// It returns a map with keys indicating various health statistics.
+// Health pings the database and reports pool stats. "status" is "up" or "down";
+// the /health handler turns "down" into a 503.
 func (s *service) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	stats := make(map[string]string)
-
-	// Ping the database
-	err := s.db.PingContext(ctx)
-	if err != nil {
-		stats["status"] = "down"
-		stats["error"] = fmt.Sprintf("db down: %v", err)
-		log.Printf("db down: %v", err) // Report unhealthy; do NOT terminate the process
-		return stats
+	if err := s.db.PingContext(ctx); err != nil {
+		slog.Error("db_health_down", "error", err.Error())
+		return map[string]string{"status": "down", "error": err.Error()}
 	}
 
-	// Database is up, add more statistics
-	stats["status"] = "up"
-	stats["message"] = "It's healthy"
-
-	// Get database stats (like open connections, in use, idle, etc.)
-	dbStats := s.db.Stats()
-	stats["open_connections"] = strconv.Itoa(dbStats.OpenConnections)
-	stats["in_use"] = strconv.Itoa(dbStats.InUse)
-	stats["idle"] = strconv.Itoa(dbStats.Idle)
-	stats["wait_count"] = strconv.FormatInt(dbStats.WaitCount, 10)
-	stats["wait_duration"] = dbStats.WaitDuration.String()
-	stats["max_idle_closed"] = strconv.FormatInt(dbStats.MaxIdleClosed, 10)
-	stats["max_lifetime_closed"] = strconv.FormatInt(dbStats.MaxLifetimeClosed, 10)
-
-	// Evaluate stats to provide a health message
-	if dbStats.OpenConnections > 40 { // Assuming 50 is the max for this example
-		stats["message"] = "The database is experiencing heavy load."
+	d := s.db.Stats()
+	return map[string]string{
+		"status":           "up",
+		"open_connections": strconv.Itoa(d.OpenConnections),
+		"in_use":           strconv.Itoa(d.InUse),
+		"idle":             strconv.Itoa(d.Idle),
 	}
-
-	if dbStats.WaitCount > 1000 {
-		stats["message"] = "The database has a high number of wait events, indicating potential bottlenecks."
-	}
-
-	if dbStats.MaxIdleClosed > int64(dbStats.OpenConnections)/2 {
-		stats["message"] = "Many idle connections are being closed, consider revising the connection pool settings."
-	}
-
-	if dbStats.MaxLifetimeClosed > int64(dbStats.OpenConnections)/2 {
-		stats["message"] = "Many connections are being closed due to max lifetime, consider increasing max lifetime or revising the connection usage pattern."
-	}
-
-	return stats
 }
 
 // Stats returns the sql.DB connection-pool statistics.
@@ -147,15 +155,7 @@ func (s *service) Stats() sql.DBStats {
 	return s.db.Stats()
 }
 
-// Close closes the database connection.
-// It logs a message indicating the disconnection from the specific database.
-// If the connection is successfully closed, it returns nil.
-// If an error occurs while closing the connection, it returns the error.
+// Close terminates the database connection.
 func (s *service) Close() error {
-	log.Printf("Disconnected from database: %s", database)
-	err := s.db.Close()
-	// Release the singleton so a later New() re-establishes the connection rather
-	// than handing back a closed one.
-	dbInstance = nil
-	return err
+	return s.db.Close()
 }

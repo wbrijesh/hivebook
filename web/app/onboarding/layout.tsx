@@ -1,27 +1,14 @@
 "use client"
 
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { LayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime"
 
 import { OnboardingTopBar } from "@/components/onboarding/onboarding-topbar"
 import { OnboardingFlowProvider } from "@/components/onboarding/onboarding-flow"
 import { progress } from "@/lib/onboarding-steps"
 import { userManager } from "@/lib/auth"
 import { fetchTenant } from "@/lib/tenant"
-
-// Keeps the exiting step rendering its own content during the exit animation.
-function FrozenRouter({ children }: { children: ReactNode }) {
-  const context = useContext(LayoutRouterContext)
-  // eslint-disable-next-line react-hooks/refs -- intentional one-time snapshot to freeze the exiting route during the transition
-  const frozen = useRef(context).current
-  return (
-    <LayoutRouterContext.Provider value={frozen}>
-      {children}
-    </LayoutRouterContext.Provider>
-  )
-}
 
 // A reasonable default workspace name from the user's email domain, so step 1
 // is pre-filled rather than blank.
@@ -97,7 +84,7 @@ export default function OnboardingLayout({
         {/* Quiet fill line — forward motion, no counter. */}
         <div className="h-1 w-full shrink-0 bg-border">
           <div
-            className="h-full bg-brand transition-[width] duration-500 ease-out"
+            className="h-full bg-brand transition-[width] duration-500 ease-out motion-reduce:transition-none"
             style={{ width: `${pct * 100}%` }}
           />
         </div>
@@ -126,7 +113,7 @@ export default function OnboardingLayout({
               }}
               className="h-full"
             >
-              <FrozenRouter>{children}</FrozenRouter>
+              {children}
             </motion.div>
           </AnimatePresence>
         </main>

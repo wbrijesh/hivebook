@@ -26,10 +26,10 @@ warnings.
 Deliberately small — toolchains run in containers, not on your machine.
 
 * OrbStack with Kubernetes enabled — provides both Docker and `kubectl`.
-* `just`, `gum`, `dagger`, `helm`, `mkcert` (`brew install just gum dagger helm mkcert`).
+* `just`, `gum`, `dagger`, `helm`, `mkcert`, `jq` (`brew install just gum dagger helm mkcert jq`).
 ** `just` is the control panel; `gum` styles its output (plain text without it);
-`dagger` runs the checks (`just check`); `helm` and `mkcert` are used by
-`just setup`.
+`dagger` runs the checks (`just check`); `helm`, `mkcert`, and `jq` (ZITADEL
+provisioning) are used by `just setup`.
 
 You do *not* need Go, Node, pnpm, or Antora locally: image builds run in Docker
 (`just update`), checks and tests run in Dagger (`just check`), and the docs site

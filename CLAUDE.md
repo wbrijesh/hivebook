@@ -146,6 +146,8 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 - `api/` — Go API: chi router, pgx/Postgres, `log/slog` JSON, ZITADEL JWT auth.
   Entrypoint `cmd/api/`, logic in `internal/{auth,database,server}`.
 - `web/` — Next.js (App Router) + shadcn/ui + Apex tokens.
+- `prototype/` — throwaway UI prototype (mock data); opt-in deploy
+  (`just update prototype`), not part of `just install`.
 - `infra/` — Kubernetes manifests (OrbStack), one dir per component.
 - `docs/` — the Antora docs this file indexes.
 - `.dagger/` — the checks as code (Dagger, Go); the `just check` / CI gate.

@@ -47,10 +47,12 @@ spec:
             - name: oidc-ca
               mountPath: /etc/hivebook/tls
               readOnly: true
-          # Probe "/" (no DB access) — "/health" calls log.Fatalf on DB error in
-          # the scaffolded code, which would crash the pod on a transient blip.
+            - name: tmp
+              mountPath: /tmp
+          # Readiness gates on the DB (/health → 503 when down); liveness stays on
+          # "/" so a transient DB blip doesn't restart an otherwise-healthy pod.
           readinessProbe:
-            httpGet: { path: /, port: http }
+            httpGet: { path: /health, port: http }
             initialDelaySeconds: 3
             periodSeconds: 5
           livenessProbe:
@@ -60,7 +62,20 @@ spec:
           resources:
             requests: { cpu: 50m, memory: 64Mi }
             limits: { cpu: 500m, memory: 256Mi }
+          # Static Go binary — full hardening is free. /tmp is a writable emptyDir
+          # since the root filesystem is read-only.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: oidc-ca
           secret:
             secretName: hivebook-wildcard-tls

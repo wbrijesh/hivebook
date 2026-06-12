@@ -1,3 +1,5 @@
+// Package server is the HTTP layer: the chi router, middleware, and handlers
+// that expose the API over the auth and database packages.
 package server
 
 import (
@@ -7,8 +9,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
-	_ "github.com/joho/godotenv/autoload"
 
 	"api/internal/auth"
 	"api/internal/database"
@@ -29,12 +29,26 @@ type Server struct {
 	auth authenticator
 }
 
-func NewServer() *http.Server {
-	port, _ := strconv.Atoi(os.Getenv("PORT"))
-	NewServer := &Server{
-		port: port,
+// NewServer wires the API: database, auth, and routes. Returns an error rather
+// than fatally exiting so the caller (main) owns process lifecycle.
+func NewServer() (*http.Server, error) {
+	port := 8080
+	if v := os.Getenv("HIVEBOOK_API_PORT"); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid HIVEBOOK_API_PORT %q: %w", v, err)
+		}
+		port = p
+	}
 
-		db: database.New(),
+	db, err := database.New(database.ConfigFromEnv())
+	if err != nil {
+		return nil, fmt.Errorf("database: %w", err)
+	}
+
+	srv := &Server{
+		port: port,
+		db:   db,
 		auth: auth.New(
 			os.Getenv("HIVEBOOK_OIDC_ISSUER"),
 			os.Getenv("HIVEBOOK_OIDC_AUDIENCE"),
@@ -42,14 +56,11 @@ func NewServer() *http.Server {
 		),
 	}
 
-	// Declare Server config
-	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", NewServer.port),
-		Handler:      NewServer.RegisterRoutes(),
+	return &http.Server{
+		Addr:         fmt.Sprintf(":%d", srv.port),
+		Handler:      srv.RegisterRoutes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
-	}
-
-	return server
+	}, nil
 }

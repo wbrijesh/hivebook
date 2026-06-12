@@ -6,11 +6,20 @@ import (
 	"testing"
 )
 
-// All store tests share the singleton from New() (migrated against the container
-// in TestMain) and isolate by a unique org id per test.
+// newStore opens a service against the TestMain container (migrations run on New)
+// and closes it when the test ends. Tests isolate by a unique org id per test.
+func newStore(t *testing.T) Service {
+	t.Helper()
+	srv, err := New(testCfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+	return srv
+}
 
 func TestGetOrCreateTenant(t *testing.T) {
-	srv := New()
+	srv := newStore(t)
 	ctx := context.Background()
 	org := "org_" + t.Name()
 
@@ -41,7 +50,7 @@ func TestGetOrCreateTenant(t *testing.T) {
 }
 
 func TestCompleteOnboarding(t *testing.T) {
-	srv := New()
+	srv := newStore(t)
 	ctx := context.Background()
 	org := "org_" + t.Name()
 
@@ -84,7 +93,7 @@ func TestCompleteOnboarding(t *testing.T) {
 }
 
 func TestCompleteOnboarding_RegionWriteOnce(t *testing.T) {
-	srv := New()
+	srv := newStore(t)
 	ctx := context.Background()
 	org := "org_" + t.Name()
 
@@ -106,7 +115,7 @@ func TestCompleteOnboarding_RegionWriteOnce(t *testing.T) {
 }
 
 func TestCompleteOnboarding_FromScratch(t *testing.T) {
-	srv := New()
+	srv := newStore(t)
 	ctx := context.Background()
 	org := "org_" + t.Name()
 

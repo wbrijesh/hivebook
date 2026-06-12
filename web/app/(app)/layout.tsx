@@ -1,7 +1,5 @@
 import type { ReactNode } from "react"
 
-import { CommandMenuProvider } from "@/components/app/command-menu"
-import { ChromeProvider } from "@/components/app/chrome"
 import { AppSpine, SpineProvider } from "@/components/app/spine"
 import { AppContextBar } from "@/components/app/app-context-bar"
 import { AppContextPanel } from "@/components/app/app-context-panel"
@@ -14,24 +12,18 @@ import { AppGate } from "@/components/app/app-gate"
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppGate>
-      <CommandMenuProvider>
-        <SpineProvider>
-          <ChromeProvider>
-            <div className="flex h-svh overflow-hidden bg-background">
-              <AppSpine />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <AppContextBar />
-                <div className="flex min-h-0 flex-1">
-                  <AppContextPanel />
-                  <main className="min-w-0 flex-1 overflow-hidden">
-                    {children}
-                  </main>
-                </div>
-              </div>
+      <SpineProvider>
+        <div className="flex h-svh overflow-hidden bg-background">
+          <AppSpine />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <AppContextBar />
+            <div className="flex min-h-0 flex-1">
+              <AppContextPanel />
+              <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
             </div>
-          </ChromeProvider>
-        </SpineProvider>
-      </CommandMenuProvider>
+          </div>
+        </div>
+      </SpineProvider>
     </AppGate>
   )
 }

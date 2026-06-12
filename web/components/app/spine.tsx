@@ -37,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { NAV, type NavItem } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 
 // ── expand/collapse state ────────────────────────────────────────────────
@@ -99,22 +100,24 @@ export function SpineProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ── the spine ────────────────────────────────────────────────────────────
-type Item = { label: string; href: string; icon: React.ElementType }
+// Labels and routes come from the shared registry (lib/nav); the spine renders
+// the filled icon variants, mapped by key.
+const FILL: Record<string, React.ElementType> = {
+  ask: RiSparkling2Fill,
+  book: RiBook2Fill,
+  sources: RiLayoutGrid2Fill,
+  entities: RiNodeTree,
+  review: RiFileSearchFill,
+  members: RiTeamFill,
+  access: RiShieldKeyholeFill,
+  audit: RiFileList3Fill,
+  usage: RiBarChartFill,
+  settings: RiSettings3Fill,
+}
 
-const KNOWLEDGE: Item[] = [
-  { label: "Ask", href: "/ask", icon: RiSparkling2Fill },
-  { label: "Book", href: "/book", icon: RiBook2Fill },
-]
-
-const MANAGE: Item[] = [
-  { label: "Sources", href: "/sources", icon: RiLayoutGrid2Fill },
-  { label: "Entities", href: "/entities", icon: RiNodeTree },
-  { label: "Review", href: "/review", icon: RiFileSearchFill },
-  { label: "Members", href: "/members", icon: RiTeamFill },
-  { label: "Access", href: "/access", icon: RiShieldKeyholeFill },
-  { label: "Audit", href: "/audit", icon: RiFileList3Fill },
-  { label: "Usage", href: "/usage", icon: RiBarChartFill },
-]
+const KNOWLEDGE = NAV.filter((n) => n.group === "knowledge")
+const MANAGE = NAV.filter((n) => n.group === "manage")
+const SETTINGS = NAV.find((n) => n.key === "settings")!
 
 export function AppSpine() {
   const pathname = usePathname()
@@ -147,10 +150,7 @@ export function AppSpine() {
         <div className="flex-1" />
 
         <Notifications />
-        <SpineLink
-          item={{ label: "Settings", href: "/settings", icon: RiSettings3Fill }}
-          active={isActive("/settings")}
-        />
+        <SpineLink item={SETTINGS} active={isActive(SETTINGS.href)} />
         <ProfileMenu />
       </nav>
     </TooltipProvider>
@@ -181,8 +181,8 @@ function Label({ children }: { children: React.ReactNode }) {
   )
 }
 
-function SpineLink({ item, active }: { item: Item; active: boolean }) {
-  const Icon = item.icon
+function SpineLink({ item, active }: { item: NavItem; active: boolean }) {
+  const Icon = FILL[item.key]
   const { expanded } = useSpine()
   return (
     <Tooltip>

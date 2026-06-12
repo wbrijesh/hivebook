@@ -3,39 +3,15 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Command as Cmdk } from "cmdk"
-import {
-  RiBarChartLine,
-  RiBook2Line,
-  RiCornerDownLeftLine,
-  RiFileList3Line,
-  RiFileSearchLine,
-  RiLayoutGrid2Line,
-  RiNodeTree,
-  RiSearchLine,
-  RiSettings3Line,
-  RiShieldKeyholeLine,
-  RiSparkling2Line,
-  RiTeamLine,
-} from "@remixicon/react"
+import { RiCornerDownLeftLine, RiSearchLine } from "@remixicon/react"
 
 import { Kbd } from "@/components/ui/kbd"
+import { NAV } from "@/lib/nav"
 import { cn } from "@/lib/utils"
 
 // A keyboard jumper for the real navigation destinations; "/" focuses it from
 // anywhere. There's no corpus content to search yet (Book/Sources/Entities aren't
 // built), so it jumps to sections — it gains content search when those land.
-const NAV: { label: string; href: string; icon: React.ElementType }[] = [
-  { label: "Ask", href: "/ask", icon: RiSparkling2Line },
-  { label: "Book", href: "/book", icon: RiBook2Line },
-  { label: "Sources", href: "/sources", icon: RiLayoutGrid2Line },
-  { label: "Entities", href: "/entities", icon: RiNodeTree },
-  { label: "Review", href: "/review", icon: RiFileSearchLine },
-  { label: "Members", href: "/members", icon: RiTeamLine },
-  { label: "Access", href: "/access", icon: RiShieldKeyholeLine },
-  { label: "Audit log", href: "/audit", icon: RiFileList3Line },
-  { label: "Usage", href: "/usage", icon: RiBarChartLine },
-  { label: "Settings", href: "/settings", icon: RiSettings3Line },
-]
 
 export function AppSearch() {
   const router = useRouter()

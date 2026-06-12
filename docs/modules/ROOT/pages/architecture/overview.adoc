@@ -5,6 +5,15 @@
 Hivebook is a layered system. Each layer has one responsibility and a
 stable interface to the layers above and below it.
 
+[NOTE]
+====
+*Implementation status.* These pages describe the target architecture in
+present tense (house style). As of v0.1, only the *tenancy + onboarding* slice
+is built (xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc
+0005]); the corpus, index, retrieval, and audit-event systems below are designed,
+not yet implemented.
+====
+
 [d2]
 ----
 direction: down

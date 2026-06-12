@@ -11,8 +11,8 @@ state by hand.
 The API contract is proto-first over Connect
 (xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
 The client below is *generated*, not hand-written. Until the generated clients
-land, this is the target every new data path is built toward — do not hand-roll a
-`fetch` layer in the meantime.
+land, the single interim fetch layer is `lib/tenant.ts` — build new data paths
+toward this target, and do not add a second hand-rolled `fetch` layer.
 ====
 
 == Rules

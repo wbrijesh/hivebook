@@ -26,3 +26,10 @@ args; there is no runtime config endpoint.
 
 Server state flows through one API layer + TanStack Query — see
 xref:ROOT:standards/frontend/data-fetching.adoc[].
+
+[NOTE]
+====
+Interim, pre-Connect: the only fetch layer today is `lib/tenant.ts`. The
+generated-client rules in data-fetching are the target, landing with
+xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006].
+====

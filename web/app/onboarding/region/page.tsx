@@ -36,7 +36,10 @@ export default function RegionPage() {
         <OnboardingBack onClick={() => router.push(prevPath(pathname)!)} />
       }
       primaryAction={
-        <OnboardingContinue onClick={() => router.push(nextPath(pathname)!)} />
+        <OnboardingContinue
+          disabled={!region}
+          onClick={() => router.push(nextPath(pathname)!)}
+        />
       }
     >
       <OptionGrid

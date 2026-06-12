@@ -11,16 +11,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func mustStartPostgresContainer() (func(context.Context, ...testcontainers.TerminateOption) error, error) {
-	var (
-		dbName = "database"
-		dbPwd  = "password"
-		dbUser = "user"
-	)
+// testCfg points at the container started in TestMain; tests pass it to New.
+var testCfg Config
 
-	dbContainer, err := postgres.Run(
+func mustStartPostgresContainer() (func(context.Context, ...testcontainers.TerminateOption) error, error) {
+	dbName, dbUser, dbPwd := "database", "user", "password"
+
+	c, err := postgres.Run(
 		context.Background(),
-		"postgres:latest",
+		"postgres:17-alpine", // pinned, matches the production StatefulSet
 		postgres.WithDatabase(dbName),
 		postgres.WithUsername(dbUser),
 		postgres.WithPassword(dbPwd),
@@ -33,24 +32,23 @@ func mustStartPostgresContainer() (func(context.Context, ...testcontainers.Termi
 		return nil, err
 	}
 
-	database = dbName
-	password = dbPwd
-	username = dbUser
-
-	dbHost, err := dbContainer.Host(context.Background())
+	host, err := c.Host(context.Background())
 	if err != nil {
-		return dbContainer.Terminate, err
+		return c.Terminate, err
+	}
+	port, err := c.MappedPort(context.Background(), "5432/tcp")
+	if err != nil {
+		return c.Terminate, err
 	}
 
-	dbPort, err := dbContainer.MappedPort(context.Background(), "5432/tcp")
-	if err != nil {
-		return dbContainer.Terminate, err
+	testCfg = Config{
+		Host:     host,
+		Port:     port.Port(),
+		User:     dbUser,
+		Password: dbPwd,
+		Database: dbName,
 	}
-
-	host = dbHost
-	port = dbPort.Port()
-
-	return dbContainer.Terminate, err
+	return c.Terminate, nil
 }
 
 func TestMain(m *testing.M) {
@@ -61,40 +59,43 @@ func TestMain(m *testing.M) {
 
 	m.Run()
 
-	if teardown != nil && teardown(context.Background()) != nil {
-		log.Fatalf("could not teardown postgres container: %v", err)
+	if teardown != nil {
+		if err := teardown(context.Background()); err != nil {
+			log.Fatalf("could not teardown postgres container: %v", err)
+		}
 	}
 }
 
 func TestNew(t *testing.T) {
-	srv := New()
-	if srv == nil {
-		t.Fatal("New() returned nil")
+	srv, err := New(testCfg)
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
+	defer srv.Close()
 }
 
 func TestHealth(t *testing.T) {
-	srv := New()
+	srv, err := New(testCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
 
 	stats := srv.Health()
-
 	if stats["status"] != "up" {
-		t.Fatalf("expected status to be up, got %s", stats["status"])
+		t.Fatalf("expected status up, got %q", stats["status"])
 	}
-
 	if _, ok := stats["error"]; ok {
-		t.Fatalf("expected error not to be present")
-	}
-
-	if stats["message"] != "It's healthy" {
-		t.Fatalf("expected message to be 'It's healthy', got %s", stats["message"])
+		t.Fatal("expected no error key when healthy")
 	}
 }
 
 func TestClose(t *testing.T) {
-	srv := New()
-
-	if srv.Close() != nil {
-		t.Fatalf("expected Close() to return nil")
+	srv, err := New(testCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 }

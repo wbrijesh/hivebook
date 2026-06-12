@@ -5,7 +5,7 @@ metadata:
   namespace: hivebook
 data:
   APP_ENV: "local"
-  PORT: "8080"
+  HIVEBOOK_API_PORT: "8080"
   HIVEBOOK_DB_HOST: "postgres"
   HIVEBOOK_DB_PORT: "5432"
   HIVEBOOK_DB_SCHEMA: "public"

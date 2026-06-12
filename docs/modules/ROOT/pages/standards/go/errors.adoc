@@ -39,8 +39,10 @@ inconsistently. New handlers use `writeJSON`; migrate the old ones when touched.
 * Reject with `http.Error(w, msg, status)` — a lowercase, factual message and
 the right status. No stack traces or internal detail to the client.
 * Status codes: `400` invalid input · `401` missing/invalid token · `403`
-authorized but forbidden · `404` not found · `503` dependency not ready · `500`
-unexpected. (See `internal/auth` for the 401/503 split.)
+authorized but forbidden · `404` not found · `409` conflict (e.g. region
+write-once) · `422` request cannot be resolved (no identity/org) · `503`
+dependency not ready · `500` unexpected. (See `internal/auth` for the 401/503
+split.)
 * Cap and validate input — wrap bodies in `http.MaxBytesReader` and reject on
 decode error (see `eventsHandler`).
 

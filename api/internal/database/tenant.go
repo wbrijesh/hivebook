@@ -71,19 +71,11 @@ func (s *service) GetOrCreateTenant(ctx context.Context, orgID string) (Tenant, 
 }
 
 // CompleteOnboarding records the onboarding answers and stamps onboarded_at.
-// Idempotent. region is write-once (ADR-0014): a different region is rejected; the
-// same (or first) region is accepted.
+// Idempotent. region is write-once (ADR-0014): the upsert only updates when the
+// stored region is unset or equals the requested one, so a conflicting region
+// returns no row — which we surface as ErrRegionImmutable. Atomic and race-safe;
+// no partial write on conflict.
 func (s *service) CompleteOnboarding(ctx context.Context, orgID, name, size, region string, useCases []string, useCaseOther string) (Tenant, error) {
-	// Enforce region write-once in the app: a COALESCE in SQL would silently keep
-	// the old region instead of telling the caller it changed.
-	existing, err := s.q.GetTenantByOrg(ctx, orgID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return Tenant{}, err
-	}
-	if err == nil && existing.Region.Valid && existing.Region.String != "" && existing.Region.String != region {
-		return Tenant{}, ErrRegionImmutable
-	}
-
 	if useCases == nil {
 		useCases = []string{}
 	}
@@ -95,8 +87,11 @@ func (s *service) CompleteOnboarding(ctx context.Context, orgID, name, size, reg
 		Size:         sql.NullString{String: size, Valid: true},
 		Region:       sql.NullString{String: region, Valid: true},
 		UseCases:     useCasesJSON,
-		Column6:      useCaseOther, // NULLIF($6,'') → NULL when empty
+		UseCaseOther: useCaseOther, // NULLIF(...,'') → NULL when empty
 	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return Tenant{}, ErrRegionImmutable
+	}
 	if err != nil {
 		return Tenant{}, err
 	}

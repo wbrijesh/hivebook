@@ -45,7 +45,7 @@ help:
     ui_info "Inspect state  →  just status (pod readiness) · just health (live endpoint + DB checks)."
     ui_info "Logs & metrics →  Grafana (just urls) is the observability surface — search, dashboards, history."
     ui_info "                  just logs is only a quick live tail of one service, not for investigating."
-    ui_subtle "buildable: api · web · prototype · docs    ·    full set also: postgres · zitadel · zitadel-db · zitadel-login"
+    ui_subtle "buildable: api · web · docs    ·    opt-in: prototype    ·    full set also: postgres · zitadel · zitadel-db · zitadel-login"
 
 # Service URLs & logins
 urls:
@@ -54,7 +54,6 @@ urls:
     ui_section "URLs & logins  (HTTPS via mkcert · local creds, never reuse)"
     ui_box \
       "Web app   https://app.hivebook.localhost" \
-      "Prototype https://prototype.hivebook.localhost  UI prototype (mock data, no login)" \
       "Docs      https://docs.hivebook.localhost       Antora site (no login)" \
       "Auth      https://id.hivebook.localhost         admin@hivebook.localhost / Password1!" \
       "API       https://api.hivebook.localhost        /health · /metrics · /api/me" \
@@ -93,7 +92,6 @@ health:
     ui_section "Hivebook"
     check "API" "/health 200" http "https://api.hivebook.localhost/health"
     check "Web" "HTTP 200" http "https://app.hivebook.localhost/"
-    check "Prototype" "HTTP 200" http "https://prototype.hivebook.localhost/"
     check "Docs" "HTTP 200" http "https://docs.hivebook.localhost/"
     check "Postgres" "pg_isready" kubectl -n hivebook exec statefulset/postgres -- pg_isready -q
 
@@ -261,7 +259,7 @@ update *services:
       exit 1
     fi
     buildable="api web prototype docs"
-    targets="{{services}}"; [ -z "${targets// /}" ] && targets="$buildable"
+    targets="{{services}}"; [ -z "${targets// /}" ] && targets="api web docs" # prototype is opt-in
     for s in $targets; do
       case " $buildable " in *" $s "*) ;; *) ui_fail "can't build '$s' — buildable: $buildable"; exit 1 ;; esac
     done
@@ -328,7 +326,7 @@ gen:
 # `just start` / `just stop` are the day-to-day controls.
 setup:
     #!/usr/bin/env bash
-    set -uo pipefail
+    set -euo pipefail
     . scripts/ui.sh
     ui_header "Setup · Hivebook"
     if ! kubectl get ns >/dev/null 2>&1; then
@@ -368,7 +366,7 @@ setup:
 [private]
 _build service:
     #!/usr/bin/env bash
-    set -uo pipefail
+    set -euo pipefail
     kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
     case "{{service}}" in
       api)
@@ -415,14 +413,13 @@ _ns service:
     echo "$n"
 
 [private]
-install: infra coredns auth provision api web prototype docs observability
+install: infra coredns auth provision api web docs observability
     #!/usr/bin/env bash
     . scripts/ui.sh
     ui_logo
     ui_header "Hivebook installed"
     ui_box \
       "Web app   https://app.hivebook.localhost" \
-      "Prototype https://prototype.hivebook.localhost" \
       "Docs      https://docs.hivebook.localhost" \
       "Auth      https://id.hivebook.localhost      admin@hivebook.localhost / Password1!" \
       "API       https://api.hivebook.localhost" \
@@ -485,7 +482,7 @@ coredns:
 [private]
 auth: repos
     #!/usr/bin/env bash
-    set -uo pipefail
+    set -euo pipefail
     . scripts/ui.sh
     ui_header "Auth · ZITADEL (Postgres + helm + ingress)"
     kubectl get ns zitadel >/dev/null 2>&1 || kubectl create ns zitadel
@@ -534,7 +531,7 @@ docs:
 [private]
 observability: repos
     #!/usr/bin/env bash
-    set -uo pipefail
+    set -euo pipefail
     . scripts/ui.sh
     ui_header "Observability · VictoriaMetrics + VictoriaLogs + Grafana"
     helm -n observability uninstall kube-prometheus-stack 2>/dev/null || true

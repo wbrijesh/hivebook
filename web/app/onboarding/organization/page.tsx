@@ -12,20 +12,11 @@ import { Input } from "@/components/ui/input"
 import { companySizes } from "@/lib/onboarding-options"
 import { nextPath } from "@/lib/onboarding-steps"
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-}
-
 export default function OrganizationPage() {
   const router = useRouter()
   const pathname = usePathname()
   const { orgName, orgSize, set } = useOnboardingFlow()
 
-  const slug = slugify(orgName) || "your-workspace"
   const canContinue = orgName.trim().length > 0
 
   return (
@@ -38,11 +29,7 @@ export default function OrganizationPage() {
       }
     >
       <div className="space-y-6">
-        <Field
-          label="Organization name"
-          htmlFor="org"
-          hint={`Your workspace will live at hivebook.co/${slug}`}
-        >
+        <Field label="Organization name" htmlFor="org">
           <Input
             id="org"
             data-autofocus

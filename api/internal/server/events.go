@@ -14,6 +14,18 @@ type webEvent struct {
 	Props map[string]any `json:"props,omitempty"`
 }
 
+// allowedWebEvents is the closed telemetry vocabulary the web app emits
+// (mirrors web/lib/telemetry.ts). The endpoint is public, so anything outside
+// this set is rejected before it can become an unbounded Prometheus label.
+var allowedWebEvents = map[string]bool{
+	"page_view":           true,
+	"login_start":         true,
+	"login_success":       true,
+	"login_error":         true,
+	"logout":              true,
+	"onboarding_complete": true,
+}
+
 // eventsHandler accepts browser telemetry, records it as a structured log line
 // (shipped to VictoriaLogs) and a Prometheus counter. Public by design — it only
 // records, never reads protected data. Body is size-capped.
@@ -23,6 +35,10 @@ func (s *Server) eventsHandler(w http.ResponseWriter, r *http.Request) {
 	var e webEvent
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil || e.Type == "" {
 		http.Error(w, "invalid event", http.StatusBadRequest)
+		return
+	}
+	if !allowedWebEvents[e.Type] {
+		http.Error(w, "unknown event type", http.StatusBadRequest)
 		return
 	}
 

@@ -17,7 +17,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -55,6 +55,8 @@ type Authenticator struct {
 const (
 	identityCacheSize = 4096
 	identityCacheTTL  = 30 * time.Minute
+	// OIDC discovery retry backoff grows from 1s up to this cap.
+	maxDiscoveryBackoff = 60 * time.Second
 )
 
 // New starts an Authenticator and kicks off provider discovery in the
@@ -75,12 +77,16 @@ func New(issuer, audience, caFile string) *Authenticator {
 func (a *Authenticator) Ready() bool { return a.verifier.Load() != nil }
 
 func (a *Authenticator) discover(hc *http.Client) {
+	backoff := time.Second
 	for {
 		ctx := oidc.ClientContext(context.Background(), hc)
 		provider, err := oidc.NewProvider(ctx, a.issuer)
 		if err != nil {
-			log.Printf("auth: OIDC discovery for %s failed, retrying: %v", a.issuer, err)
-			time.Sleep(5 * time.Second)
+			slog.Warn("oidc_discovery_retry", "issuer", a.issuer, "error", err.Error(), "backoff", backoff.String())
+			time.Sleep(backoff)
+			if backoff *= 2; backoff > maxDiscoveryBackoff {
+				backoff = maxDiscoveryBackoff
+			}
 			continue
 		}
 		// Audience is set once the ZITADEL api app exists (Phase 3). Until then
@@ -88,11 +94,11 @@ func (a *Authenticator) discover(hc *http.Client) {
 		cfg := &oidc.Config{ClientID: a.audience}
 		if a.audience == "" {
 			cfg.SkipClientIDCheck = true
-			log.Printf("auth: no HIVEBOOK_OIDC_AUDIENCE set — skipping audience check")
+			slog.Warn("oidc_audience_check_skipped", "issuer", a.issuer)
 		}
 		a.provider.Store(provider)
 		a.verifier.Store(provider.Verifier(cfg))
-		log.Printf("auth: OIDC provider ready (issuer=%s audience=%q)", a.issuer, a.audience)
+		slog.Info("oidc_provider_ready", "issuer", a.issuer, "audience", a.audience)
 		return
 	}
 }
@@ -110,13 +116,13 @@ func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 		raw, err := bearerToken(r)
 		if err != nil {
 			verifications.WithLabelValues("missing").Inc()
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			http.Error(w, "missing or malformed authorization header", http.StatusUnauthorized)
 			return
 		}
 		tok, err := v.Verify(r.Context(), raw)
 		if err != nil {
 			verifications.WithLabelValues("invalid").Inc()
-			http.Error(w, "invalid token: "+err.Error(), http.StatusUnauthorized)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 		var claims map[string]any
@@ -262,7 +268,7 @@ func buildHTTPClient(caFile string) *http.Client {
 		if pem, err := os.ReadFile(caFile); err == nil {
 			pool.AppendCertsFromPEM(pem)
 		} else {
-			log.Printf("auth: could not read OIDC CA file %s: %v", caFile, err)
+			slog.Warn("oidc_ca_file_unreadable", "path", caFile, "error", err.Error())
 		}
 	}
 	return &http.Client{

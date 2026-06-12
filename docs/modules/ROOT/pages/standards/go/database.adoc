@@ -22,7 +22,7 @@ the `Service` interface to the rest of the app. Stateful rules sqlc can't expres
 == Migrations
 
 * Versioned up/down pairs in `internal/database/migrations/`
-(`{version}_{name}.{up,down}.sql`), embedded and applied on startup with
+(`\{version}_\{name}.{up,down}.sql`), embedded and applied on startup with
 golang-migrate. Write *both* directions — the down is tested.
 * sqlc reads the *up* migrations as its schema, so a new column is available to
 queries as soon as its migration lands.

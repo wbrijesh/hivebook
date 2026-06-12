@@ -27,3 +27,6 @@ next-env.d.ts
 # Scratch / tool output (prototype exploration, UX review, etc.)
 .playwright-cli/
 .ux-review/
+
+# Antora build output
+/public/

@@ -19,7 +19,9 @@ RUN git init -q \
 # build time and bakes it into the site — the served pages never call Kroki.
 RUN npx antora antora-playbook.yml
 
-FROM nginx:1.27-alpine AS prod
+# Unprivileged nginx: runs as uid 101, listens on 8080, writes its pid to /tmp
+# — so the pod needs no root and no NET_BIND_SERVICE capability.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS prod
 COPY infra/docs/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/public /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080

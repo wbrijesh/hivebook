@@ -12,7 +12,8 @@ api/
 ----
 
 Current packages: `internal/auth` (OIDC token verification), `internal/database`
-(pgx pool + health), `internal/server` (chi router, middleware, handlers).
+(sqlc query store over `database/sql` + golang-migrate, ADR-0018/0017),
+`internal/server` (chi router, middleware, handlers).
 
 == Rules
 

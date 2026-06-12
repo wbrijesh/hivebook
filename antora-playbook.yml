@@ -20,9 +20,11 @@ asciidoc:
     kroki-server-url: https://kroki.io
 
 ui:
+  # Vendored, not fetched: the upstream HEAD artifact is rebuilt and expires, so
+  # a URL can't pin it. The committed zip makes the build reproducible and
+  # network-free. Refresh by re-downloading the antora-ui-default stable bundle.
   bundle:
-    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
-    snapshot: true
+    url: ./docs/ui-bundle.zip
   supplemental_files: ./docs/supplemental-ui
 
 output:

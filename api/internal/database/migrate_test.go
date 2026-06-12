@@ -3,14 +3,15 @@ package database
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
 )
 
 func connStrTo(name string) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", username, password, host, port, name)
+	c := testCfg
+	c.Database = name
+	return c.dsn()
 }
 
 func tableExists(t *testing.T, db *sql.DB, name string) bool {
@@ -37,7 +38,7 @@ func columnExists(t *testing.T, db *sql.DB, table, col string) bool {
 // shared container — proving up applies the full schema, up is idempotent, and the
 // down files are valid (down then up again).
 func TestMigrations_UpDownUp(t *testing.T) {
-	admin, err := sql.Open("pgx", connStrTo(database))
+	admin, err := sql.Open("pgx", connStrTo(testCfg.Database))
 	if err != nil {
 		t.Fatal(err)
 	}

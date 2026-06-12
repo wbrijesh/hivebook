@@ -35,7 +35,7 @@ export function OnboardingFlowProvider({
     orgSize: null,
     useCases: [],
     useCaseOther: "",
-    region: "us-east",
+    region: "", // unchosen — region is write-once (ADR-0014), so never pre-select
     ...initial,
   })
 

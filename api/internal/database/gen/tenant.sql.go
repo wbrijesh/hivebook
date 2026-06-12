@@ -14,7 +14,7 @@ import (
 
 const completeOnboarding = `-- name: CompleteOnboarding :one
 INSERT INTO tenants (zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), now(), now())
+VALUES ($1, $2, $3, $4, $5, NULLIF($6::text, ''), now(), now())
 ON CONFLICT (zitadel_org_id) DO UPDATE SET
     name           = EXCLUDED.name,
     size           = EXCLUDED.size,
@@ -23,6 +23,7 @@ ON CONFLICT (zitadel_org_id) DO UPDATE SET
     use_case_other = EXCLUDED.use_case_other,
     onboarded_at   = COALESCE(tenants.onboarded_at, now()),
     updated_at     = now()
+WHERE tenants.region IS NULL OR tenants.region = EXCLUDED.region
 RETURNING id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, created_at, updated_at
 `
 
@@ -32,7 +33,7 @@ type CompleteOnboardingParams struct {
 	Size         sql.NullString
 	Region       sql.NullString
 	UseCases     json.RawMessage
-	Column6      interface{}
+	UseCaseOther string
 }
 
 type CompleteOnboardingRow struct {
@@ -48,8 +49,10 @@ type CompleteOnboardingRow struct {
 	UpdatedAt    time.Time
 }
 
-// Region is write-once: COALESCE keeps an already-set region. The app rejects a
-// *changing* region before calling this (a COALESCE alone would silently ignore it).
+// Region is write-once (ADR-0014), enforced atomically: the WHERE on DO UPDATE
+// only applies when the stored region is unset or already equals the requested
+// one. A conflicting region skips the update, so RETURNING yields no row — the
+// caller maps that to ErrRegionImmutable. Race-safe with no partial write.
 // onboarded_at is stamped once, then preserved.
 func (q *Queries) CompleteOnboarding(ctx context.Context, arg CompleteOnboardingParams) (CompleteOnboardingRow, error) {
 	row := q.db.QueryRowContext(ctx, completeOnboarding,
@@ -58,7 +61,7 @@ func (q *Queries) CompleteOnboarding(ctx context.Context, arg CompleteOnboarding
 		arg.Size,
 		arg.Region,
 		arg.UseCases,
-		arg.Column6,
+		arg.UseCaseOther,
 	)
 	var i CompleteOnboardingRow
 	err := row.Scan(

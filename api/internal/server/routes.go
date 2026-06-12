@@ -1,8 +1,6 @@
 package server
 
 import (
-	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +28,7 @@ func (s *Server) RegisterRoutes() http.Handler {
 	}))
 
 	// Public routes.
-	r.Get("/", s.HelloWorldHandler)
+	r.Get("/", s.rootHandler)
 	r.Get("/health", s.healthHandler)
 	r.Handle("/metrics", promhttp.Handler())
 	r.Post("/events", s.eventsHandler)
@@ -46,21 +44,19 @@ func (s *Server) RegisterRoutes() http.Handler {
 	return r
 }
 
-func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
-	resp := make(map[string]string)
-	resp["message"] = "Hello World"
-
-	jsonResp, err := json.Marshal(resp)
-	if err != nil {
-		log.Fatalf("error handling JSON marshal. Err: %v", err)
-	}
-
-	_, _ = w.Write(jsonResp)
+func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"service": "hivebook-api"})
 }
 
+// healthHandler returns the DB health and a 503 when it's down, so readiness and
+// liveness probes mean something.
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	jsonResp, _ := json.Marshal(s.db.Health())
-	_, _ = w.Write(jsonResp)
+	h := s.db.Health()
+	status := http.StatusOK
+	if h["status"] != "up" {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, h)
 }
 
 type meUser struct {

@@ -1,4 +1,4 @@
-# Grafana on https://grafana.hivebook.localhost (admin / admin).
+# Grafana on https://grafana.hivebook.localhost (admin / password1234 — see infra/.env).
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:

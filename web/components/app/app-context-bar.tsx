@@ -3,35 +3,16 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import {
-  RiBarChartLine,
-  RiBook2Line,
-  RiFileList3Line,
-  RiFileSearchLine,
-  RiLayoutGrid2Line,
-  RiNodeTree,
-  RiSettings3Line,
-  RiShieldKeyholeLine,
-  RiSparkling2Line,
-  RiTeamLine,
-} from "@remixicon/react"
+import { RiBook2Line, RiNodeTree, RiSettings3Line } from "@remixicon/react"
 
 import { AppSearch } from "@/components/app/app-search"
-import { ChromeActionHost } from "@/components/app/chrome"
+import { navByKey } from "@/lib/nav"
 
 type Crumb = { label: string; href?: string }
 
-const SECTION: Record<string, { label: string; icon: React.ElementType }> = {
-  ask: { label: "Ask", icon: RiSparkling2Line },
-  book: { label: "Book", icon: RiBook2Line },
-  sources: { label: "Sources", icon: RiLayoutGrid2Line },
-  entities: { label: "Entities", icon: RiNodeTree },
-  review: { label: "Review", icon: RiFileSearchLine },
-  members: { label: "Members", icon: RiTeamLine },
-  access: { label: "Access", icon: RiShieldKeyholeLine },
-  audit: { label: "Audit log", icon: RiFileList3Line },
-  usage: { label: "Usage", icon: RiBarChartLine },
-  settings: { label: "Settings", icon: RiSettings3Line },
+// Primary sections come from the shared nav registry; secondary surfaces that
+// aren't in the spine (e.g. account) live here.
+const EXTRA: Record<string, { label: string; icon: React.ElementType }> = {
   account: { label: "Account", icon: RiSettings3Line },
 }
 
@@ -54,7 +35,7 @@ function resolve(pathname: string): {
     }
   }
 
-  const s = SECTION[segs[0]]
+  const s = navByKey[segs[0]] ?? EXTRA[segs[0]]
   return s
     ? { icon: s.icon, crumbs: [{ label: s.label }] }
     : { icon: RiBook2Line, crumbs: [] }
@@ -94,7 +75,6 @@ export function AppContextBar() {
         ))}
       </nav>
 
-      <ChromeActionHost className="flex shrink-0 items-center gap-1.5" />
       <AppSearch />
     </header>
   )

@@ -16,4 +16,6 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 COPY --from=build /app/main /app/main
 EXPOSE 8080
+# Non-root; matches runAsUser in the deployment securityContext.
+USER 65532:65532
 CMD ["./main"]

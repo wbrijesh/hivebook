@@ -16,7 +16,7 @@ runner ourselves.
 == Decision
 
 Schema migrations use *golang-migrate* as a library: up/down SQL files
-(`internal/database/migrations/{version}_{name}.{up,down}.sql`) embedded in the
+(`internal/database/migrations/\{version}_\{name}.{up,down}.sql`) embedded in the
 binary and applied on startup (`Up`, ignoring `ErrNoChange`) over the existing
 `*sql.DB`. Supersedes ADR-0015.
 
