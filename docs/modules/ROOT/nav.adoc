@@ -25,6 +25,8 @@
 * xref:design-docs/0005-tenancy-and-onboarding.adoc[0005 · Tenant model & onboarding]
 * xref:design-docs/0006-api-transport-and-contract.adoc[0006 · API transport & contract]
 * xref:design-docs/0007-configuration-pattern.adoc[0007 · Configuration pattern]
+* xref:design-docs/0008-raw-ingestion-and-object-storage.adoc[0008 · Raw ingestion & object storage]
+* xref:design-docs/0009-integrations-service.adoc[0009 · The integrations service]
 * xref:design-docs/0000-template.adoc[Template]
 
 .Decision records (ADRs)
@@ -51,6 +53,11 @@
 * xref:adrs/0020-proto-first-contract-buf.adoc[0020 · Proto-first contract (buf)]
 * xref:adrs/0021-protovalidate-field-rules.adoc[0021 · protovalidate field rules]
 * xref:adrs/0022-connect-error-model.adoc[0022 · Connect error model]
+* xref:adrs/0023-raw-first-connectors.adoc[0023 · Raw-first connectors]
+* xref:adrs/0024-raw-corpus-object-storage.adoc[0024 · Raw corpus in object storage]
+* xref:adrs/0025-integrations-service.adoc[0025 · Integrations service]
+* xref:adrs/0026-integrations-independent-service.adoc[0026 · Integrations is an independent service]
+* xref:adrs/0027-connector-oauth.adoc[0027 · Connector OAuth2]
 * xref:adrs/0000-template.adoc[Template]
 
 .Standards

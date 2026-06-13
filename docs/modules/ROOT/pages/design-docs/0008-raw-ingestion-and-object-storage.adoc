@@ -1,0 +1,194 @@
+= 0008 — Raw Ingestion: Connectors, Object Storage & the Integrations Service
+:design-id: 0008
+:status: accepted
+:date: 2026-06-13
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs: adrs/0001-corpus-and-index-strata.adoc, adrs/0010-day-zero-enterprise-primitives.adoc
+
+== Context
+
+xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[Design-doc 0001]
+files raw artifacts that already exist in the corpus; it assumes the *front* of
+the pipeline. This doc specifies that front: how raw content gets from a source
+system into the raw corpus, where it is stored, and the exact boundary a
+connector implements — before we build the first connectors (Google Docs and
+GitHub issues).
+
+Today the architecture pages fold normalization and embeddings into "ingestion,"
+leave the raw store unspecified, and leave connector build-vs-integrate open. We
+need to pin three things: what a connector emits, where raw lives, and how
+connectors are packaged.
+
+== Goals
+
+* A connector boundary that generalizes to *any* source — no source-specific
+shape leaks past it into the corpus or the pipeline.
+* Raw content captured verbatim and durably *before* any interpretation, so
+normalization, segmentation, embedding, and filing can be re-run as they improve
+without re-fetching from the source.
+* A raw store that satisfies day-zero tenancy and residency
+(xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]) and swaps
+from local to cloud as a configuration change.
+* Connectors packaged so adding one is cheap and splitting one into its own
+service later is mechanical.
+
+== Non-goals
+
+* The batched filing pipeline (0001), per-archetype segmentation rules (own
+follow-up), and entity reconciliation
+(xref:ROOT:design-docs/0003-entity-reconciliation.adoc[0003]).
+* The canonical artifact's exact storage location and schema — sketched here,
+pinned when the canonicalization stage is built.
+* Push/webhook ingestion. The first connectors are pull; webhook infrastructure
+arrives with the first hot source.
+* The provider-mediated long-tail connector decision — still open; we build
+first-party for the first connectors.
+
+== Proposal
+
+=== Raw-first: connectors are dumb capture
+
+A connector does only four things: *authenticate*, *sync* (backfill plus
+incremental), *watermark*, and emit each artifact as `(manifest, raw_payload)`.
+It performs *no* normalization and computes *no* embeddings — those are
+downstream stages over the raw corpus. It writes the raw payload verbatim to
+object storage and a manifest row to Postgres, then advances its watermark
+(xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]).
+
+The raw bytes are the only thing we cannot re-derive — the source may delete,
+rate-limit, or rotate tokens. Capturing full-fidelity raw *first* makes every
+later stage reprocessable from the corpus alone. It also keeps the connector
+thin, which is what keeps the canonical model from overfitting to any one source:
+interpretation lives in *one* downstream place that sees every source's raw, not
+spread across N connectors.
+
+=== Strata: raw, canonical, book
+
+xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001]'s raw corpus is the
+source of truth: verbatim, in object storage. A downstream *canonicalization*
+stage derives a *canonical artifact* — normalized body, segments, embeddings —
+from the raw, and links back to it (raw object key plus span offsets) so
+citations resolve to exact source ranges and the canonical layer stays fully
+regeneratable. The book index (summaries) is derived from filing on top of that.
+
+[d2]
+----
+direction: right
+con: "Connector\n(auth, sync, watermark)"
+raw: "Raw corpus\nobject storage (verbatim)"
+canon: "Canonical artifact\nnormalize · segment · embed"
+book: "Book index\nsummaries"
+con -> raw: "(manifest, raw)"
+raw -> canon: "derive (links back)"
+canon -> book: file
+----
+
+=== Object storage
+
+Raw payloads live in object storage: *RustFS* locally, *S3* in production,
+reached through the AWS SDK (`aws-sdk-go-v2`) so the swap is configuration only
+(xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]).
+
+* *One bucket per `(connector, region)`.* Region is physical — it anchors
+residency; the bucket lives in that region's cluster. Connector keeps sources
+separable and allows per-connector credentials and lifecycle.
+* *Object key `<tenant-id>/<document-id>`.* Tenant isolation is by key prefix
+*derived from the authenticated tenant, never from request input*, backed by
+prefix-scoped access. (Bucket-per-tenant would exceed S3's bucket cap;
+key-prefix is the standard multi-tenant pattern.)
+* *Lazy creation.* A bucket is created on first write for its `(connector,
+region)`, never bootstrapped.
+* *Globally-unique names.* Bucket names carry an env/account prefix
+(`hivebook-<env>-<connector>-<region>`) because S3 bucket names are global.
+
+Every manifest also records the artifact's *source URL* where one exists, for
+traceability back to the original.
+
+=== The manifest (connector-agnostic)
+
+Each raw artifact gets a thin Postgres manifest, so the pipeline can index,
+dedup, resync, and cite *without parsing the blob*:
+
+[source]
+----
+RawArtifact (Postgres) → bytes in object storage
+  tenant_id, region                         // day-zero partitioning
+  source, connector_id, source_native_kind  // "gdoc" / "github_issue"
+  container { id, kind, name }              // drive folder / repo → priors + batch key
+  external_id, source_url                   // source_url is the citation deep-link
+  source_created_at, source_updated_at, ingested_at
+  object_key                               // <tenant-id>/<document-id>
+  content_hash                             // dedup + idempotent resync
+----
+
+The `body` and the *archetype* are deliberately absent: the connector stamps
+`source` and `source_native_kind`; mapping a native kind to an archetype is a
+downstream concern.
+
+=== Archetypes, not sources
+
+Dozens of sources collapse into a few content *archetypes* — *document*,
+*conversation*, *record*, *transcript*. Downstream segmentation and filing key
+off the archetype, never the specific source, so the system generalizes by
+construction. The first two connectors are chosen to span two archetypes —
+Google Docs (document) and GitHub issues (record) — so the canonical model is
+forced honest against two real shapes from the start; a conversation source
+(e.g. Slack) and a transcript source follow.
+
+=== The integrations service
+
+Connectors are packaged as modules inside a single *integrations* service (its
+own deployable), structured so a module lifts out into its own service later with
+minimal surgery (xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025]). It
+owns source auth, sync loops, watermarks, and raw writes — and nothing else: it
+does not canonicalize, file, or summarize.
+
+== Alternatives considered
+
+* *Normalize and embed at the connector* (the architecture pages' current
+language). Rejected — it bakes source shape into the corpus, makes reprocessing
+require a re-fetch, and overfits the canonical model to whichever source ships
+first.
+* *Store raw in Postgres* (`bytea`/JSONB). Rejected — large blobs bloat the DB;
+object storage is the right tool (cheap, immutable, S3-portable) and aligns with
+residency.
+* *Bucket per tenant.* Rejected — exceeds S3 bucket caps at scale; server-derived
+key prefixes give the same isolation.
+* *One service per connector now.* Rejected — premature operational cost;
+modules-now keeps splitting cheap once a connector earns its own service.
+* *Provider-mediated (Nango / Merge) for the first connectors.* Deferred — we
+build first-party to feel the interface; the long-tail provider decision stays
+open (xref:ROOT:architecture/ingestion.adoc[]).
+* *Do nothing.* Rejected — a connector cannot be built without pinning the
+boundary and the store.
+
+== Tradeoffs
+
+* *Double storage* (raw plus canonical) and a reprocessing stage — bought for
+reprocessability and exact citations.
+* *Key-prefix isolation* puts the isolation burden on the data layer (prefixes
+must be server-derived), not on a bucket boundary.
+* A new infrastructure dependency (object storage) and a new service to operate.
+
+== Open questions
+
+* The canonical artifact's storage location and schema (object storage vs.
+Postgres JSONB; segments and embeddings in pgvector). Pinned when
+canonicalization is built.
+* Provider-mediated long-tail connectors — build-vs-integrate beyond the
+first-party set (xref:ROOT:architecture/ingestion.adoc[]).
+* Per-archetype segmentation rules — their own follow-up doc.
+* Webhook/push ingestion for hot sources.
+
+== Decisions to be recorded as ADRs
+
+* xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023] — connectors capture
+raw only; normalization and embeddings are downstream stages.
+* xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024] — the raw corpus
+lives in object storage (RustFS→S3 via the AWS SDK; bucket per connector ×
+region; tenant key-prefix; lazy creation).
+* xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025] — connectors are
+modules in the integrations service, splittable later.

@@ -1,0 +1,44 @@
+= 0026 — Integrations is an independent service
+:adr-id: 0026
+:status: accepted
+:date: 2026-06-13
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0009-integrations-service.adoc
+
+== Context
+
+xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025] made integrations its own
+deployable hosting connector modules. What remained open: does it share the API's
+Go module, runtime, and database, or stand alone? Go scopes `internal/` packages
+to their module, so a separate module cannot import the API's `internal/` code —
+reuse and separation pull in opposite directions.
+
+== Decision
+
+Integrations is an independent Go module (`integrations/`) and deployable,
+*internal-only* (ClusterIP, no public ingress), communicating with the API over
+Connect. It owns its own database on the *shared* Postgres instance (its own
+migrations, sqlc, and tables); the API never reads it — it asks over Connect. It
+reuses the API's *patterns* (config from `HIVEBOOK_*` env, slog, golang-migrate,
+sqlc, the hardened non-root pod), not its code. The shared frontend↔API↔integrations
+contract is one proto package, generated into each consumer's tree.
+
+== Alternatives considered
+
+* *A second binary in the API module* — maximises code reuse but couples deploy,
+scale, and the eventual split; the only thing genuinely shared (the proto) is
+shared via codegen anyway.
+* *A shared database with the API* — couples schemas and clashes on the
+golang-migrate version table; a per-service DB on the shared instance gives a real
+boundary at the same cost.
+* *A separate Postgres instance now* — cleaner still, but unnecessary for v0.1;
+the shared instance with a separate database splits trivially later.
+
+== Consequences
+
+A genuinely separable service from day one, at the cost of a little duplicated
+boilerplate and a second service to operate. The API and integrations trust the
+cluster network (tenant_id in the request) until mTLS or a service token lands.
+The shared Postgres *instance* is a shared failure domain until split. Reusing
+patterns rather than code means the two services can diverge without entangling.

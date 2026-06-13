@@ -1,0 +1,41 @@
+= 0027 — Connector authorization via first-party OAuth2
+:adr-id: 0027
+:status: accepted
+:date: 2026-06-13
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0009-integrations-service.adoc
+
+== Context
+
+A user must grant Hivebook access to their sources, and we build connectors
+first-party (xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]) rather than
+through a provider. The browser OAuth leg needs a stable, public HTTPS endpoint;
+the integrations service is internal; and access/refresh tokens are credentials.
+
+== Decision
+
+Connector authorization is OAuth2 *Authorization Code + PKCE* via
+`golang.org/x/oauth2`. The integrations service owns connector OAuth config, code
+exchange, token storage, and refresh; the API *fronts the browser leg* — it
+returns the provider authorize URL and hosts the public callback, relaying the
+code to integrations over Connect. A signed `state` (tenant + connector + nonce +
+expiry) ties the callback to the tenant without a session. Tokens are encrypted at
+rest with a key from config, BYOK-ready
+(xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]).
+
+== Alternatives considered
+
+* *Integrations owns a public OAuth ingress* — fewer hops, but it gives the
+internal service a public surface and breaks the frontend→API topology.
+* *A provider (Nango / Merge)* — deferred to the long tail (ADR-0023); we build
+first-party first.
+* *Store tokens unencrypted* — they are credentials; rejected.
+
+== Consequences
+
+Integrations stays internal; the API is a thin browser relay; connector OAuth
+config stays in the connector module; there is one guarded, public callback path.
+We now own a token-encryption key (an interim server key, customer-managed later)
+and its rotation story. The signed `state` is the trust anchor for the
+session-less callback.

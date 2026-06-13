@@ -1,0 +1,45 @@
+= 0023 — Connectors capture raw only; normalization is downstream
+:adr-id: 0023
+:status: accepted
+:date: 2026-06-13
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0008-raw-ingestion-and-object-storage.adoc
+
+== Context
+
+A connector is the only component that touches a specific source system. The
+architecture pages had it also normalize and compute embeddings at ingest. But
+raw bytes are the one thing we cannot re-derive (a source may delete, rate-limit,
+or rotate tokens), and any interpretation done inside the connector both blocks
+reprocessing and bakes that source's shape into the corpus.
+
+== Decision
+
+A connector does only authentication, sync (backfill + incremental),
+watermarking, and emitting each artifact as `(manifest, raw_payload)` — writing
+the raw payload verbatim to object storage
+(xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]) and a thin,
+connector-agnostic manifest row to Postgres, then advancing its watermark. It
+performs no normalization and computes no embeddings. Normalization into a
+canonical, segmented, embedded artifact — linked back to the raw for provenance —
+is a separate downstream stage over the raw corpus. Supersedes the
+"`light normalization / compute embeddings`" language in
+xref:ROOT:architecture/ingestion.adoc[].
+
+== Alternatives considered
+
+* *Normalize and embed at the connector* — the prior language. Couples capture to
+interpretation: reprocessing needs a re-fetch, and the canonical model overfits
+to whichever source is built first.
+* *Store raw in Postgres instead of object storage* — bloats the database with
+large blobs; object storage is the right tool (see ADR-0024).
+
+== Consequences
+
+Every stage downstream of capture (normalize, segment, embed, file, summarize) is
+reprocessable from the corpus without touching the source. Connectors stay thin,
+so adding one is cheap and interpretation lives in one place that sees every
+source's raw. The cost is double storage (raw + canonical) and a reprocessing
+stage. Citations resolve through the canonical→raw provenance link to exact
+source spans.

@@ -57,7 +57,7 @@ Then open https://app.hivebook.localhost.
 |Prototype |https://prototype.hivebook.localhost (mock data, no login)
 |Docs |https://docs.hivebook.localhost
 |Auth (ZITADEL) |https://id.hivebook.localhost — `admin@hivebook.localhost` / `Password1!`
-|API |https://api.hivebook.localhost — `/health`, `/metrics`, `/api/me`
+|API |https://api.hivebook.localhost — `/health`, `/metrics`, Connect RPCs
 |Grafana |https://grafana.hivebook.localhost — `admin` / `password1234`
 |===
 

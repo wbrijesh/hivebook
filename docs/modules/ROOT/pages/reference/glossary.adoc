@@ -27,11 +27,20 @@ summaries cite child topic summaries.
 
 == Content
 
-* *Raw corpus* — every ingested artifact, stored verbatim. The
-source of truth for citations.
+* *Raw corpus* — every ingested artifact, stored verbatim in object
+storage. The source of truth for citations.
 * *Artifact* — a single ingested unit (a Slack message, a Google
 Doc, a Jira ticket, an email).
-* *Segment* — a coherent portion of an artifact (e.g., one
+* *Manifest* — the connector-agnostic metadata row for a raw
+artifact (tenant, region, source, container, external id, source
+URL, object key, content hash) in Postgres; it indexes the raw bytes
+held in object storage so the pipeline never parses the blob to find
+or dedup an artifact (`design-docs/0008`).
+* *Canonical artifact* — the normalized, segmented, embedded form
+derived from a raw artifact and linked back to it for provenance.
+The retrieval and filing pipelines read canonical artifacts, never
+raw (`design-docs/0008`).
+* *Segment* — a coherent portion of a canonical artifact (e.g., one
 sub-thread of a longer Slack thread). Segmentation runs before
 entity tagging and filing.
 * *Source span* — a specific cited range within a specific
@@ -101,10 +110,25 @@ applied to users to represent personas, departments, or roles.
 
 == Ingestion
 
-* *Connector* — the per-source-system component that handles auth
-and sync.
+* *Source* — an external system Hivebook ingests from (Google Docs,
+GitHub, Slack). The thing a connector talks to.
+* *Connector* — *our driver for a source type*. Handles auth, sync,
+watermarking, and raw capture to object storage; it does not normalize
+or embed (`design-docs/0008`). One per source type.
+* *Connection* — a tenant's authorized link to a source via a
+connector: stored tokens, watermark, status, last error. What a user
+creates and manages in `/sources` (`design-docs/0009`).
+* *Integrations service* — the service that hosts connectors as
+modules and owns connections: source auth, sync loops, watermarks, and
+raw writes (`design-docs/0009`).
 * *Watermark* — a per-source position that lets sync resume
 incrementally.
+* *Archetype* — the source-neutral shape of an artifact: document,
+conversation, record, or transcript. Normalization, segmentation,
+and filing key off the archetype, not the specific source.
+* *Object storage* — where raw payloads live (RustFS locally, S3 in
+production), tenant- and region-partitioned (`adrs/0024`). Keyed by
+tenant and document; one bucket per `(connector, region)`.
 
 == Configuration and lifecycle
 

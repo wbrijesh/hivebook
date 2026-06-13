@@ -15,7 +15,7 @@ slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Lev
 == Rules
 
 . *The message is the event name; fields carry the data.*
-`slog.Info("http_request", "status", 200, "route", "/api/me")` — not a
+`slog.Info("http_request", "status", 200, "route", "/health")` — not a
 formatted sentence. Event names are `snake_case` nouns (`http_request`,
 `web_event`).
 . *Field keys are `snake_case` and stable* (`request_id`, `duration_ms`,

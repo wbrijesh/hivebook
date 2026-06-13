@@ -6,10 +6,18 @@ Knowledge lives in two strata (xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[
 
 [arabic]
 . *Raw corpus* — every ingested artifact, verbatim, with metadata. The
-append-only source of truth for citations.
+append-only source of truth for citations. Raw payloads are stored in object
+storage (RustFS locally, S3 in production), tenant- and region-partitioned
+(xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]); a Postgres
+manifest indexes them.
 . *Book index* — a per-customer hierarchical organization of the corpus
 into navigable summaries. Derived, regeneratable, and continuously
 redesigned by the system as content arrives.
+
+Between the two, a downstream stage derives a *canonical artifact* — normalized,
+segmented, embedded — from each raw artifact and links back to it for provenance,
+so the derived layers are fully regeneratable from raw without re-fetching the
+source (xref:ROOT:design-docs/0008-raw-ingestion-and-object-storage.adoc[design-doc 0008]).
 
 == The book index
 

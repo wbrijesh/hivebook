@@ -1,6 +1,6 @@
 = 0006 — API Transport & Contract (Connect, proto-first)
 :design-id: 0006
-:status: accepted
+:status: implemented
 :date: 2026-06-10
 :authors:
 //   - Brijesh <google@brijesh.dev>

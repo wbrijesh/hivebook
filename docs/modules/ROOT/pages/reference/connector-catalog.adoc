@@ -3,6 +3,16 @@
 Planned and considered connectors, with rough priority. This file
 is the working catalog — not a roadmap commitment.
 
+== Archetypes, not products
+
+Dozens of sources collapse into a few content *archetypes* — *document*,
+*conversation*, *record*, *transcript*. The pipeline generalizes by covering
+archetypes, not specific products: normalization, segmentation, and filing key
+off the archetype, never the source
+(xref:ROOT:design-docs/0008-raw-ingestion-and-object-storage.adoc[design-doc 0008]).
+The first two first-party connectors are chosen to span two of them: *Google
+Docs* (document) and *GitHub issues* (record).
+
 == v0.1 candidate set
 
 The smallest set that meaningfully covers "`where decisions get
@@ -84,5 +94,11 @@ for the top 5–10 highest-value sources.
 * *Provider-mediated* — built on a unified API provider (Nango,
 Paragon, Merge). Used for the long tail.
 
-The build-vs-integrate split itself is an open question — see
-xref:ROOT:architecture/ingestion.adoc[].
+Either way, a connector is a module in the *integrations* service and implements
+the same dumb-capture interface
+(xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025],
+xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023];
+xref:ROOT:design-docs/0009-integrations-service.adoc[design-doc 0009]). We build first-party
+for the first connectors; the provider-mediated long-tail split is still open —
+see xref:ROOT:architecture/ingestion.adoc[] and
+xref:ROOT:design-docs/0008-raw-ingestion-and-object-storage.adoc[design-doc 0008].

@@ -6,7 +6,7 @@
 //   - Brijesh <google@brijesh.dev>
 :supersedes:
 :superseded-by:
-:related-adrs: adrs/0012-tenant-is-zitadel-org.adoc, adrs/0013-tenant-state-in-postgres.adoc, adrs/0014-region-write-once.adoc, adrs/0015-embedded-startup-migrations.adoc
+:related-adrs: adrs/0012-tenant-is-zitadel-org.adoc, adrs/0013-tenant-state-in-postgres.adoc, adrs/0014-region-write-once.adoc, adrs/0017-schema-migrations-golang-migrate.adoc
 
 == Context
 
@@ -80,9 +80,9 @@ tenants
 residency anchor. `name` and `size` stay editable later from settings; `region`
 and `use_cases` are onboarding-time.
 
-Schema is applied by versioned SQL migrations embedded in the API binary and run
-on startup, tracked in a `schema_migrations` table — no external tooling for
-v0.1.
+Schema is applied by versioned up/down SQL migrations embedded in the API binary
+and run on startup via golang-migrate
+(xref:ROOT:adrs/0017-schema-migrations-golang-migrate.adoc[ADR-0017]).
 
 === API surface (Go API)
 

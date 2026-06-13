@@ -1,0 +1,45 @@
+= 0024 — Raw corpus in object storage (RustFS → S3)
+:adr-id: 0024
+:status: accepted
+:date: 2026-06-13
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0008-raw-ingestion-and-object-storage.adoc
+
+== Context
+
+The raw corpus (xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001]) is
+verbatim, append-only, large, and the source of truth for citations — a poor fit
+for Postgres rows and a natural fit for object storage. It must also satisfy
+day-zero tenancy and residency
+(xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]) and run both
+locally and in the cloud.
+
+== Decision
+
+Raw payloads live in object storage — *RustFS* locally, *S3* in production —
+accessed through the AWS SDK (`aws-sdk-go-v2`) so the swap is configuration only.
+Layout: one bucket per `(connector, region)` (region is physical, anchoring
+residency); object key `<tenant-id>/<document-id>`, with tenant isolation by key
+prefix *derived from the authenticated tenant, never from request input*; buckets
+created lazily on first write, never bootstrapped; bucket names carry an
+env/account prefix (`hivebook-<env>-<connector>-<region>`) because S3 names are
+global. A Postgres manifest indexes each object. Canonical (normalized) storage
+is decided separately when canonicalization is built.
+
+== Alternatives considered
+
+* *Postgres `bytea`/JSONB* — bloats the database with large immutable blobs and
+loses object-storage economics and lifecycle.
+* *Bucket per tenant* — exceeds S3's per-account bucket cap at scale;
+server-derived key prefixes give equivalent isolation.
+* *A single global bucket* — defeats residency; region must be a physical bucket
+boundary.
+
+== Consequences
+
+The raw store is cheap, immutable, and portable from RustFS to S3 with no code
+change. Residency is a bucket-level property; tenant isolation becomes a data-layer
+responsibility (prefixes must always be server-derived) rather than a bucket
+boundary. Bucket count stays bounded (connectors × regions). Lazy creation means
+no region/connector is provisioned until a tenant actually uses it.

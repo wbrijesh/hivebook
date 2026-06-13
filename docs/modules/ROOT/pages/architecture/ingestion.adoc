@@ -1,78 +1,116 @@
 = Ingestion
 :status: living
-:last-reviewed: 2026-06-06
+:last-reviewed: 2026-06-13
 
-How content gets from source systems into the raw corpus and, downstream,
-the book index.
+How content gets from source systems into the raw corpus and, downstream, the
+book index. The connector boundary, the raw store, and the connector packaging
+are specified in
+xref:ROOT:design-docs/0008-raw-ingestion-and-object-storage.adoc[design-doc 0008].
 
 == The connector
 
-A connector is the only component that talks to a specific source
-system. It handles:
+A connector is the only component that talks to a specific source system. It does
+exactly four things (xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]):
 
 * *Authentication* — OAuth flow, token storage, refresh.
 * *Sync* — initial backfill plus ongoing incremental updates.
-* *Watermarking* — a per-source position (timestamp, cursor, ETag) so
-resyncs are incremental.
+* *Watermarking* — a per-source position (timestamp, cursor, ETag) so resyncs
+are incremental.
+* *Raw capture* — emit each artifact as `(manifest, raw_payload)`: the raw
+payload written verbatim to object storage, a thin connector-agnostic manifest
+row written to Postgres, then the watermark advanced.
 
-Connectors do not extract source-system ACLs; access control is
-admin-managed at the chapter level (xref:ROOT:adrs/0009-chapter-level-access.adoc[ADR-0009]). See
+A connector does *not* normalize content or compute embeddings — those are
+downstream stages over the raw corpus (below). It also does not extract
+source-system ACLs; access is admin-managed at the chapter level
+(xref:ROOT:adrs/0009-chapter-level-access.adoc[ADR-0009]). Connectors are
+packaged as modules in the *integrations* service
+(xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025];
+xref:ROOT:design-docs/0009-integrations-service.adoc[design-doc 0009] specifies the
+service, its OAuth flow, and how it talks to the API). See
 xref:ROOT:reference/connector-catalog.adoc[] for the planned list.
 
-== Open question: build vs. integrate
+== Raw storage
 
-* *Integrate* with a unified API provider (Nango, Paragon, Merge) for
-breadth across the long tail.
-* *Hand-build* for sources needing deep semantics (Slack threading,
-GitHub PR graph).
+The raw payload is stored verbatim in object storage — RustFS locally, S3 in
+production, via the AWS SDK
+(xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]) — keyed
+`<tenant-id>/<document-id>` in a per-`(connector, region)` bucket. The Postgres
+manifest indexes it (source, container, external id, source URL, object key,
+content hash) so the pipeline can index, dedup, resync, and cite without parsing
+the blob. Raw is the source of truth for citations
+(xref:ROOT:architecture/corpus-and-index.adoc[]); everything downstream is
+re-derivable from it without re-fetching the source.
 
-Working hypothesis: hybrid — provider for the long tail, in-house for
-the top 5–10 sources. Final decision is deferred to build time and will
-be captured in an ADR.
+== Downstream: normalization, segmentation, embeddings
 
-== Light normalization
+Interpretation happens *after* capture, over the raw corpus, in one place that
+sees every source — which is what keeps the canonical model from overfitting to
+any single connector:
 
-The pipeline performs only the normalization needed to make artifacts
-comparable and queryable:
+* *Normalization* derives a *canonical artifact* from the raw — a source-neutral
+body plus metadata — and links back to the raw object (key + span offsets) for
+provenance.
+* *Segmentation* splits the canonical artifact into coherent units (below).
+* *Embeddings* are computed over segments for retrieval
+(xref:ROOT:architecture/retrieval.adoc[]).
 
-* assign a stable internal ID
-* record `source`, `source++_++id`, `author`, `created++_++at`,
-`updated++_++at`
-* compute embeddings for retrieval
-* store the raw content verbatim
-
-Semantic decisions — topic placement, entity references, structural
-change — happen downstream in the batched filing pipeline
+Semantic decisions — topic placement, entity references, structural change —
+happen further downstream in the batched filing pipeline
 (xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[]).
+
+== Archetypes, not sources
+
+Dozens of sources collapse into a few content *archetypes* — *document*,
+*conversation*, *record*, *transcript*. Normalization and segmentation key off
+the archetype, never the specific source, so the pipeline generalizes by
+construction. The first two connectors are chosen to span two archetypes —
+Google Docs (document) and GitHub issues (record).
 
 == Push vs. pull per source
 
-* *Push* (webhooks) for hot sources where freshness matters — Slack,
-Jira, Linear, GitHub, PagerDuty.
-* *Pull* (polling) for cold sources where periodic sync is fine —
-Drive, Confluence, Notion, file storage.
+* *Push* (webhooks) for hot sources where freshness matters — Slack, Jira,
+Linear, GitHub, PagerDuty.
+* *Pull* (polling) for cold sources where periodic sync is fine — Drive,
+Confluence, Notion, file storage.
 
-Every record carries an `ingested++_++at` and a `source++_++updated++_++at`.
+Every record carries an `ingested++_++at` and a `source++_++updated++_++at`. The
+first connectors are pull; webhook infrastructure arrives with the first hot
+source.
 
 == Segmentation
 
-Before filing, an artifact is segmented: a Slack thread becomes one or
-more coherent segments; a long doc is sectioned. Per-source rules use
-time gaps, reply structure, topic-shift markers, and section breaks. The
-segment is the unit of filing and entity tagging; the full thread or doc
-stays in the corpus for reconstruction.
+Before filing, a canonical artifact is segmented: a Slack thread becomes one or
+more coherent segments; a long doc is sectioned. Rules are per-archetype — time
+gaps and reply structure for conversation, section breaks and headings for
+documents. The segment is the unit of filing and entity tagging; the full
+artifact stays in the corpus for reconstruction.
 
 == Entity tagging
 
-Entity tagging — resolving mentions to canonical entities in the
-per-tenant entity store — runs inside the batched filing LLM call
-(xref:ROOT:adrs/0008-entity-reconciliation-in-filing.adoc[ADR-0008]; xref:ROOT:design-docs/0003-entity-reconciliation.adoc[]).
+Entity tagging — resolving mentions to canonical entities in the per-tenant
+entity store — runs inside the batched filing LLM call
+(xref:ROOT:adrs/0008-entity-reconciliation-in-filing.adoc[ADR-0008];
+xref:ROOT:design-docs/0003-entity-reconciliation.adoc[]).
 
 == Failure handling
 
-* Connector failures (auth lapse, rate limit, source outage) surface to
-admins via the control plane, not silent infinite retry.
-* Partial syncs are explicit: the watermark advances only after a
-window is fully ingested.
-* Raw artifacts persist before the filing pipeline runs, so filing
-failures lose no data; filing retries are idempotent (see xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[0001]).
+* Connector failures (auth lapse, rate limit, source outage) surface to admins
+via the control plane, not silent infinite retry.
+* Partial syncs are explicit: the watermark advances only after a window is
+fully ingested.
+* Raw artifacts persist before any downstream stage runs, so normalization and
+filing failures lose no data and their retries are idempotent (see
+xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[0001]).
+
+== Open question: build vs. integrate
+
+We build *first-party* connectors for the first sources (Google Docs, GitHub
+issues) to feel the interface directly. The long tail is still open:
+
+* *Integrate* with a unified API provider (Nango, Paragon, Merge) for breadth.
+* *Hand-build* for sources needing deep semantics (Slack threading, GitHub PR
+graph).
+
+Working hypothesis: hybrid — provider for the long tail, in-house for the top
+5–10 sources. The long-tail decision is deferred and will be captured in an ADR.

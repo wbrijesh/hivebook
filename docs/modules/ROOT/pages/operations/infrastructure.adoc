@@ -13,7 +13,7 @@ warnings.
 |Service |URL |Notes
 |ZITADEL |https://id.hivebook.localhost/ui/console |admin@hivebook.localhost / Password1!
 |Web app |https://app.hivebook.localhost |login {plus} call protected API
-|Go API |https://api.hivebook.localhost |`/health`, `/metrics`, `/api/me`
+|Go API |https://api.hivebook.localhost |`/health`, `/metrics`, Connect RPCs
 |Docs |https://docs.hivebook.localhost |Antora site (no login)
 |Grafana |https://grafana.hivebook.localhost |admin / password1234
 |===

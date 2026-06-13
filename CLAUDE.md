@@ -50,6 +50,11 @@ docs
 │           │   ├── 0020-proto-first-contract-buf.adoc
 │           │   ├── 0021-protovalidate-field-rules.adoc
 │           │   ├── 0022-connect-error-model.adoc
+│           │   ├── 0023-raw-first-connectors.adoc
+│           │   ├── 0024-raw-corpus-object-storage.adoc
+│           │   ├── 0025-integrations-service.adoc
+│           │   ├── 0026-integrations-independent-service.adoc
+│           │   ├── 0027-connector-oauth.adoc
 │           │   └── index.adoc
 │           ├── architecture
 │           │   ├── corpus-and-index.adoc
@@ -70,6 +75,8 @@ docs
 │           │   ├── 0005-tenancy-and-onboarding.adoc
 │           │   ├── 0006-api-transport-and-contract.adoc
 │           │   ├── 0007-configuration-pattern.adoc
+│           │   ├── 0008-raw-ingestion-and-object-storage.adoc
+│           │   ├── 0009-integrations-service.adoc
 │           │   └── index.adoc
 │           ├── index.adoc
 │           ├── operations

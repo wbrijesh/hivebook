@@ -1,0 +1,210 @@
+= 0009 — The Integrations Service
+:design-id: 0009
+:status: accepted
+:date: 2026-06-13
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs: adrs/0023-raw-first-connectors.adoc, adrs/0025-integrations-service.adoc, adrs/0026-integrations-independent-service.adoc, adrs/0027-connector-oauth.adoc
+
+== Context
+
+xref:ROOT:design-docs/0008-raw-ingestion-and-object-storage.adoc[Design-doc 0008]
+fixed the connector *boundary* (dumb raw capture) and
+xref:ROOT:adrs/0025-integrations-service.adoc[ADR-0025] put connectors in an
+integrations service. This doc specifies the service: its runtime shape, how it
+talks to the API and the API to the frontend, how a user authorizes a connector,
+and its data model — enough to build the first two connectors (Google Docs,
+GitHub issues). The API service is the template (Connect, pgx/sqlc,
+golang-migrate, hardened pod). The aim is *working* integrations quickly; scale
+and productionizing come later.
+
+== Goals
+
+* A separately deployable service that runs connectors, owns connections, and
+writes raw to object storage — built on the API's proven patterns.
+* One consistent vocabulary — *source / connector / connection* — in code, proto,
+UI, and docs.
+* A connector-authorization flow the user drives from the app: first-party
+OAuth2, tokens stored and refreshed by us.
+* The frontend talks only to the API; the API talks to integrations; both over
+Connect.
+* The first two connectors ingesting real data.
+
+== Non-goals
+
+* Scale/productionizing: distributed or queue-based sync workers, autoscaling,
+service-to-service auth (mTLS/tokens), per-service Postgres *instances*,
+webhook/push ingestion. Later.
+* Canonicalization and filing (downstream — 0001, 0008).
+* A container-selection UI (v0.1 discovers and syncs all accessible containers,
+capped).
+* Customer-managed keys (tokens are encrypted with a server key now; BYOK later —
+xref:ROOT:adrs/0010-day-zero-enterprise-primitives.adoc[ADR-0010]).
+
+== Proposal
+
+=== Vocabulary
+
+* *Source* — an external system Hivebook ingests from (Google Docs, GitHub).
+* *Connector* — our driver for a *source type*. One per source type; implements
+the dumb-capture interface (xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]).
+* *Connection* — a tenant's authorized link to a source via a connector: stored
+tokens, watermark, status, last error. What a user creates and manages in
+`/sources`.
+* *Integrations service* — the deployable that runs connectors and owns
+connections.
+
+So: a *connector* (driver) lets a tenant create a *connection* (instance) to a
+*source* (external system), all run by the *integrations* service.
+
+=== A separate service, on the API's patterns
+
+Integrations is its own Go module (`integrations/`), not part of the API module —
+Go scopes `internal/` to a module, so an independent service cannot import the
+API's `internal/` packages. It therefore reuses the API's *patterns* (config from
+`HIVEBOOK_*` env, slog JSON, Prometheus, `/health`, golang-migrate, sqlc, the
+hardened non-root Dockerfile/deployment) with a small amount of duplicated
+boilerplate, rather than its code. It is *internal-only* (ClusterIP, no public
+ingress). Layout mirrors the API
+(xref:ROOT:adrs/0026-integrations-independent-service.adoc[ADR-0026]):
+
+----
+integrations/
+  cmd/integrations
+  internal/
+    server/      Connect service + /health, /metrics
+    database/    own migrations, sqlc, tables (its own DB)
+    connectors/  gdocs/ github/  (driver per source type)
+    storage/     object-storage (S3 API) writes
+    oauth/       token storage, refresh, state signing
+    sync/        the periodic sync loop
+    gen/         generated proto (server)
+----
+
+=== Topology — frontend → API → integrations, all Connect
+
+[d2]
+----
+direction: right
+fe: Frontend
+api: API service
+ig: "Integrations service\n(internal, ClusterIP)"
+fe -> api: "Connect (connect-query)"
+api -> ig: "Connect (internal)"
+----
+
+The contract is one proto package, `hivebook.integration.v1`: messages
+*Connector* (an available source type) and *Connection* (a tenant's instance),
+and an `IntegrationService` — `ListConnectors`, `ListConnections`,
+`GetAuthorizeUrl`, `TriggerSync`, `Disconnect`. The OAuth code-exchange
+(`CompleteConnection`) is internal-only and kept off the API's public surface. It
+generates into `api/internal/gen` (the API serves the public subset to the
+frontend and is a *client* of integrations), `integrations/internal/gen` (the
+service implements it), and `web/lib/gen` (the frontend client). Integrations
+trusts the API over the cluster network and takes `tenant_id` in the request
+(service-to-service auth is a later hardening).
+
+=== Connector authorization (OAuth2, first-party)
+
+Authorization Code + PKCE via `golang.org/x/oauth2`, owned by integrations; the
+API fronts the browser leg so the frontend-only-talks-to-API topology holds
+(xref:ROOT:adrs/0027-connector-oauth.adoc[ADR-0027]):
+
+[arabic]
+. `/sources` → `GetAuthorizeUrl(connector)` → the API asks integrations, which
+builds the provider URL with a *signed `state`* (tenant_id + connector + nonce +
+expiry) → the browser redirects to the provider.
+. The user authorizes → the provider redirects to the API's public callback
+(`GET /connectors/\{connector}/callback?code&state`) — no JWT; it trusts the
+signed state.
+. The API hands the code to integrations (`CompleteConnection(code, state)`),
+which exchanges it, stores the connection + encrypted tokens, and starts the
+first sync → the API redirects the browser back to `/sources`.
+
+Connector OAuth config (client id/secret, scopes, endpoints) lives only in the
+connector module. Tokens are encrypted at rest with a key from config (BYOK-ready,
+ADR-0010) and refreshed via `oauth2.TokenSource` during sync.
+
+=== Data model — its own database
+
+Integrations owns its own database on the *shared* Postgres instance (own
+migrations, sqlc, tables); the API never reads it — it asks over Connect. Tables:
+
+* `connector_connection` — tenant, region, connector, status, external account,
+encrypted tokens, scopes, `last_synced_at`, `last_error`, `sync_requested_at`.
+* `watermark` — per connection × container (xref:ROOT:reference/glossary.adoc[]).
+* `raw_artifact` — the manifest from design-doc 0008; raw payloads go to object
+storage (xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]), not the DB.
+
+A per-service database avoids a shared golang-migrate version-table clash and
+keeps a real boundary; splitting to a separate instance later is trivial.
+
+=== Sync — deliberately minimal
+
+An in-process periodic loop: a scheduler scans connections *due* for sync
+(interval elapsed, or `sync_requested_at` set), runs each connector's `Sync` from
+its watermark, writes raw → object storage + manifests → DB, and advances the
+watermark. No external queue, no distributed workers, no autoscaling — that is the
+productionizing pass. The first two connectors are pull (gdocs, github issues);
+push/webhooks arrive with the first hot source. v0.1 discovers and syncs all
+accessible containers (capped); selection is a later UI.
+
+=== Infrastructure
+
+RustFS (S3-compatible) is added as a stack component (`infra/rustfs/`: ClusterIP,
+PVC, access-key secret); integrations reaches it via the AWS SDK, creating buckets
+lazily per `(connector, region)` (ADR-0024). The integrations deployment
+(`infra/integrations/`) is internal ClusterIP, hardened non-root, and runs its
+migrations on start. The justfile gains `integrations` as a buildable service and
+applies `infra/rustfs` in `just install`; the Dagger gate gains an integrations
+build/vet/test suite and the proto drift-check covers `integrations/internal/gen`.
+
+== Alternatives considered
+
+* *A second binary in the API module.* Rejected — the goal is a genuinely
+separate service; sharing the module couples deploy/scale and the eventual split,
+and the only thing actually shared (the proto contract) is shared via codegen, not
+a module.
+* *Integrations owns a public OAuth ingress* (the browser leg). Workable, fewer
+hops — but it gives the internal service a public surface and breaks the
+frontend→API topology. The API-fronted relay keeps integrations internal.
+* *Shared database with the API.* Rejected — couples schemas, clashes on the
+golang-migrate version table, and weakens the boundary; a per-service DB on the
+shared instance is as quick and far cleaner.
+* *A queue/worker system now* (River, Postgres `SKIP LOCKED`, a broker).
+Deferred — the in-process loop gets us to working integrations; the queue is the
+scale pass.
+* *Provider-mediated connectors* (Nango / Merge). Deferred to the long tail
+(xref:ROOT:architecture/ingestion.adoc[]); we build first-party first.
+* *Do nothing.* Rejected — no connector can run without the service.
+
+== Tradeoffs
+
+* A second service to operate (deploy, observability, migrations) and a little
+duplicated boilerplate — bought for a clean, independently-scalable boundary.
+* Trust-the-network between the API and integrations (tenant_id in the request)
+until mTLS / a service token lands.
+* The in-process sync loop is single-process — no horizontal scale or
+work-stealing yet.
+* The shared Postgres *instance* is a shared failure domain until split.
+
+== Open questions
+
+* Container selection vs. sync-all-accessible, and the cap — pinned with the first
+design partner's data volume.
+* Service-to-service auth (mTLS vs. signed service token) — the productionizing
+pass.
+* Where the token-encryption key lives and how it rotates (interim server key now;
+BYOK later).
+* Cross-tenant sync fairness once volume grows (the queue pass).
+
+== Decisions to be recorded as ADRs
+
+* xref:ROOT:adrs/0026-integrations-independent-service.adoc[ADR-0026] —
+integrations is an independent service (own Go module, own database on the shared
+instance, internal-only, talks Connect).
+* xref:ROOT:adrs/0027-connector-oauth.adoc[ADR-0027] — connector authorization is
+first-party OAuth2 (Authorization Code + PKCE); the API fronts the browser leg,
+integrations owns exchange/storage/refresh; tokens encrypted at rest.

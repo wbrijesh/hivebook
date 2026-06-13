@@ -82,9 +82,10 @@ just update web    # bakes WEB_CLIENT_ID/PROJECT_ID into the web image, deploys
 just update api    # redeploys api so it picks up PROJECT_ID as the audience
 ----
 
-Then visit https://app.hivebook.localhost, log in, and exercise `GET /api/me` —
-the Go API returns the caller's identity and tenant
-(xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005]).
+Then visit https://app.hivebook.localhost, log in, and exercise
+`TenantService/GetSession` — the Go API returns the caller's identity and tenant
+(xref:ROOT:operations/api.adoc[the API surface],
+xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005]).
 
 == Identity → tenant
 
@@ -113,4 +114,5 @@ URIs → `WEB++_++CLIENT++_++ID`
 
 The `hivebook-oidc` Secret was then created with `kubectl create secret generic`.
 Verified end-to-end by minting a project-audience JWT (jwt-bearer grant with the
-`iam-admin` key) and calling `/api/me` → 200 with claims.
+`iam-admin` key) and calling `TenantService/GetSession` → identity + tenant
+returned.

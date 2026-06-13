@@ -1,0 +1,38 @@
+= 0025 — Connectors are modules in the integrations service
+:adr-id: 0025
+:status: accepted
+:date: 2026-06-13
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0008-raw-ingestion-and-object-storage.adoc
+
+== Context
+
+Each connector is an independent integration with a third-party system (its own
+auth, API quirks, sync cadence). Connectors will eventually differ enough in load
+and lifecycle that some warrant their own service — but standing up a service per
+connector on day one is premature operational cost.
+
+== Decision
+
+Connectors are packaged as modules inside a single *integrations* service (its
+own deployable), each module self-contained behind the connector interface
+(xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]). The service owns source
+auth, sync loops, watermarks, and raw writes to object storage — not
+canonicalization, filing, or summarization. The module boundary is drawn so a
+connector can be lifted into its own service later with minimal surgery.
+
+== Alternatives considered
+
+* *One service per connector now* — premature; multiplies deployments, secrets,
+and observability surfaces before any connector has earned isolation.
+* *Connectors inside the existing API service* — conflates the request/response
+API with long-running background sync; different scaling and failure profiles.
+
+== Consequences
+
+Adding a connector is adding a module, not standing up a service. The connectors
+share one deployment, one set of sync infrastructure, and one place for source
+auth — until one earns its own service, at which point the module boundary makes
+the split mechanical. The trade is that all connectors share a blast radius until
+they are split.

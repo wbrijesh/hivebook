@@ -23,10 +23,10 @@ system: Hivebook {
   sl: "Summary lifecycle\nlazy · query-driven · maintenance"
   bi: "Book index\n3-level hierarchy of summaries"
   rt: "Retrieval\nhybrid: vector + BM25"
-  rc: "Raw corpus\nverbatim content + metadata"
-  ing: "Ingestion pipeline\nnormalize, segment"
-  con: "Connectors\nper source: OAuth, sync"
-  qs -> sl -> bi -> rt -> rc -> ing -> con
+  canon: "Canonicalization\nnormalize · segment · embed"
+  rc: "Raw corpus\nobject storage (verbatim)"
+  con: "Connectors\nper source: OAuth, sync, raw capture"
+  qs -> sl -> bi -> rt -> canon -> rc -> con
 }
 
 cp: "Enterprise control plane\nauth · audit · tenancy · metering" {
@@ -41,13 +41,17 @@ cp -> tenants
 == Layer responsibilities
 
 * *Connectors* — talk to source systems (Slack, Google Workspace,
-Notion, GitHub, …): OAuth, incremental sync, watermarking. See
+GitHub, …): OAuth, incremental sync, watermarking, and raw capture to object
+storage. They do not normalize or embed
+(xref:ROOT:adrs/0023-raw-first-connectors.adoc[ADR-0023]). See
 xref:ROOT:architecture/ingestion.adoc[].
-* *Ingestion pipeline* — light normalization (stable ID, source,
-author, timestamps, embeddings) and segmentation. Semantic decisions
-happen downstream. See xref:ROOT:architecture/ingestion.adoc[].
-* *Raw corpus* — verbatim storage of every artifact; the source of
-truth for citations (xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001]). See xref:ROOT:architecture/corpus-and-index.adoc[].
+* *Canonicalization* — derives the canonical artifact from raw (normalize,
+segment, embed), linked back to raw for provenance. Semantic decisions happen
+further downstream. See xref:ROOT:architecture/ingestion.adoc[].
+* *Raw corpus* — verbatim storage of every artifact in object storage; the
+source of truth for citations
+(xref:ROOT:adrs/0001-corpus-and-index-strata.adoc[ADR-0001],
+xref:ROOT:adrs/0024-raw-corpus-object-storage.adoc[ADR-0024]). See xref:ROOT:architecture/corpus-and-index.adoc[].
 * *Retrieval* — one hybrid index serving query time and ingest time
 (xref:ROOT:adrs/0007-hybrid-retrieval.adoc[ADR-0007]). See xref:ROOT:architecture/retrieval.adoc[].
 * *Book index* — the per-customer three-level hierarchy of summaries
