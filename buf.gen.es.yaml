@@ -1,0 +1,12 @@
+version: v2
+# TypeScript codegen, run with --include-imports so the buf/validate schema the
+# generated descriptors reference is vendored locally (web/lib/gen/buf/validate).
+# protobuf-es has no global registry, so a local copy is safe; well-known types
+# still come from the @bufbuild/protobuf runtime, not generated here.
+plugins:
+  - remote: buf.build/bufbuild/es:v2.12.0
+    out: web/lib/gen
+    opt: target=ts
+  - remote: buf.build/connectrpc/query-es:v2.2.0
+    out: web/lib/gen
+    opt: target=ts

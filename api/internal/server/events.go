@@ -24,6 +24,7 @@ var allowedWebEvents = map[string]bool{
 	"login_error":         true,
 	"logout":              true,
 	"onboarding_complete": true,
+	"app_error":           true,
 }
 
 // eventsHandler accepts browser telemetry, records it as a structured log line

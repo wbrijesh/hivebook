@@ -1,6 +1,6 @@
 = Checks & CI
 :status: living
-:last-reviewed: 2026-06-11
+:last-reviewed: 2026-06-12
 
 One gate, one definition, run the same way everywhere. The checks are *code*
 (a Dagger module in `.dagger/`), not shell scripts or CI YAML — so they run
@@ -14,8 +14,12 @@ just check        # the gate — what CI runs
 dagger call check # the same thing, directly
 ----
 
-`check` runs two suites in parallel, each in its own container:
+`check` runs three suites in parallel, each in its own container:
 
+* *proto* — `buf lint`, `buf format`, and a generated-code drift check
+(regenerate from the proto and diff against the committed `gen/`, so a stale
+commit fails). The contract is proto-first
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
 * *web* — `prettier --check`, `eslint`, `tsc --noEmit` (Node, pnpm).
 * *api* — `go build`, `go vet`, and the *full* `go test ./...`, including the
 testcontainers integration tests (a Docker-in-Docker engine is bound for them).
@@ -23,12 +27,17 @@ testcontainers integration tests (a Docker-in-Docker engine is bound for them).
 Toolchain images are pinned to match the service Dockerfiles, so the checks and
 the shipped images agree on versions.
 
+Breaking-change detection (`buf breaking`) needs git history, which the hermetic
+Dagger context deliberately excludes — so it runs as its own job in
+`.github/workflows/ci.yml`, against the PR base, not in the module.
+
 == Where it lives
 
 * `.dagger/main.go` — the pipeline. Add or change a check here, in Go.
 * `dagger.json` — module + pinned engine version.
-* `.github/workflows/ci.yml` — a few lines that install Dagger and run
-`dagger call check`. All real logic is in the module, not the YAML.
+* `.github/workflows/ci.yml` — installs Dagger and runs `dagger call check`,
+plus the one `buf breaking` job that needs git history. Otherwise all logic is in
+the module, not the YAML.
 
 The generated SDK bindings (`.dagger/internal`, `dagger.gen.go`) are gitignored
 and regenerated automatically by `dagger call` / `dagger develop`.

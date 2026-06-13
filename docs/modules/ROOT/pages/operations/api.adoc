@@ -1,29 +1,37 @@
 = Hivebook API
 
-The Go API (chi router, pgx/Postgres). Verifies ZITADEL JWT access tokens and
-resolves the caller's identity and tenant server-side
+The Go API (chi router, pgx/Postgres). The application surface is *Connect*,
+proto-first (xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006],
+xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]). It verifies ZITADEL JWT
+access tokens and resolves the caller's identity and tenant server-side
 (xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005]).
 
-== Endpoints
+== Surface
 
-* *Public:* `/health`, `/metrics`, `POST /events` (browser telemetry beacon).
-* *Protected* (require a valid ZITADEL access token):
-** `GET /api/me` — the session: caller identity + tenant.
-** `GET /api/tenant` — the tenant and onboarding status (row created lazily).
-** `POST /api/tenant/onboarding` — record onboarding answers; idempotent, region
+* *Connect — `hivebook.tenant.v1.TenantService`* (one access token required,
+verified by an auth interceptor):
+** `GetSession` — the session: caller identity + tenant (row created lazily).
+Replaces the former `GET /api/me` and `GET /api/tenant`.
+** `CompleteOnboarding` — record onboarding answers; idempotent, region
 write-once.
++
+RPCs are `POST /hivebook.tenant.v1.TenantService/<Method>`; the handler is
+h2c-wrapped so one listener serves the Connect, gRPC, and gRPC-Web protocols
+(Traefik forwards h2c to the pod). gRPC *server reflection* and *gRPC health*
+(`grpc.health.v1.Health`, mirroring the DB readiness) are served too, so
+`grpcurl` / `buf curl` / agent tooling can introspect and probe. Field rules are
+enforced by protovalidate (xref:ROOT:adrs/0021-protovalidate-field-rules.adoc[ADR-0021]);
+errors use Connect codes (xref:ROOT:standards/go/errors.adoc[standards/go/errors],
+xref:ROOT:adrs/0022-connect-error-model.adoc[ADR-0022]).
+* *Plain HTTP (public):* `/health`, `/metrics`, `POST /events` (browser
+telemetry beacon).
 
-Schema migrations are embedded and applied on startup via golang-migrate
+The contract lives in `proto/`; `just proto` regenerates the Go and TS clients
+(xref:ROOT:adrs/0020-proto-first-contract-buf.adoc[ADR-0020]). Schema migrations
+are embedded and applied on startup via golang-migrate
 (xref:ROOT:adrs/0017-schema-migrations-golang-migrate.adoc[ADR-0017]); queries are
 generated from SQL by sqlc (xref:ROOT:adrs/0018-sqlc-query-package.adoc[ADR-0018],
 regenerate with `just gen`). See xref:ROOT:standards/go/database.adoc[database access].
-
-[NOTE]
-====
-The transport is moving to Connect (proto-first)
-(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
-These REST routes are the current surface.
-====
 
 == Build / deploy / test
 

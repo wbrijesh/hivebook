@@ -6,6 +6,9 @@ metadata:
 data:
   APP_ENV: "local"
   HIVEBOOK_API_PORT: "8080"
+  # Browser origins allowed to call the Connect API (comma-separated, explicit —
+  # never a wildcard with credentials). The web app is served from app.*.
+  HIVEBOOK_CORS_ORIGINS: "https://app.hivebook.localhost"
   HIVEBOOK_DB_HOST: "postgres"
   HIVEBOOK_DB_PORT: "5432"
   HIVEBOOK_DB_SCHEMA: "public"

@@ -1,0 +1,17 @@
+version: v2
+modules:
+  - path: proto
+deps:
+  # protovalidate's wire descriptor (pinned in buf.lock). Keep in lockstep with the
+  # runtime validator module in api/go.mod
+  # (buf.build/gen/go/bufbuild/protovalidate/...): both must come from the same
+  # protovalidate release so the field options the codegen embeds match the
+  # extension the validator reads at runtime. Bump them together — `just proto-deps`
+  # then `go get` the SDK — never one without the other.
+  - buf.build/bufbuild/protovalidate
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

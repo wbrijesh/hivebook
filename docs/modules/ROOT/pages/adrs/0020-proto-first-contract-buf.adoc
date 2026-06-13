@@ -1,0 +1,41 @@
+= 0020 — Proto-first contract, generated with buf
+:adr-id: 0020
+:status: accepted
+:date: 2026-06-12
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0006-api-transport-and-contract.adoc
+
+== Context
+
+With Connect as the API layer (xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]),
+the request/response types and service stubs must exist — in sync — on the Go
+side and the TypeScript side. Hand-keeping them is exactly the drift we are
+removing.
+
+== Decision
+
+A `.proto` per service under `proto/hivebook/<area>/v1/` is the single source of
+truth, and the *buf* toolchain generates from it: Go types + Connect stubs into
+`api/internal/gen/`, and TS types + connect-query hooks into `web/lib/gen/`.
+Generated code is *committed*, not built in the image. `just proto` runs buf in
+Docker (no local buf/protoc; plugins are pinned BSR remote plugins); the
+`just check` gate re-runs generation and fails on any drift, and a separate CI
+job runs `buf breaking` against the PR base.
+
+== Alternatives considered
+
+* *Build-time generation (don't commit gen/)* — smaller tree, but opaque review
+diffs and a proto toolchain in every service image build.
+* *Local plugins / hermetic generation* — no BSR dependency at generation time,
+but a heavier custom tool image to maintain; pinned remote plugins are
+reproducible and need nothing installed locally.
+* *Hand-written types both sides* — the drift this decision exists to remove.
+
+== Consequences
+
+A real toolchain (`buf` + pinned codegen plugins) is wired into the justfile and
+the gate — against the minimalism elsewhere, but `buf lint`, formatting, and
+breaking-change detection are worth it. Generated code lives in the tree (one
+more thing to keep current, enforced by the drift check). Generation needs BSR
+network access; the committed output means *builds* never do.

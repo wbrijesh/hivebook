@@ -321,6 +321,26 @@ gen:
     docker run --rm -v "{{justfile_directory()}}/api":/src -w /src sqlc/sqlc generate
     @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/database/gen"'
 
+# Regenerate the Connect contract (Go + TS) from proto/. Runs buf in Docker — no
+# local buf/protoc. Edit proto/**/*.proto, run this, commit api/internal/gen +
+# web/lib/gen. Deliberately does NOT run `buf dep update` (that's `just proto-deps`)
+# so this regen is byte-identical to what the CI drift gate enforces from the
+# committed buf.lock (design-doc 0006).
+proto:
+    @bash -c '. scripts/ui.sh && ui_header "Generate · buf"'
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 lint
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.go.yaml
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.es.yaml --include-imports
+    @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/gen + web/lib/gen"'
+
+# Update proto dependencies (rewrites buf.lock). Separate from `just proto` so the
+# regen path stays reproducible; bump deliberately, then re-run `just proto` and
+# keep the protovalidate pin in api/go.mod in step (see buf.yaml).
+proto-deps:
+    @bash -c '. scripts/ui.sh && ui_header "Update · buf deps"'
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 dep update
+    @bash -c '. scripts/ui.sh && ui_ok "updated buf.lock — now run just proto"'
+
 # First-time setup: trust a local CA, write local secrets, deploy the whole stack.
 # Idempotent — safe to re-run to reconcile a half-broken cluster. After this,
 # `just start` / `just stop` are the day-to-day controls.

@@ -6,7 +6,7 @@
 //   - Brijesh <google@brijesh.dev>
 :supersedes:
 :superseded-by:
-:related-adrs:
+:related-adrs: adrs/0019-connect-api-layer.adoc, adrs/0020-proto-first-contract-buf.adoc, adrs/0021-protovalidate-field-rules.adoc, adrs/0022-connect-error-model.adoc
 
 == Context
 
@@ -142,21 +142,31 @@ cacheable, side-effect-free methods. A public REST API later needs transcoding
 
 == Open questions
 
-* *Auth placement.* JWT verification as a Connect interceptor, or keep the
-existing outer HTTP middleware and pass claims via context. Both work.
-* *Generated code: committed vs build-time only.* Commit `gen/` for diff-ability
-and zero-toolchain builds, or generate during the image build.
-* *Versioning.* Package-version (`v1`) discipline and how breaking changes are
-gated by `buf` in CI.
+Resolved on implementation:
+
+* *Auth placement* → a Connect *interceptor* that resolves the caller and puts
+the identity in context (xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]).
+* *Generated code* → *committed* (`api/internal/gen`, `web/lib/gen`); the CI gate
+re-runs generation and fails on drift
+(xref:ROOT:adrs/0020-proto-first-contract-buf.adoc[ADR-0020]).
+* *Versioning* → package `v1`; `buf breaking` runs against the PR base in CI
+(xref:ROOT:standards/ci.adoc[ci]).
+* *gRPC surface* → the handler is h2c-wrapped and serves gRPC + gRPC-Web +
+Connect, with server reflection and gRPC health for tooling.
+
+Still open:
+
 * *REST transcoding.* If/when an external curl/webhook API is needed, add
 transcoding rather than a parallel REST surface.
 
-== Decisions to be recorded as ADRs
+== Decisions recorded as ADRs
 
-* Connect (not raw gRPC) is the API layer for both the browser and
-service-to-service calls.
-* The API contract is proto-first, generated with `buf`.
-* protovalidate (on the proto) is the validation source of truth; stateful rules
-stay in application code.
-* The Connect error model supersedes the REST error shape
-(xref:ROOT:standards/go/errors.adoc[]).
+* xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019] — Connect (not raw gRPC)
+is the API layer for both the browser and service-to-service calls.
+* xref:ROOT:adrs/0020-proto-first-contract-buf.adoc[ADR-0020] — the API contract
+is proto-first, generated with `buf`.
+* xref:ROOT:adrs/0021-protovalidate-field-rules.adoc[ADR-0021] — protovalidate (on
+the proto) is the validation source of truth; stateful rules stay in application
+code.
+* xref:ROOT:adrs/0022-connect-error-model.adoc[ADR-0022] — the Connect error model
+supersedes the REST error shape (xref:ROOT:standards/go/errors.adoc[]).

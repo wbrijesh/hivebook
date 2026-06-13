@@ -12,6 +12,7 @@ export type TelemetryEvent =
   | "login_error"
   | "logout"
   | "onboarding_complete"
+  | "app_error"
 
 // Fire-and-forget browser telemetry. Posts to the Go API's /events endpoint,
 // which records each event as a structured log (VictoriaLogs) and a metric

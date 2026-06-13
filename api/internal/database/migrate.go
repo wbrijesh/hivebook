@@ -1,10 +1,13 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	pgxdriver "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -15,9 +18,10 @@ import (
 var migrationFiles embed.FS
 
 // newMigrator builds a golang-migrate instance over the embedded migrations,
-// reusing an existing *sql.DB (opened with the pgx stdlib driver) so migrations
-// run on the same connection as the app. Caller closes it with m.Close() when
-// driving up/down directly (tests); the app path uses migrate() below.
+// bound to the given *sql.DB (opened with the pgx stdlib driver). Callers own the
+// *sql.DB and close the migrator with m.Close() when done — which also closes that
+// connection, so never pass the shared app pool here. Tests drive up/down with it
+// directly; the app path uses applyMigrations below.
 func newMigrator(db *sql.DB) (*migrate.Migrate, error) {
 	src, err := iofs.New(migrationFiles, "migrations")
 	if err != nil {
@@ -34,16 +38,47 @@ func newMigrator(db *sql.DB) (*migrate.Migrate, error) {
 	return m, nil
 }
 
-// migrate applies all up migrations on startup. No-op when already current
-// (golang-migrate, embedded — ADR-0017). The source/driver instances created
-// here are tied to s.db, so we do not close the *sql.DB out from under the app.
-func (s *service) migrate() error {
-	m, err := newMigrator(s.db)
+// applyMigrations opens a short-lived connection of its own, applies all up
+// migrations, and closes everything — the migrator and that connection — when
+// done. It never touches the app pool, so closing leaks nothing across retries.
+// No-op when already current (golang-migrate, embedded — ADR-0017).
+func applyMigrations(cfg Config) error {
+	db, err := sql.Open("pgx", cfg.dsn())
+	if err != nil {
+		return fmt.Errorf("open migration db: %w", err)
+	}
+	defer db.Close()
+
+	m, err := newMigrator(db)
 	if err != nil {
 		return err
 	}
+	defer m.Close()
+
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrate up: %w", err)
 	}
 	return nil
+}
+
+// migrateWithRetry runs applyMigrations until it succeeds or ctx expires —
+// Postgres may not be up yet on first boot. The wait is context-aware so a
+// shutdown signal isn't ignored for the retry interval.
+func migrateWithRetry(ctx context.Context, cfg Config) error {
+	const retryInterval = 2 * time.Second
+	for {
+		err := applyMigrations(cfg)
+		if err == nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return fmt.Errorf("migrate: %w", err)
+		}
+		slog.Warn("db_migrate_retry", "error", err.Error())
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("migrate: %w", err)
+		case <-time.After(retryInterval):
+		}
+	}
 }

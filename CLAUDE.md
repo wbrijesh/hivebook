@@ -46,6 +46,10 @@ docs
 │           │   ├── 0016-configuration-layering.adoc
 │           │   ├── 0017-schema-migrations-golang-migrate.adoc
 │           │   ├── 0018-sqlc-query-package.adoc
+│           │   ├── 0019-connect-api-layer.adoc
+│           │   ├── 0020-proto-first-contract-buf.adoc
+│           │   ├── 0021-protovalidate-field-rules.adoc
+│           │   ├── 0022-connect-error-model.adoc
 │           │   └── index.adoc
 │           ├── architecture
 │           │   ├── corpus-and-index.adoc
@@ -143,9 +147,13 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 
 ## Repo map
 
-- `api/` — Go API: chi router, pgx/Postgres, `log/slog` JSON, ZITADEL JWT auth.
-  Entrypoint `cmd/api/`, logic in `internal/{auth,database,server}`.
-- `web/` — Next.js (App Router) + shadcn/ui + Apex tokens.
+- `api/` — Go API: chi router + Connect, pgx/Postgres, `log/slog` JSON, ZITADEL
+  JWT auth. Entrypoint `cmd/api/`, logic in `internal/{auth,database,server}`;
+  generated proto code in `internal/gen/` (committed).
+- `web/` — Next.js (App Router) + shadcn/ui + Apex tokens; Connect/connect-query
+  data layer (`lib/api/`, `lib/session.ts`), generated client in `lib/gen/`.
+- `proto/` — the proto-first API contract (Connect, design-doc 0006). Edit, then
+  `just proto` regenerates the Go + TS clients; gen is committed.
 - `prototype/` — throwaway UI prototype (mock data); opt-in deploy
   (`just update prototype`), not part of `just install`.
 - `infra/` — Kubernetes manifests (OrbStack), one dir per component.
@@ -157,9 +165,11 @@ surrounding code _is_ the standard. To change a standard, edit its page in a PR
 
 - First-time setup (local CA + secrets + full deploy): `just setup` — idempotent.
 - Dev cluster: `just start` · `just stop` · `just status` · `just health` · `just urls`
-- Checks (the gate): `just check` — web (prettier/eslint/tsc) + api (build/vet/test),
-  in clean containers via Dagger; same pipeline as CI (`standards/ci.adoc`). Fix web
-  formatting with `just format`.
+- Checks (the gate): `just check` — proto (buf lint/format/drift) + web
+  (prettier/eslint/tsc) + api (build/vet/test), in clean containers via Dagger;
+  same pipeline as CI (`standards/ci.adoc`). Fix web formatting with `just format`.
+- Regenerate code: `just proto` (Connect Go+TS from `proto/`) · `just gen` (sqlc) —
+  both run in Docker, no local toolchain; commit the output.
 - API tests directly: `cd api && go test ./...` (needs Docker for testcontainers).
 - After changing code, rebuild + roll out: `just update <service...>` (e.g.
   `just update web api`) — builds the named services in parallel, zero-downtime.

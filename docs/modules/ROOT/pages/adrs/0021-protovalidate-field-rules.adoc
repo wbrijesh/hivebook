@@ -1,0 +1,37 @@
+= 0021 — protovalidate is the validation source of truth
+:adr-id: 0021
+:status: accepted
+:date: 2026-06-12
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0006-api-transport-and-contract.adoc
+
+== Context
+
+Field validation was hand-written in Go handlers (e.g. the "region is required"
+check) and would otherwise be mirrored by client-side schemas — the same
+dual-maintenance the proto-first contract
+(xref:ROOT:adrs/0020-proto-first-contract-buf.adoc[ADR-0020]) removes for types.
+
+== Decision
+
+Field constraints are declared on the proto with *protovalidate* (CEL) and
+enforced server-side by a Connect interceptor, which returns
+`CodeInvalidArgument` on violation. The constraints live once, on the proto, and
+are available to the client too. This replaces the hand-written Go `Validate()`
+layer and any client-side schema. Stateful rules a field constraint cannot
+express — region write-once (xref:ROOT:adrs/0014-region-write-once.adoc[ADR-0014])
+— stay in application code and surface as `CodeFailedPrecondition`.
+
+== Alternatives considered
+
+* *Hand-written Go validation + client-side schema (e.g. Zod)* — two mirrors that
+drift; the problem this avoids.
+* *Server-only hand validation, no client schema* — no drift, but the rules
+aren't shared with the client and stay imperative rather than declarative.
+
+== Consequences
+
+Field rules are declarative and one-sided to maintain. The split is explicit:
+shape/format rules on the proto; stateful/business rules in the service layer.
+The validator (a CEL runtime) is a new Go dependency, built once at startup.

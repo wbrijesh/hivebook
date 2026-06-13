@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 
 	"api/internal/database/gen"
 )
@@ -45,7 +46,12 @@ func toTenant(id, org string, name, size, region, useCaseOther sql.NullString, u
 		UseCases:     []string{},
 	}
 	if len(useCases) > 0 {
-		_ = json.Unmarshal(useCases, &t.UseCases)
+		if err := json.Unmarshal(useCases, &t.UseCases); err != nil {
+			// Shouldn't happen — the column is written as a JSON array by this
+			// package — but a corrupt value shouldn't crash the read; log and
+			// fall back to empty.
+			slog.Error("tenant_use_cases_unmarshal_failed", "tenant_id", id, "error", err.Error())
+		}
 	}
 	if t.UseCases == nil {
 		t.UseCases = []string{}
@@ -58,7 +64,9 @@ func toTenant(id, org string, name, size, region, useCaseOther sql.NullString, u
 }
 
 // GetOrCreateTenant returns the tenant for a ZITADEL org id, creating an empty
-// (un-onboarded) row the first time an org is seen.
+// (un-onboarded) row the first time an org is seen. Two statements (insert-if-
+// absent, then select) rather than one upsert-returning, for readability — it is
+// race-safe via the unique constraint on zitadel_org_id, not via ordering.
 func (s *service) GetOrCreateTenant(ctx context.Context, orgID string) (Tenant, error) {
 	if err := s.q.CreateTenantIfAbsent(ctx, orgID); err != nil {
 		return Tenant{}, err

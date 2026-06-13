@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 )
 
@@ -111,6 +112,93 @@ func TestCompleteOnboarding_RegionWriteOnce(t *testing.T) {
 	}
 	if tn.Region == nil || *tn.Region != "us-east" {
 		t.Fatalf("region must stay us-east, got %v", tn.Region)
+	}
+}
+
+// TestGetOrCreateTenant_Concurrent proves the insert-if-absent + select is
+// race-safe: many goroutines racing on a brand-new org all resolve to the same
+// single row, none error (the unique constraint, not ordering, guarantees it).
+func TestGetOrCreateTenant_Concurrent(t *testing.T) {
+	srv := newStore(t)
+	ctx := context.Background()
+	org := "org_" + t.Name()
+
+	const n = 16
+	ids := make([]string, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer wg.Done()
+			tn, err := srv.GetOrCreateTenant(ctx, org)
+			ids[i], errs[i] = tn.ID, err
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("goroutine %d errored: %v", i, err)
+		}
+		if ids[i] != ids[0] {
+			t.Fatalf("concurrent get-or-create returned different ids: %s != %s", ids[i], ids[0])
+		}
+	}
+}
+
+// TestCompleteOnboarding_ConcurrentRegions proves region write-once holds under a
+// race: many goroutines onboard the same fresh org with different regions at once;
+// exactly one region may ever succeed, every other attempt gets ErrRegionImmutable,
+// and the stored region is that one winner.
+func TestCompleteOnboarding_ConcurrentRegions(t *testing.T) {
+	srv := newStore(t)
+	ctx := context.Background()
+	org := "org_" + t.Name()
+
+	regions := []string{"us-east", "eu-central", "asia-south", "us-west"}
+	const perRegion = 4
+
+	type res struct {
+		region string
+		err    error
+	}
+	results := make(chan res, len(regions)*perRegion)
+	var wg sync.WaitGroup
+	for _, r := range regions {
+		for range perRegion {
+			wg.Add(1)
+			go func(region string) {
+				defer wg.Done()
+				_, err := srv.CompleteOnboarding(ctx, org, "Acme", "11-50", region, []string{"support"}, "")
+				results <- res{region, err}
+			}(r)
+		}
+	}
+	wg.Wait()
+	close(results)
+
+	winners := map[string]bool{}
+	for r := range results {
+		switch {
+		case r.err == nil:
+			winners[r.region] = true
+		case errors.Is(r.err, ErrRegionImmutable):
+			// expected for the losing regions
+		default:
+			t.Fatalf("unexpected error: %v", r.err)
+		}
+	}
+	if len(winners) != 1 {
+		t.Fatalf("write-once violated: more than one region succeeded: %v", winners)
+	}
+
+	tn, err := srv.GetOrCreateTenant(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tn.Region == nil || !winners[*tn.Region] {
+		t.Fatalf("stored region %v is not the winning region %v", tn.Region, winners)
 	}
 }
 

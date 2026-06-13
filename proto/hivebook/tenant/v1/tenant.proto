@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+// The tenant/workspace API. One ZITADEL organization is one tenant
+// (design-doc 0005); this service exposes the signed-in caller's session and the
+// onboarding write. Connect, proto-first (design-doc 0006).
+package hivebook.tenant.v1;
+
+import "buf/validate/validate.proto";
+
+service TenantService {
+  // GetSession returns the authenticated caller's identity and their tenant,
+  // both resolved server-side from the token/userinfo and the database — never
+  // trusted from the client. The single source the app chrome reads (it
+  // supersedes the old /api/me and /api/tenant endpoints).
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+
+  // CompleteOnboarding records the onboarding answers and marks the tenant
+  // onboarded. Idempotent; the storage region is write-once (ADR-0014).
+  rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
+}
+
+// User is the caller's identity, resolved from the OIDC token/userinfo.
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+// Tenant is one customer workspace. The optional fields are unset until
+// onboarding fills them; `onboarded` is the gate the app reads.
+message Tenant {
+  string id = 1;
+  optional string name = 2;
+  optional string size = 3;
+  optional string region = 4;
+  repeated string use_cases = 5;
+  optional string use_case_other = 6;
+  bool onboarded = 7;
+}
+
+message GetSessionRequest {}
+
+message GetSessionResponse {
+  User user = 1;
+  Tenant tenant = 2;
+}
+
+// CompleteOnboardingRequest carries the onboarding answers. Field rules are
+// enforced server-side by protovalidate (CEL); the stateful region write-once
+// rule lives in application code — a field constraint can't express it.
+message CompleteOnboardingRequest {
+  // region selects where the corpus is stored. Required and write-once.
+  string region = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 50
+  }];
+  string name = 2 [(buf.validate.field).string.max_len = 200];
+  string size = 3 [(buf.validate.field).string.max_len = 50];
+  repeated string use_cases = 4 [(buf.validate.field).repeated.max_items = 32];
+  string use_case_other = 5 [(buf.validate.field).string.max_len = 500];
+}
+
+message CompleteOnboardingResponse {
+  Tenant tenant = 1;
+}

@@ -22,7 +22,7 @@ import {
 } from "@remixicon/react"
 
 import { Logo } from "@/components/brand/logo"
-import { fetchMe, type Session } from "@/lib/tenant"
+import { useSession } from "@/lib/session"
 import {
   Tooltip,
   TooltipContent,
@@ -303,21 +303,14 @@ function Notifications() {
 }
 
 function ProfileMenu() {
-  // Identity and workspace both come from the server (/api/me) — never derived
-  // from client-side OIDC state (design-doc 0005).
-  const [session, setSession] = React.useState<Session | null>(null)
+  // Identity and workspace both come from the server session — never derived from
+  // client-side OIDC state (design-doc 0005). One shared query, deduplicated with
+  // every other consumer (design-doc 0006).
+  const { data } = useSession()
 
-  React.useEffect(() => {
-    fetchMe()
-      .then((s) => {
-        if (s) setSession(s)
-      })
-      .catch(() => {})
-  }, [])
-
-  const name = session?.user.name || session?.user.email || ""
-  const email = session?.user.email || ""
-  const orgName = session?.tenant.name || null
+  const name = data?.user?.name || data?.user?.email || ""
+  const email = data?.user?.email || ""
+  const orgName = data?.tenant?.name || null
   const initial = name ? name.trim().charAt(0).toUpperCase() : ""
 
   return (

@@ -1,8 +1,9 @@
 // Hivebook CI — the project's checks as code, run identically locally and in CI.
 //
-// `dagger call check` is the single enforcement entrypoint: it runs the web
-// checks (prettier, eslint, tsc) and the API checks (build, vet, test) in
-// parallel, each in a clean, pinned container. See docs: standards/ci.adoc.
+// `dagger call check` is the single enforcement entrypoint: it runs the proto
+// checks (buf lint, format, gen-drift), the web checks (prettier, eslint, tsc),
+// and the API checks (build, vet, test) in parallel, each in a clean, pinned
+// container. See docs: standards/ci.adoc.
 package main
 
 import (
@@ -17,10 +18,12 @@ import (
 // Toolchain images are pinned to match the service Dockerfiles, so the checks
 // and the shipped images agree on versions.
 const (
-	nodeImage = "node:22-alpine"     // web/Dockerfile
-	goImage   = "golang:1.26-alpine" // api/Dockerfile
-	dindImage = "docker:27-dind"     // engine for testcontainers
-	pnpmVer   = "10"                 // web/Dockerfile pins pnpm@10
+	nodeImage   = "node:22-alpine"      // web/Dockerfile
+	goImage     = "golang:1.26-alpine"  // api/Dockerfile
+	dindImage   = "docker:27-dind"      // engine for testcontainers
+	bufImage    = "bufbuild/buf:1.70.0" // justfile `proto` recipe
+	alpineImage = "alpine:3.20"         // tiny base for the gen-drift diff
+	pnpmVer     = "10"                  // web/Dockerfile pins pnpm@10
 )
 
 type Hivebook struct {
@@ -38,8 +41,8 @@ func New(
 	return &Hivebook{Source: source}
 }
 
-// Check runs every enforcement check (web + api) in parallel and reports the
-// result. Errors if any check fails. This is the CI and `just check` entrypoint.
+// Check runs every enforcement check (proto + web + api) in parallel and reports
+// the result. Errors if any check fails. The CI and `just check` entrypoint.
 func (m *Hivebook) Check(ctx context.Context) (string, error) {
 	type result struct {
 		name string
@@ -50,6 +53,7 @@ func (m *Hivebook) Check(ctx context.Context) (string, error) {
 		name string
 		run  func(context.Context) (string, error)
 	}{
+		{"proto", m.CheckProto},
 		{"web", m.CheckWeb},
 		{"api", m.CheckApi},
 	}
@@ -80,6 +84,43 @@ func (m *Hivebook) Check(ctx context.Context) (string, error) {
 		return report.String(), fmt.Errorf("checks failed: %s", strings.Join(failed, ", "))
 	}
 	return report.String(), nil
+}
+
+// CheckProto runs the contract gate: buf lint, buf format, and a generated-code
+// drift check (regenerate from the proto and diff against the committed gen/, so
+// a stale commit fails). Breaking-change detection needs git history and runs in
+// GitHub Actions, not in this hermetic context — see standards/ci.adoc.
+func (m *Hivebook) CheckProto(ctx context.Context) (string, error) {
+	buf := dag.Container().
+		From(bufImage).
+		WithDirectory("/work", m.Source).
+		WithWorkdir("/work")
+
+	if _, err := buf.
+		WithExec([]string{"buf", "lint"}).
+		WithExec([]string{"buf", "format", "--diff", "--exit-code"}).
+		Sync(ctx); err != nil {
+		return "", err
+	}
+
+	// Regenerate with the same two templates `just proto` uses, then diff the
+	// fresh output against what's committed.
+	regen := buf.
+		WithExec([]string{"buf", "generate", "--template", "buf.gen.go.yaml"}).
+		WithExec([]string{"buf", "generate", "--template", "buf.gen.es.yaml", "--include-imports"})
+
+	_, err := dag.Container().
+		From(alpineImage).
+		WithDirectory("/committed/go", m.Source.Directory("api/internal/gen")).
+		WithDirectory("/committed/es", m.Source.Directory("web/lib/gen")).
+		WithDirectory("/fresh/go", regen.Directory("/work/api/internal/gen")).
+		WithDirectory("/fresh/es", regen.Directory("/work/web/lib/gen")).
+		WithExec([]string{"sh", "-c", "diff -r /committed/go /fresh/go && diff -r /committed/es /fresh/es"}).
+		Sync(ctx)
+	if err != nil {
+		return "", fmt.Errorf("generated code is stale — run `just proto` and commit: %w", err)
+	}
+	return "buf lint + format + gen-drift", nil
 }
 
 // CheckWeb runs the web quality gate: prettier --check, eslint, then tsc.

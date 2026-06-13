@@ -1,54 +1,78 @@
 = Go · Errors & Responses
 :status: living
-:last-reviewed: 2026-06-06
+:last-reviewed: 2026-06-12
 
-One response shape, one error path. The page that stops "four error formats"
-before it starts.
+One response shape, one error path. The API is Connect
+(xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]); its error model
+(xref:ROOT:adrs/0022-connect-error-model.adoc[ADR-0022]) replaces HTTP status
+codes for RPCs. The plain operational handlers keep HTTP status — see the last
+section.
 
-[NOTE]
-====
-The API is moving to Connect, whose error model
-(`CodeInvalidArgument`, …) will replace `http.Error` + HTTP status codes
-(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
-This page is rewritten when that lands; the REST guidance below is accurate for
-the current code.
-====
+== RPC responses
 
-== Success responses
-
-Set `Content-Type: application/json` explicitly, then write JSON — through one
-helper, not ad-hoc `json.Marshal` + `w.Write`:
+Handlers return a typed proto message wrapped in `connect.Response`; the
+framework encodes it. There is no `writeJSON` and no hand-built envelope.
 
 [source,go]
 ----
-func writeJSON(w http.ResponseWriter, status int, v any) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    _ = json.NewEncoder(w).Encode(v)
-}
+return connect.NewResponse(&tenantv1.GetSessionResponse{
+    User:   &tenantv1.User{Id: id.Sub, Name: id.Name, Email: id.Email},
+    Tenant: toProtoTenant(t),
+}), nil
 ----
 
-[NOTE]
-====
-`HelloWorldHandler` and `healthHandler` predate this helper and set the header
-inconsistently. New handlers use `writeJSON`; migrate the old ones when touched.
-====
+== RPC errors
 
-== Error responses
+Reject with `connect.NewError(code, err)` — a lowercase, factual message and the
+right code. No stack traces or internal detail to the client; log the detail
+server-side with `slog` (include the `request_id`).
 
-* Reject with `http.Error(w, msg, status)` — a lowercase, factual message and
-the right status. No stack traces or internal detail to the client.
-* Status codes: `400` invalid input · `401` missing/invalid token · `403`
-authorized but forbidden · `404` not found · `409` conflict (e.g. region
-write-once) · `422` request cannot be resolved (no identity/org) · `503`
-dependency not ready · `500` unexpected. (See `internal/auth` for the 401/503
-split.)
-* Cap and validate input — wrap bodies in `http.MaxBytesReader` and reject on
-decode error (see `eventsHandler`).
+[source,go]
+----
+return nil, connect.NewError(connect.CodeFailedPrecondition,
+    errors.New("region cannot be changed after setup"))
+----
+
+The code mapping is fixed (xref:ROOT:adrs/0022-connect-error-model.adoc[ADR-0022]):
+
+[cols="1,2"]
+|===
+| Code | When
+
+| `CodeInvalidArgument` | A field rule failed — raised by the protovalidate
+interceptor (xref:ROOT:adrs/0021-protovalidate-field-rules.adoc[ADR-0021]), not by
+hand.
+| `CodeUnauthenticated` | No usable identity: missing/invalid token, or a verified
+token with no resolvable org. Raised by the auth interceptor.
+| `CodeUnavailable` | A dependency isn't ready (e.g. OIDC discovery still in
+progress) — transient, the caller may retry.
+| `CodeFailedPrecondition` | A stateful rule blocks the write, e.g. region
+write-once (xref:ROOT:adrs/0014-region-write-once.adoc[ADR-0014]).
+| `CodeNotFound` | A named resource doesn't exist.
+| `CodePermissionDenied` | Authenticated but not allowed (role/ACL).
+| `CodeInternal` | Unexpected server failure — log the detail, return a generic
+message.
+|===
+
+Validation (shape, length, required fields) is declared on the proto and enforced
+by the interceptor — *don't* re-check those in handlers. Stateful rules a field
+constraint can't express stay in the service layer.
 
 == Error values
 
 * Wrap with context and `%w`: `fmt.Errorf("discover provider: %w", err)`.
 * `log.Fatal` / `panic` only at startup (`main`), never in a handler — a handler
 returns an error response and lets the _request_ fail, not the process.
-* Sentinel errors via `errors.New`; compare with `errors.Is`.
+* Sentinel errors via `errors.New`; compare with `errors.Is`. The data and auth
+layers return sentinels (e.g. `database.ErrRegionImmutable`, `auth.ErrUnauthenticated`)
+and the handler/interceptor maps them to a Connect code — the transport never
+leaks the sentinel text.
+
+== Plain operational handlers
+
+`/health`, `/metrics`, and the `/events` telemetry beacon are not RPCs. They stay
+plain HTTP: success via the one `writeJSON` helper (sets `Content-Type`, then
+encodes), errors via `http.Error(w, msg, status)` with a lowercase message —
+`400` invalid input, `503` dependency down, `500` unexpected. Cap and validate
+input — wrap bodies in `http.MaxBytesReader` and reject on decode error (see
+`eventsHandler`).

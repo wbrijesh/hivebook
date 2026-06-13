@@ -1,6 +1,6 @@
 = Frontend · Data Fetching
-:status: draft
-:last-reviewed: 2026-06-10
+:status: living
+:last-reviewed: 2026-06-12
 
 All server state flows through the generated Connect client and TanStack Query.
 No component calls `fetch`, builds a URL, attaches a token, or holds loading
@@ -9,10 +9,11 @@ state by hand.
 [NOTE]
 ====
 The API contract is proto-first over Connect
-(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006]).
-The client below is *generated*, not hand-written. Until the generated clients
-land, the single interim fetch layer is `lib/tenant.ts` — build new data paths
-toward this target, and do not add a second hand-rolled `fetch` layer.
+(xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006],
+xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]). The client is *generated*
+into `web/lib/gen/` by `just proto`, not hand-written. The transport and
+interceptors live in `lib/api/client.ts`; `lib/session.ts` exposes the single
+`useSession()` query.
 ====
 
 == Rules
@@ -28,8 +29,10 @@ hand-rolled `useEffect` + `useState` fetch.
 . *Query keys come from the method.* Connect-Query derives a stable key from the
 service method and the request message; a mutation invalidates the keys it
 affects. Don't invent ad-hoc key strings.
-. *One QueryClient at the root.* A single `QueryClientProvider` in the root
-layout; defaults (`staleTime`, `retry`) are set once there.
+. *One QueryClient at the root.* A single `QueryClientProvider` (with the
+`TransportProvider`) in the root layout — see `components/providers.tsx`. Defaults
+(`staleTime`, `retry`) are set once there; `retry` skips auth failures so the
+session policy can sign out instead of looping (`lib/session.ts`).
 . *Errors are `ConnectError`; Query surfaces them.* The transport throws a typed
 `ConnectError` (with a `Code`) on failure; components render Query's `error`, not
 their own `try/catch`. Field validation comes from protovalidate on the proto
@@ -42,19 +45,21 @@ sites. Swapping transport or auth touches one layer.
 
 [source,tsx]
 ----
-// lib/api/client.ts — the transport: one client, token via interceptor
-const authInterceptor: Interceptor = (next) => async (req) => {
+// lib/api/client.ts — the transport: one client; token via interceptor, plus a
+// renew-once-on-401 interceptor wrapping it (outermost first, so a retry re-reads
+// the refreshed token).
+const auth: Interceptor = (next) => async (req) => {
   const token = await accessToken()        // from lib/auth.ts
   if (token) req.header.set("Authorization", `Bearer ${token}`)
   return next(req)
 }
 export const transport = createConnectTransport({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE!,
-  interceptors: [authInterceptor],
+  interceptors: [renewOnce, auth],         // renewOnce single-flights the renewal
 })
 
-// a component — usage only, hooks generated from the proto by connect-query
-const { data, isPending, error } = useQuery(getTenant)
+// a component — usage only; hooks generated from the proto by connect-query
+const { data, isPending, error } = useSession() // wraps useQuery(getSession)
 const onboard = useMutation(completeOnboarding, {
   onSuccess: () => queryClient.invalidateQueries(),
 })

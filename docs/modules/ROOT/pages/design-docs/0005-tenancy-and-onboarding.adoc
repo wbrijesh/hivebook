@@ -86,10 +86,18 @@ v0.1.
 
 === API surface (Go API)
 
-Three endpoints, all behind the existing ZITADEL JWT middleware, all scoping
-every query by the token-derived `tenant_id`. (These are REST today; the
-transport moves to Connect, proto-first — the surface is unchanged —
-xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006].)
+Three endpoints, all behind ZITADEL JWT verification, all scoping every query by
+the token-derived `tenant_id`.
+
+[NOTE]
+====
+*Superseded by the Connect surface.* These shipped as the Connect
+`hivebook.tenant.v1.TenantService` (xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006],
+xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]): `GetSession` replaces both
+`GET /api/me` and `GET /api/tenant`, and `CompleteOnboarding` replaces
+`POST /api/tenant/onboarding`. The message shapes below are unchanged; the
+authoritative contract is `proto/` and xref:ROOT:operations/api.adoc[operations/api].
+====
 
 * `GET /api/me` — the authenticated *session*: who the caller is and which
 workspace they're in, both resolved server-side. The web chrome reads identity
@@ -125,8 +133,9 @@ resource-owner org — caching the result per user in a bounded LRU with a TTL
 === Frontend wiring
 
 The prototype's onboarding UI is copied verbatim. Its local-only
-`OnboardingFlowProvider` is swapped for one that hydrates from `GET /api/tenant`
-and submits to `POST /api/tenant/onboarding` on the complete step. The gate
+`OnboardingFlowProvider` is swapped for one that hydrates from the session
+(`getSession`, via `useSession`) and submits via `completeOnboarding` on the
+complete step. The gate
 that already protects the app shell
 (xref:ROOT:standards/frontend/component-patterns.adoc[RequireAuth]) is extended
 into a small state machine:

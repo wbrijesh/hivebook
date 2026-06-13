@@ -1,11 +1,10 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { RiLogoutBoxRLine, RiUser6Fill } from "@remixicon/react"
 
 import { Logo } from "@/components/brand/logo"
-import { fetchMe } from "@/lib/tenant"
+import { useSession } from "@/lib/session"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,19 +25,12 @@ export function OnboardingTopBar() {
   )
 }
 
-type Profile = { name: string; email: string }
-
 function ProfileMenu() {
-  const [p, setP] = React.useState<Profile | null>(null)
-
-  // Identity comes from the server (/api/me), not client OIDC state (design-doc 0005).
-  React.useEffect(() => {
-    fetchMe()
-      .then((s) => {
-        if (s) setP({ name: s.user.name, email: s.user.email })
-      })
-      .catch(() => {})
-  }, [])
+  // Identity comes from the server session, not client OIDC state (design-doc
+  // 0005); the same shared query the rest of the app uses (design-doc 0006).
+  const { data } = useSession()
+  const name = data?.user?.name
+  const email = data?.user?.email
 
   return (
     <DropdownMenu>
@@ -46,16 +38,16 @@ function ProfileMenu() {
         <RiUser6Fill className="size-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        {(p?.name || p?.email) && (
+        {(name || email) && (
           <>
             <div className="px-2 py-1.5">
-              {p?.name && (
+              {name && (
                 <p className="text-[13px] leading-tight font-medium text-foreground">
-                  {p.name}
+                  {name}
                 </p>
               )}
-              {p?.email && (
-                <p className="text-[12px] text-muted-foreground">{p.email}</p>
+              {email && (
+                <p className="text-[12px] text-muted-foreground">{email}</p>
               )}
             </div>
             <DropdownMenuSeparator />

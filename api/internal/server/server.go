@@ -1,36 +1,32 @@
-// Package server is the HTTP layer: the chi router, middleware, and handlers
-// that expose the API over the auth and database packages.
+// Package server is the HTTP layer: the chi router and middleware, the Connect
+// API (design-doc 0006), and the plain operational handlers, over the auth and
+// database packages.
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
+
 	"api/internal/auth"
 	"api/internal/database"
 )
 
-// authenticator is the slice of the auth layer the server depends on: protecting
-// routes and resolving the caller's identity. A small interface so handlers can
-// be tested with a stub. *auth.Authenticator satisfies it.
-type authenticator interface {
-	Middleware(http.Handler) http.Handler
-	Identity(context.Context, *http.Request) (auth.Identity, error)
-}
-
 type Server struct {
 	port int
 
-	db   database.Service
-	auth authenticator
+	db       database.Service
+	auth     authenticator
+	validate connect.Interceptor // protovalidate, built once
 }
 
-// NewServer wires the API: database, auth, and routes. Returns an error rather
-// than fatally exiting so the caller (main) owns process lifecycle.
+// NewServer wires the API: database, auth, validation, and routes. Returns an
+// error rather than fatally exiting so the caller (main) owns process lifecycle.
 func NewServer() (*http.Server, error) {
 	port := 8080
 	if v := os.Getenv("HIVEBOOK_API_PORT"); v != "" {
@@ -54,6 +50,9 @@ func NewServer() (*http.Server, error) {
 			os.Getenv("HIVEBOOK_OIDC_AUDIENCE"),
 			os.Getenv("HIVEBOOK_OIDC_CA_FILE"),
 		),
+		// protovalidate runs the CEL field constraints declared on the proto,
+		// before any handler.
+		validate: validate.NewInterceptor(),
 	}
 
 	return &http.Server{

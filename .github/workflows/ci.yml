@@ -1,5 +1,7 @@
-# Thin dispatcher. All check logic lives in the Dagger module (.dagger/), so this
-# file stays a few lines and the pipeline runs identically here and via `just check`.
+# Thin dispatcher. The check logic lives in the Dagger module (.dagger/), so the
+# pipeline runs identically here and via `just check`. The one exception is the
+# proto breaking-change gate: it needs git history, which the hermetic Dagger
+# context deliberately excludes, so it runs as its own job here (design-doc 0006).
 name: ci
 
 on:
@@ -22,3 +24,19 @@ jobs:
         run: curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION=0.21.4 BIN_DIR=/usr/local/bin sh
       - name: Run checks
         run: dagger call check
+
+  # Proto breaking-change detection against the PR base. Lives here, not in
+  # Dagger, because it needs the base branch's git history.
+  proto-breaking:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.70.0"
+      - name: Check for breaking changes
+        run: buf breaking --against ".git#branch=${{ github.event.pull_request.base.ref }}"

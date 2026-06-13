@@ -34,11 +34,26 @@ var (
 		Name: "hivebook_web_events_total",
 		Help: "Total web (browser) telemetry events received, by type.",
 	}, []string{"type"})
+
+	// Per-RPC metrics, recorded by the Connect metrics interceptor. The HTTP
+	// middleware can't see individual RPCs — the chi mount collapses them all to
+	// one wildcard route — so per-procedure latency and error rate live here.
+	rpcRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "hivebook_rpc_requests_total",
+		Help: "Total Connect RPCs handled, by procedure and result code.",
+	}, []string{"procedure", "code"})
+
+	rpcDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "hivebook_rpc_request_duration_seconds",
+		Help:    "Connect RPC latency in seconds, by procedure.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"procedure"})
 )
 
-// metricsMiddleware records request count and latency. The matched chi route
-// pattern (e.g. "/api/me") is the label, which keeps cardinality bounded even
-// under path parameters.
+// metricsMiddleware records HTTP request count and latency, labelled by the
+// matched chi route pattern (so cardinality stays bounded). For the mounted
+// Connect handler that pattern is a single wildcard — per-procedure RPC metrics
+// come from the Connect interceptor instead (rpcRequests / rpcDuration).
 func metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

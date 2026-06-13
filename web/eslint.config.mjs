@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated Connect/protobuf code — owned by buf, not hand-edited (it must
+    // still typecheck, so it is not excluded from tsc).
+    "lib/gen/**",
   ]),
 ])
 

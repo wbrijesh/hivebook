@@ -47,6 +47,10 @@
 * xref:adrs/0016-configuration-layering.adoc[0016 · Configuration layering]
 * xref:adrs/0017-schema-migrations-golang-migrate.adoc[0017 · Migrations via golang-migrate]
 * xref:adrs/0018-sqlc-query-package.adoc[0018 · sqlc query package]
+* xref:adrs/0019-connect-api-layer.adoc[0019 · Connect API layer]
+* xref:adrs/0020-proto-first-contract-buf.adoc[0020 · Proto-first contract (buf)]
+* xref:adrs/0021-protovalidate-field-rules.adoc[0021 · protovalidate field rules]
+* xref:adrs/0022-connect-error-model.adoc[0022 · Connect error model]
 * xref:adrs/0000-template.adoc[Template]
 
 .Standards

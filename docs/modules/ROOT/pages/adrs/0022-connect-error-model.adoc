@@ -1,0 +1,42 @@
+= 0022 — Connect error model supersedes the REST error shape
+:adr-id: 0022
+:status: accepted
+:date: 2026-06-12
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0006-api-transport-and-contract.adoc
+
+== Context
+
+The REST API rejected with `http.Error` + an HTTP status code, codified in
+xref:ROOT:standards/go/errors.adoc[standards/go/errors]. Connect
+(xref:ROOT:adrs/0019-connect-api-layer.adoc[ADR-0019]) carries its own status
+codes end to end, and the generated client raises them as a typed `ConnectError`.
+
+== Decision
+
+For the Connect API, Connect error codes replace HTTP status codes. Handlers
+return `connect.NewError(code, …)` with a factual, lowercase message and no
+internal detail. The mapping is fixed: identity failure → `CodeUnauthenticated`;
+auth provider not ready → `CodeUnavailable`; field-rule violation →
+`CodeInvalidArgument` (from protovalidate,
+xref:ROOT:adrs/0021-protovalidate-field-rules.adoc[ADR-0021]); region write-once →
+`CodeFailedPrecondition`; unexpected → `CodeInternal`. The web treats only
+`CodeUnauthenticated`/`CodePermissionDenied` as session-ending; everything else
+is retryable. `standards/go/errors` is rewritten to document this; the plain
+operational handlers (`/health`, `/metrics`, `/events`) keep returning HTTP
+status codes.
+
+== Alternatives considered
+
+* *Keep HTTP status codes over Connect* — fights the framework; the client
+surfaces Connect codes regardless, so a second scheme would only confuse.
+* *Custom error envelope in the message body* — re-invents what the Connect code
++ message already give, and isn't typed on the client.
+
+== Consequences
+
+One error model for the API, typed on both ends; the web's session policy keys
+off the code rather than guessing from a status. `standards/go/errors` changes —
+a standards edit, not a no-op. Two error surfaces coexist by design: Connect
+codes for RPCs, HTTP status for the plain operational endpoints.

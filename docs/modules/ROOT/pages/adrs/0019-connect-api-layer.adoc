@@ -1,0 +1,42 @@
+= 0019 — Connect is the API layer
+:adr-id: 0019
+:status: accepted
+:date: 2026-06-12
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0006-api-transport-and-contract.adoc
+
+== Context
+
+The API was REST/JSON with hand-written request/response structs on the Go side
+and hand-written types on the web side — two mirrors that drift the moment a
+second consumer exists. We want one contract that works from the browser *and*
+service-to-service, without standing up a translating proxy.
+
+== Decision
+
+*Connect* (connectrpc.com) is the API layer for both the browser and future
+service-to-service calls. The Connect service mounts as an `http.Handler` on the
+existing chi mux; the current middleware (request-id, structured log, metrics,
+CORS) keeps wrapping it, and `/health`, `/metrics`, and `/events` stay as plain
+handlers alongside it. The browser uses the Connect protocol over `fetch`; future
+Go services get real gRPC — one handler serves all three protocols.
+
+== Alternatives considered
+
+* *Raw gRPC* — no browser support without an Envoy/grpc-web proxy as standing
+infrastructure. Connect gives gRPC *and* the browser with no proxy.
+* *gRPC-Web + proxy* — works in the browser but needs the translating proxy
+Connect subsumes.
+* *REST + OpenAPI codegen* — a second contract runtime separate from any future
+gRPC, with a weaker Go server-codegen story.
+* *Stay REST with hand-written DTOs* — the status quo this replaces; types and
+validation are dual-maintained and drift.
+
+== Consequences
+
+The API is RPC-shaped (`POST /hivebook.tenant.v1.TenantService/GetSession`), not
+RESTful resource URLs — fine internally; a public REST surface later needs
+transcoding. The HTTP middleware and observability investment carry over
+unchanged. New deps enter the Go and web builds (Connect runtimes + the buf
+toolchain, xref:ROOT:adrs/0020-proto-first-contract-buf.adoc[ADR-0020]).

@@ -1,6 +1,6 @@
 = Frontend · State Management
-:status: draft
-:last-reviewed: 2026-06-06
+:status: living
+:last-reviewed: 2026-06-12
 
 Keep client state small; let the server and the URL hold most of it.
 
@@ -24,12 +24,6 @@ args; there is no runtime config endpoint.
 
 == Data fetching
 
-Server state flows through one API layer + TanStack Query — see
-xref:ROOT:standards/frontend/data-fetching.adoc[].
-
-[NOTE]
-====
-Interim, pre-Connect: the only fetch layer today is `lib/tenant.ts`. The
-generated-client rules in data-fetching are the target, landing with
-xref:ROOT:design-docs/0006-api-transport-and-contract.adoc[design-doc 0006].
-====
+Server state flows through the generated Connect client + TanStack Query — see
+xref:ROOT:standards/frontend/data-fetching.adoc[]. The one read is `useSession()`
+(`lib/session.ts`); writes are generated `useMutation` hooks.

@@ -5,7 +5,8 @@ import * as React from "react"
 // Carries the user's answers across the onboarding steps so the flow feels
 // continuous (e.g. the org name set on step 1 reads back on the summary). Lives
 // in the onboarding layout, which persists across step navigations. Resets on a
-// hard refresh — fine, because the layout re-seeds it from GET /api/tenant.
+// hard refresh — fine, because the layout re-seeds it from the session
+// (getSession, via useSession).
 type OnboardingState = {
   orgName: string
   orgSize: string | null

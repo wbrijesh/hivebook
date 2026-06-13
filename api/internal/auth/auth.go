@@ -36,10 +36,6 @@ var verifications = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Token verification outcomes on protected routes.",
 }, []string{"result"})
 
-type ctxKey int
-
-const claimsKey ctxKey = iota
-
 // Authenticator holds the lazily-initialised token verifier.
 type Authenticator struct {
 	issuer   string
@@ -103,44 +99,62 @@ func (a *Authenticator) discover(hc *http.Client) {
 	}
 }
 
-// Middleware verifies the bearer access token and stores its claims in the
-// request context. Unauthenticated or invalid requests are rejected.
-func (a *Authenticator) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		v := a.verifier.Load()
-		if v == nil {
-			verifications.WithLabelValues("not_ready").Inc()
-			http.Error(w, "auth provider not ready", http.StatusServiceUnavailable)
-			return
-		}
-		raw, err := bearerToken(r)
-		if err != nil {
-			verifications.WithLabelValues("missing").Inc()
-			http.Error(w, "missing or malformed authorization header", http.StatusUnauthorized)
-			return
-		}
-		tok, err := v.Verify(r.Context(), raw)
-		if err != nil {
-			verifications.WithLabelValues("invalid").Inc()
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
-		var claims map[string]any
-		if err := tok.Claims(&claims); err != nil {
-			verifications.WithLabelValues("invalid").Inc()
-			http.Error(w, "cannot parse claims", http.StatusUnauthorized)
-			return
-		}
-		verifications.WithLabelValues("ok").Inc()
-		ctx := context.WithValue(r.Context(), claimsKey, claims)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// Sentinel errors from Authenticate, mapped to transport codes by the caller
+// (the Connect auth interceptor maps them to CodeUnavailable / CodeUnauthenticated).
+var (
+	// ErrProviderNotReady means OIDC discovery hasn't completed yet — transient.
+	ErrProviderNotReady = errors.New("auth provider not ready")
+	// ErrUnauthenticated means no usable identity: missing/malformed/invalid
+	// token, or a verified token with no resolvable organization.
+	ErrUnauthenticated = errors.New("unauthenticated")
+)
+
+// Authenticate verifies the bearer token from an Authorization header value and
+// resolves the caller's identity. Transport-neutral: it takes the raw header so
+// the same path serves the Connect interceptor and any future caller. Returns
+// ErrProviderNotReady or ErrUnauthenticated; never leaks token detail.
+func (a *Authenticator) Authenticate(ctx context.Context, authzHeader string) (Identity, error) {
+	v := a.verifier.Load()
+	if v == nil {
+		verifications.WithLabelValues("not_ready").Inc()
+		return Identity{}, ErrProviderNotReady
+	}
+	raw, err := bearerFromHeader(authzHeader)
+	if err != nil {
+		verifications.WithLabelValues("missing").Inc()
+		return Identity{}, ErrUnauthenticated
+	}
+	tok, err := v.Verify(ctx, raw)
+	if err != nil {
+		verifications.WithLabelValues("invalid").Inc()
+		return Identity{}, ErrUnauthenticated
+	}
+	var claims map[string]any
+	if err := tok.Claims(&claims); err != nil {
+		verifications.WithLabelValues("invalid").Inc()
+		return Identity{}, ErrUnauthenticated
+	}
+	id, err := a.resolveIdentity(ctx, claims, raw)
+	if err != nil {
+		verifications.WithLabelValues("invalid").Inc()
+		return Identity{}, ErrUnauthenticated
+	}
+	verifications.WithLabelValues("ok").Inc()
+	return id, nil
 }
 
-// Claims returns the verified token claims stored by Middleware.
-func Claims(r *http.Request) (map[string]any, bool) {
-	c, ok := r.Context().Value(claimsKey).(map[string]any)
-	return c, ok
+type identityCtxKey struct{}
+
+// ContextWithIdentity carries the resolved caller down to the handler; the
+// interceptor sets it, handlers read it with IdentityFromContext.
+func ContextWithIdentity(ctx context.Context, id Identity) context.Context {
+	return context.WithValue(ctx, identityCtxKey{}, id)
+}
+
+// IdentityFromContext returns the caller resolved by the auth interceptor.
+func IdentityFromContext(ctx context.Context) (Identity, bool) {
+	id, ok := ctx.Value(identityCtxKey{}).(Identity)
+	return id, ok
 }
 
 // Identity is the caller's resolved profile: who they are (sub/name/email) and
@@ -178,12 +192,11 @@ func nameFromClaims(m map[string]any) string {
 	return strClaim(m, "preferred_username")
 }
 
-// Identity resolves the caller's profile and organization. It prefers the token
-// claims, and otherwise fetches them from the userinfo endpoint — ZITADEL's
+// resolveIdentity resolves the caller's profile and organization from the
+// verified token claims, falling back to the userinfo endpoint — ZITADEL's
 // access tokens are minimal, exposing name/email and the resource-owner org only
 // at userinfo (and only with the scopes the web app requests). Cached per user.
-func (a *Authenticator) Identity(ctx context.Context, r *http.Request) (Identity, error) {
-	claims, _ := Claims(r)
+func (a *Authenticator) resolveIdentity(ctx context.Context, claims map[string]any, raw string) (Identity, error) {
 	sub, _ := claims["sub"].(string)
 
 	if sub != "" {
@@ -201,7 +214,7 @@ func (a *Authenticator) Identity(ctx context.Context, r *http.Request) (Identity
 
 	// Fill any gaps from userinfo (one call covers org, name and email).
 	if id.Org == "" || id.Name == "" || id.Email == "" {
-		info, err := a.userInfo(ctx, r)
+		info, err := a.userInfo(ctx, raw)
 		if err != nil {
 			return Identity{}, err
 		}
@@ -225,15 +238,11 @@ func (a *Authenticator) Identity(ctx context.Context, r *http.Request) (Identity
 	return id, nil
 }
 
-// userInfo calls the issuer's userinfo endpoint with the request's bearer token.
-func (a *Authenticator) userInfo(ctx context.Context, r *http.Request) (map[string]any, error) {
+// userInfo calls the issuer's userinfo endpoint with the caller's bearer token.
+func (a *Authenticator) userInfo(ctx context.Context, raw string) (map[string]any, error) {
 	p := a.provider.Load()
 	if p == nil {
 		return nil, errors.New("auth provider not ready")
-	}
-	raw, err := bearerToken(r)
-	if err != nil {
-		return nil, err
 	}
 	ui, err := p.UserInfo(oidc.ClientContext(ctx, a.hc),
 		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: raw}))
@@ -247,12 +256,13 @@ func (a *Authenticator) userInfo(ctx context.Context, r *http.Request) (map[stri
 	return info, nil
 }
 
-func bearerToken(r *http.Request) (string, error) {
-	h := r.Header.Get("Authorization")
-	if h == "" {
+// bearerFromHeader extracts the token from an "Authorization: Bearer <token>"
+// header value.
+func bearerFromHeader(authz string) (string, error) {
+	if authz == "" {
 		return "", errors.New("missing Authorization header")
 	}
-	parts := strings.SplitN(h, " ", 2)
+	parts := strings.SplitN(authz, " ", 2)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
 		return "", errors.New("malformed Authorization header")
 	}

@@ -1,12 +1,13 @@
 "use client"
 
-import * as React from "react"
 import { useRouter } from "next/navigation"
+import { useMutation } from "@connectrpc/connect-query"
+import { useQueryClient } from "@tanstack/react-query"
 
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell"
 import { Button } from "@/components/ui/button"
 import { useOnboardingFlow } from "@/components/onboarding/onboarding-flow"
-import { submitOnboarding } from "@/lib/tenant"
+import { completeOnboarding } from "@/lib/gen/hivebook/tenant/v1/tenant-TenantService_connectquery"
 import { track } from "@/lib/telemetry"
 
 // What comes after setup. None of these are built yet, so they're shown as a
@@ -28,18 +29,21 @@ const NEXT = [
 
 export default function CompletePage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { orgName, orgSize, useCases, useCaseOther, region } =
     useOnboardingFlow()
-  const [submitting, setSubmitting] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
 
-  // Persist the answers, mark the tenant onboarded, then enter the app. The gate
-  // (AppGate) sees the onboarded tenant and lets the shell render.
+  // The write goes through the generated mutation; on success we invalidate the
+  // session so the gate (AppGate) re-reads an onboarded tenant and lets the shell
+  // render. Field rules and region write-once are enforced server-side and come
+  // back as a typed ConnectError (design-doc 0006).
+  const { mutateAsync, isPending, error } = useMutation(completeOnboarding, {
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+
   async function finish() {
-    setSubmitting(true)
-    setError(null)
     try {
-      await submitOnboarding({
+      await mutateAsync({
         name: orgName,
         size: orgSize ?? "",
         region,
@@ -49,9 +53,8 @@ export default function CompletePage() {
       })
       track("onboarding_complete", { areas: useCases.length, region })
       router.push("/book")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setSubmitting(false)
+    } catch {
+      // Surfaced below via the mutation's `error`.
     }
   }
 
@@ -62,9 +65,9 @@ export default function CompletePage() {
           size="xl"
           className="px-6"
           onClick={finish}
-          disabled={submitting}
+          disabled={isPending}
         >
-          {submitting ? "Setting up…" : "Open your workspace"}
+          {isPending ? "Setting up…" : "Open your workspace"}
         </Button>
       }
     >
@@ -79,7 +82,7 @@ export default function CompletePage() {
 
         {error && (
           <p role="alert" className="text-[13px] text-destructive">
-            {error}
+            {error.rawMessage}
           </p>
         )}
 

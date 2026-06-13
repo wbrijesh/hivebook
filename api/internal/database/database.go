@@ -19,6 +19,9 @@ import (
 )
 
 // Connection-pool tuning and the startup migration window (constants-first, ADR-0011).
+// maxIdle == maxOpen keeps the pool warm — no connect/teardown churn under bursty
+// load — at the cost of holding up to maxOpen idle connections; sized for the API's
+// modest concurrency, with lifetime/idle caps so stale connections still recycle.
 const (
 	maxOpenConns    = 25
 	maxIdleConns    = 25
@@ -112,22 +115,16 @@ func New(cfg Config) (Service, error) {
 	db.SetConnMaxLifetime(connMaxLifetime)
 	db.SetConnMaxIdleTime(connMaxIdleTime)
 
-	s := &service{db: db, q: gen.New(db)}
-
+	// Apply migrations on a separate short-lived connection (not the app pool),
+	// retrying within a bounded window since Postgres may not be up yet.
 	ctx, cancel := context.WithTimeout(context.Background(), migrateTimeout)
 	defer cancel()
-	for {
-		if err := s.migrate(); err == nil {
-			break
-		} else if ctx.Err() != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("migrate: %w", err)
-		} else {
-			slog.Warn("db_migrate_retry", "error", err.Error())
-			time.Sleep(2 * time.Second)
-		}
+	if err := migrateWithRetry(ctx, cfg); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
-	return s, nil
+
+	return &service{db: db, q: gen.New(db)}, nil
 }
 
 // Health pings the database and reports pool stats. "status" is "up" or "down";
