@@ -76,6 +76,10 @@ Not a robot, not a friend.
 * Errors are factual and actionable, never apologetic-cute.
 * Address a competent adult. Don’t over-explain the obvious.
 * Prefer verbs and specifics over reassurance.
+* Don’t name the product in UI copy. The reader knows what app they’re in —
+  repeating "`Hivebook`" through labels and descriptions reads as marketing, not
+  product. Say "`sync`", not "`Hivebook syncs`". Reserve the name for first-touch
+  surfaces (sign-in, the logo, page metadata), never sprinkled through everyday copy.
 
 [width="100%",cols="50%,50%",options="header",]
 |===
@@ -84,6 +88,7 @@ Not a robot, not a friend.
 |"`Welcome back! 🎉 Great to see you.`" |"`Sign in or create your account.`"
 |"`We’re sending a magic link your way…`" |"`Enter the 6-digit code we sent to you@company.com.`"
 |"`Awesome, your workspace is all set up!`" |"`Your workspace is ready.`"
+|"`Choose which projects Hivebook should sync.`" |"`Choose which projects to sync.`"
 |===
 
 == Visual system

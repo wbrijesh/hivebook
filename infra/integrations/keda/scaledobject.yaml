@@ -1,0 +1,43 @@
+# KEDA autoscaling for the Temporal sync worker (ADR-0030, design-doc 0012). The
+# worker scales 0→N off the *Temporal task-queue backlog* — the total count of
+# pending tasks across the connection control queue and every per-connector sync
+# queue, exported as `hivebook_temporal_backlog` by the always-on integrations
+# server's exporter (NOT by the worker — the worker is scaled to zero).
+#
+# WHY this metric (and not the old River `available + running` job-count query):
+# the River query read the worker's own queue table, which sat at zero precisely
+# when no worker was running to claim jobs — a triggered sync enqueued work but the
+# scale signal stayed flat, so KEDA never woke a worker. Classic scale-to-zero
+# deadlock. The Temporal backlog is a SERVER-side gauge (the frontend's pending
+# task count via DescribeTaskQueue): it goes non-zero the instant a sync is signalled,
+# with zero workers running. That property is what lets KEDA scale up from zero.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: integrations-worker
+  namespace: hivebook
+  labels:
+    app: integrations-worker
+spec:
+  scaleTargetRef:
+    name: integrations-worker # the Deployment in worker.yaml
+  minReplicaCount: 0 # scale fully to zero when the backlog drains
+  maxReplicaCount: 5
+  pollingInterval: 15 # seconds — match the server exporter's refresh cadence
+  cooldownPeriod: 120 # seconds idle at zero backlog before scaling back to 0
+  triggers:
+    - type: prometheus
+      metricType: AverageValue
+      metadata:
+        # VictoriaMetrics single, Prometheus-compatible query API. VM serves
+        # /api/v1/query at the root, so no /prometheus suffix is needed here.
+        # Phase-7 live run: confirm the path — if KEDA logs a 404, switch to
+        # http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc.cluster.local:8428/prometheus
+        serverAddress: http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc.cluster.local:8428
+        # Total pending Temporal tasks across all queues. Non-zero with zero workers,
+        # so a triggered sync scales the worker up from zero.
+        query: sum(hivebook_temporal_backlog)
+        # ~5 pending tasks per worker replica; KEDA adds replicas as the backlog grows.
+        threshold: "5"
+        # An empty/absent series (no sync ever run) must read as 0 backlog, not error.
+        ignoreNullValues: "true"

@@ -1,0 +1,48 @@
+= 0030 — Sync workers are a separate KEDA-scaled, scale-to-zero deployment
+:adr-id: 0030
+:status: superseded
+:date: 2026-06-14
+:supersedes:
+:superseded-by: adrs/0034-temporal-sync-orchestrator.adoc
+:related-design-doc: design-docs/0010-connector-sync-jobs.adoc
+
+[NOTE]
+====
+*Superseded by xref:ROOT:adrs/0034-temporal-sync-orchestrator.adoc[ADR-0034]* — workers
+remain a separate, KEDA-scaled, scale-to-zero deployment, but they are Temporal workers
+scaled on task-queue backlog, not River workers scaled on queue depth (whose
+`available`+`running` query caused the scale-to-zero deadlock — see
+xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012]).
+====
+
+== Context
+
+With sync on a durable queue (xref:ROOT:adrs/0028-river-job-queue.adoc[ADR-0028]),
+the work can be drained by any number of stateless workers. The integrations
+Connect server (request/response, latency-sensitive) and the sync workers
+(throughput, bursty, idle much of the time) have different scaling and failure
+profiles, and sync load is spiky — flat-out during a backfill, nothing between
+incremental passes.
+
+== Decision
+
+Sync runs in a *separate `integrations-worker` Deployment*, distinct from the
+integrations Connect server: the server only enqueues jobs, workers only drain
+them. *KEDA* scales the worker Deployment on the available-job count (its Postgres
+scaler), *to zero* when the queue is empty. River leases make workers crash-safe,
+so scaling — including to and from zero — is safe.
+
+== Alternatives considered
+
+* *Run workers in the Connect server pod* — couples two different scaling profiles;
+a backfill burst would contend with API latency, and the API can't scale to zero.
+* *A fixed worker pool (HPA on CPU)* — wastes capacity while idle (no scale-to-zero)
+and reacts to CPU rather than the real signal, queue depth.
+
+== Consequences
+
+Workers scale with actual backlog and cost nothing when idle. The server and
+workers evolve and scale independently. The trade is KEDA as a dependency and
+cold-start latency on the first job after idle — acceptable for a background
+pipeline. Workers must stay stateless and idempotent (already true: jobs are
+durable and artifacts are content-hash idempotent).

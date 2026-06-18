@@ -65,6 +65,22 @@ const onboard = useMutation(completeOnboarding, {
 })
 ----
 
+== Server streams
+
+Connect-Query has no hook for server-streaming RPCs, so a stream is the one
+sanctioned exception to "TanStack Query owns server state". Build a raw client
+from the shared transport and consume the async iterable in a single, contained
+hook under `lib/api/` — never inline in a component.
+
+* *Reuse the shared transport.* `createClient(Service, transport)` — same token
+and renew interceptors as every other call. Don't build a second transport.
+* *One hook, fully owned.* The hook holds the `useEffect`, the `AbortController`
+(abort on unmount), and a reconnect-with-backoff loop. The server re-sends a full
+snapshot on (re)subscribe, so a dropped stream self-heals. See
+`lib/api/use-connections-stream.ts` (backs the live sync status on Sources).
+* *Snapshots, not deltas.* Stream a full snapshot per change and replace state
+wholesale; the client never reassembles diffs.
+
 == Boundaries
 
 * *Fire-and-forget telemetry is not server state.* `track()`

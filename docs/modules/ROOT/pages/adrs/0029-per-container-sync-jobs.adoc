@@ -1,0 +1,45 @@
+= 0029 — Sync is per-container, with per-container watermarks
+:adr-id: 0029
+:status: superseded
+:date: 2026-06-14
+:supersedes:
+:superseded-by: adrs/0035-connector-defined-sync-units.adoc
+:related-design-doc: design-docs/0010-connector-sync-jobs.adoc
+
+[NOTE]
+====
+*Superseded by xref:ROOT:adrs/0035-connector-defined-sync-units.adoc[ADR-0035]* — the
+per-container *isolation and delta* survive, but the unit is now connector-defined and
+orchestration scales `O(connections)`, not per-container River jobs
+(xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012]).
+====
+
+== Context
+
+The v0.1 sync ran a whole connection in one unit with a single shared watermark.
+That loses data (one cursor across many containers skips items in quieter ones),
+has no failure isolation (a deleted GitHub repo's 404 fails and re-walks the
+entire connection), and offers no parallelism (one connection pins one worker).
+
+== Decision
+
+The unit of sync work is a *container* (a Drive folder, a GitHub repo), not a
+connection. A cheap `DiscoverConnection` job lists a connection's containers and
+fans out one `SyncContainer` job per container; each `SyncContainer` syncs from
+its own per-`(connection, container)` watermark. Cursors advance with `>=` plus
+content-hash dedup so boundary items aren't dropped.
+
+== Alternatives considered
+
+* *One job per connection* — a single failing container fails and retries the
+whole connection (re-walking everything), one shared cursor loses data, and a
+connection can't be parallelized across workers.
+* *One job per artifact* — maximal isolation but enormous job volume and
+per-artifact overhead; the container is the natural retry/cursor boundary.
+
+== Consequences
+
+A broken or slow container fails, retries, and DLQs in isolation; containers sync
+in parallel across workers; and each keeps its own cursor, so nothing is skipped.
+The cost is a discovery step per connection and more jobs in flight (bounded by
+container count), plus per-container watermark rows.

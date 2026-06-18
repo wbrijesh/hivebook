@@ -143,6 +143,14 @@ keeps a real boundary; splitting to a separate instance later is trivial.
 
 === Sync — deliberately minimal
 
+[NOTE]
+====
+*Superseded by xref:ROOT:design-docs/0010-connector-sync-jobs.adoc[design-doc 0010].*
+The in-process loop below was the v0.1 starting point; productionizing replaces it
+with a durable River job queue, per-container jobs, and KEDA-scaled workers. The
+rest of this doc (service shape, topology, OAuth, data model) still holds.
+====
+
 An in-process periodic loop: a scheduler scans connections *due* for sync
 (interval elapsed, or `sync_requested_at` set), runs each connector's `Sync` from
 its watermark, writes raw → object storage + manifests → DB, and advances the

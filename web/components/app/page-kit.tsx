@@ -5,30 +5,29 @@ import { cn } from "@/lib/utils"
 // Shared building blocks for the application surfaces. Server-safe (no hooks) so
 // any page can compose them.
 
+// PageShell is full-width — no centered max-width container. The work area uses
+// the whole pane (tables/lists earn the space on big displays); content that needs
+// a comfortable measure (forms, prose) constrains itself, not the page. Padding is
+// responsive so it stays sensible on small screens.
 export function PageShell({
   children,
-  width = "wide",
   className,
 }: {
   children: ReactNode
-  width?: "wide" | "reading"
   className?: string
 }) {
   return (
     <div className="h-full overflow-y-auto">
-      <div
-        className={cn(
-          "mx-auto px-8 py-7",
-          width === "wide" ? "max-w-[1100px]" : "max-w-[760px]",
-          className
-        )}
-      >
+      <div className={cn("w-full px-4 py-6 sm:px-6", className)}>
         {children}
       </div>
     </div>
   )
 }
 
+// Page-level actions don't live here — they go in the application chrome (the
+// context bar, left of search) via ChromeActions, so the page body stays content
+// only. PageHeading is title + description.
 export function PageHeading({
   title,
   description,

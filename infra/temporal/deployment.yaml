@@ -1,0 +1,81 @@
+# Temporal for local dev: the all-in-one dev server (`temporal server start-dev`),
+# the durable backbone for sync orchestration (design-doc 0012, ADR-0034). The
+# dev server is in-memory (no external DB), self-setups the namespace, and bundles
+# the Web UI — ideal for local; production swaps in a real cluster / Temporal Cloud.
+#
+# In-memory means state is lost on pod restart. That is acceptable locally: the
+# sync_unit table is the resumption state, so a restarted dev server re-discovers
+# and resumes — workflow history is not the source of truth (design-doc 0012).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal
+  namespace: hivebook
+  labels:
+    app: temporal
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: the dev server is in-memory and single-instance,
+  # so two pods would be two divergent clusters. Tear the old one down first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: temporal
+  template:
+    metadata:
+      labels:
+        app: temporal
+    spec:
+      # The official image runs as uid 1000 (temporal). Pin it and harden.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: temporal
+          # Pinned: the CLI image ships `temporal server start-dev`.
+          image: temporalio/temporal:1.7.2
+          args:
+            - server
+            - start-dev
+            # Bind the frontend gRPC to all interfaces so the ClusterIP Service
+            # can reach it from other pods.
+            - --ip
+            - 0.0.0.0
+            # Bind the Web UI to all interfaces too (defaults to --ip otherwise,
+            # but stated explicitly so the UI Service reaches it).
+            - --ui-ip
+            - 0.0.0.0
+            # Pre-create the namespace the workers and client expect ("default"
+            # is always created too).
+            - --namespace
+            - hivebook
+            - --port
+            - "7233"
+            - --ui-port
+            - "8233"
+          ports:
+            - name: frontend
+              containerPort: 7233
+            - name: ui
+              containerPort: 8233
+          # The dev server answers gRPC health on the frontend port once up.
+          readinessProbe:
+            tcpSocket: { port: frontend }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: frontend }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

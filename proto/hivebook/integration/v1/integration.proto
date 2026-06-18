@@ -1,0 +1,236 @@
+syntax = "proto3";
+
+// The integrations API: the connectors a tenant can use, the connections they've
+// authorized, and the actions on them. Served by the integrations service and
+// re-exposed (the user-facing subset) by the API to the frontend (design-doc 0009).
+// The tenant is carried out-of-band — the JWT on the frontend hop, a header on the
+// internal hop — never as a field here.
+package hivebook.integration.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// Connector is our driver for a source type — the thing a tenant can connect.
+message Connector {
+  string id = 1; // stable key, e.g. "gdocs", "github"
+  string name = 2; // display name, e.g. "Google Docs"
+  string archetype = 3; // "document", "record", ... (design-doc 0008)
+}
+
+enum ConnectionStatus {
+  CONNECTION_STATUS_UNSPECIFIED = 0;
+  CONNECTION_STATUS_CONNECTED = 1;
+  CONNECTION_STATUS_SYNCING = 2;
+  CONNECTION_STATUS_ERROR = 3;
+  // The source revoked/expired our credentials beyond refresh — the admin must
+  // reconnect (design-doc 0010). Terminal until re-auth.
+  CONNECTION_STATUS_NEEDS_REAUTH = 4;
+  // A Stop is in flight: jobs are being cancelled and the connection is settling
+  // back to connected (design-doc 0011). Transient.
+  CONNECTION_STATUS_STOPPING = 5;
+}
+
+// Connection is a tenant's authorized link to a source via a connector.
+message Connection {
+  string id = 1;
+  string connector_id = 2;
+  ConnectionStatus status = 3;
+  string account = 4; // the connected account label (email / login)
+  google.protobuf.Timestamp last_synced_at = 5;
+  string last_error = 6;
+  // When the connection's catalog (its projects) was first discovered. Unset means
+  // discovery hasn't finished yet — the post-connect cold-start window; the UI shows a
+  // "discovering your projects…" state rather than a false "no projects" (design-doc 0012).
+  google.protobuf.Timestamp catalog_discovered_at = 7;
+  // True once the user has configured this source (saved a project selection). The
+  // frontend routes a not-onboarded connection to its manage page, an onboarded one to
+  // its details page (design-doc 0012).
+  bool onboarded = 8;
+  // Whether periodic auto-sync is on. When false the connection only syncs on a manual
+  // "Sync now" (the workflow arms no due timer) (design-doc 0012).
+  bool auto_sync_enabled = 9;
+  // The auto-sync cadence in seconds (default 900 = 15 min). Honored only while
+  // auto_sync_enabled is true.
+  int32 sync_interval_seconds = 10;
+}
+
+message ListConnectorsRequest {}
+
+message ListConnectorsResponse {
+  repeated Connector connectors = 1;
+}
+
+message ListConnectionsRequest {}
+
+message ListConnectionsResponse {
+  repeated Connection connections = 1;
+}
+
+message GetAuthorizeUrlRequest {
+  string connector_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetAuthorizeUrlResponse {
+  string url = 1;
+}
+
+message ConnectWithTokenRequest {
+  string connector_id = 1 [(buf.validate.field).string.min_len = 1];
+  string token = 2 [(buf.validate.field).string.min_len = 1];
+  // A human label for this source (e.g. "Work GitHub"); the token owner's login
+  // is used if blank.
+  string name = 3 [(buf.validate.field).string.max_len = 100];
+}
+
+message ConnectWithTokenResponse {
+  Connection connection = 1;
+}
+
+message TriggerSyncRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message TriggerSyncResponse {}
+
+message StopSyncRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message StopSyncResponse {}
+
+message DisconnectRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DisconnectResponse {}
+
+message WatchConnectionsRequest {}
+
+// A fresh snapshot of all the tenant's connections — sent on subscribe and again
+// whenever any of them changes (status, sync progress). The client replaces its
+// list with each snapshot; no diffing.
+message WatchConnectionsResponse {
+  repeated Connection connections = 1;
+}
+
+// Artifact is one synced item's manifest row — the raw bytes live in object
+// storage (design-doc 0008); this is the index the frontend lists.
+message Artifact {
+  string id = 1;
+  string connector_id = 2; // source connector, e.g. "github"
+  string source_native_kind = 3; // e.g. "github_issue", "google_doc"
+  string container_name = 4; // repo / drive / folder it came from
+  string external_id = 5;
+  string source_url = 6; // link back to the source, when known
+  google.protobuf.Timestamp ingested_at = 7;
+  string connection_id = 8; // the connection (source) this item was synced from
+}
+
+message ListArtifactsRequest {
+  uint32 limit = 1 [(buf.validate.field).uint32.lte = 200];
+  uint32 offset = 2;
+  // Optional: scope to one connection's files (the source→files deep link).
+  string connection_id = 3;
+}
+
+message ListArtifactsResponse {
+  repeated Artifact artifacts = 1;
+  uint32 total = 2;
+}
+
+message GetArtifactContentRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// The raw bytes of one artifact, served through our API (never a direct object-
+// storage URL). The frontend renders/downloads this; the URL stays ours.
+message GetArtifactContentResponse {
+  bytes data = 1;
+  string content_type = 2;
+  string filename = 3;
+}
+
+// Project is one selectable sync container of a connection (a GitHub repo). The
+// user picks which to sync in the connector's settings; status reflects the last
+// sync so the UI can show per-project progress.
+message Project {
+  string id = 1; // container id, e.g. "owner/repo"
+  string name = 2;
+  bool selected = 3;
+  string status = 4; // idle | syncing | synced | error
+  google.protobuf.Timestamp last_synced_at = 5;
+  uint32 artifact_count = 6; // items synced so far (the "synced" of synced/total)
+  string last_error = 7;
+  uint32 total_estimate = 8; // best-effort items to sync (the "total"); 0 = unknown
+  google.protobuf.Timestamp total_estimate_at = 9; // when total_estimate was last checked; unset = never
+}
+
+message ListProjectsRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Optional case-insensitive name filter. Empty means no filter — the manage page
+  // sends a debounced query string; the backend filters the projects by name.
+  string query = 2;
+}
+
+message ListProjectsResponse {
+  repeated Project projects = 1;
+}
+
+message SetProjectSelectionRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+  // The full set of selected container ids — selection is replaced wholesale.
+  repeated string selected_ids = 2;
+}
+
+message SetProjectSelectionResponse {}
+
+message UpdateSyncScheduleRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Whether periodic auto-sync is on. When false, interval_seconds is ignored.
+  bool enabled = 2;
+  // The cadence in seconds. Bounds are enforced in the handler (the floor is a
+  // temporary dev value), not buf.validate, so they can change without a proto edit.
+  int32 interval_seconds = 3;
+}
+
+message UpdateSyncScheduleResponse {}
+
+message WatchProjectsRequest {
+  string connection_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message WatchProjectsResponse {
+  repeated Project projects = 1;
+}
+
+// IntegrationService is the user-facing surface: the API serves it to the
+// frontend and proxies to the integrations service's implementation.
+service IntegrationService {
+  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse);
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsResponse);
+  rpc GetAuthorizeUrl(GetAuthorizeUrlRequest) returns (GetAuthorizeUrlResponse);
+  // Connect a token-auth connector (e.g. github_pat) with a user-supplied token —
+  // no OAuth redirect. Gated by the connector's feature flag.
+  rpc ConnectWithToken(ConnectWithTokenRequest) returns (ConnectWithTokenResponse);
+  rpc TriggerSync(TriggerSyncRequest) returns (TriggerSyncResponse);
+  // Stop an in-flight sync for one connection: cancel its queued/running jobs and
+  // settle it back to connected. Already-synced work is kept; a later sync resumes
+  // from each container's watermark (design-doc 0011).
+  rpc StopSync(StopSyncRequest) returns (StopSyncResponse);
+  rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse);
+  // Serve one artifact's bytes through the API (the frontend's View action).
+  rpc GetArtifactContent(GetArtifactContentRequest) returns (GetArtifactContentResponse);
+  // The connection's selectable projects and the user's selection.
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+  rpc SetProjectSelection(SetProjectSelectionRequest) returns (SetProjectSelectionResponse);
+  // Set the connection's auto-sync cadence (on/off + interval). Applied live: the
+  // workflow re-reads it on the next idle entry (design-doc 0012).
+  rpc UpdateSyncSchedule(UpdateSyncScheduleRequest) returns (UpdateSyncScheduleResponse);
+  // Server-streams a connections snapshot on subscribe, then again on every
+  // change. Postgres LISTEN/NOTIFY-backed — event-driven, no polling.
+  rpc WatchConnections(WatchConnectionsRequest) returns (stream WatchConnectionsResponse);
+  // Server-streams per-project status for one connection (same LISTEN/NOTIFY
+  // backing) so the connector view shows live per-project progress.
+  rpc WatchProjects(WatchProjectsRequest) returns (stream WatchProjectsResponse);
+}

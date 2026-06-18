@@ -1,0 +1,74 @@
+# Network isolation for the integrations service (design-doc 0011 P3-8, defence in
+# depth behind the B1 tenant-isolation fix). The RPC server trusts the
+# Hivebook-Tenant-Id header from the API (design-doc 0009), so tenant isolation
+# rests on only the API being able to reach it. These policies restrict ingress:
+#   - server (app: integrations): RPC from the API + metrics from observability
+#   - worker (app: integrations-worker): metrics from observability only (it serves
+#     no tenant-trusting RPC, so nothing else needs to reach it)
+# Egress is left open — integrations must reach Postgres, object storage, GitHub,
+# and Google.
+#
+# IMPORTANT — kubelet probes: both deployments expose readiness/liveness HTTP probes
+# (server on :8080, worker on :8081), executed by the kubelet from the NODE, which
+# matches neither `from` rule.
+# Most CNIs (Cilium/Calico without a host firewall) permit host→pod traffic by
+# default, so probes pass. Under a CNI that ENFORCES host→pod policy, these probes
+# would be denied → NotReady → CrashLoop, for BOTH server and worker. Enforcement
+# needs a policy-aware CNI, which the local OrbStack cluster lacks (so these objects
+# are inert here, correct-for-prod). VERIFY on the first policy-CNI deploy that
+# probes pass; if the CNI enforces host→pod, add a node-CIDR ipBlock ingress on
+# :8080 (or the CNI's probe-allow mechanism) to both policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: integrations-allow-api-only
+  namespace: hivebook
+  labels:
+    app: integrations
+spec:
+  podSelector:
+    matchLabels:
+      app: integrations
+  policyTypes:
+    - Ingress
+  ingress:
+    # The API proxies the user-facing surface to integrations.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api
+      ports:
+        - protocol: TCP
+          port: 8080
+    # vmagent (observability namespace) scrapes /metrics on the same port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: integrations-worker-metrics-only
+  namespace: hivebook
+  labels:
+    app: integrations-worker
+spec:
+  podSelector:
+    matchLabels:
+      app: integrations-worker
+  policyTypes:
+    - Ingress
+  ingress:
+    # The worker polls the Temporal queues and serves no RPC — only /metrics is
+    # scraped, on its own port 8081 (distinct from the server's 8080).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - protocol: TCP
+          port: 8081

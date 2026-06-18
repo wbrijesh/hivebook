@@ -43,6 +43,13 @@ spec:
             - name: HIVEBOOK_OIDC_AUDIENCE
               valueFrom:
                 secretKeyRef: { name: hivebook-oidc, key: PROJECT_ID, optional: true }
+            # Service-account PAT for the ZITADEL management API (the Members
+            # surface). Optional so the pod runs before it's provisioned — Members
+            # then reports "directory not connected". Synced from infra/.env on
+            # `just update api`.
+            - name: HIVEBOOK_ZITADEL_MGMT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: hivebook-oidc, key: MGMT_TOKEN, optional: true }
           volumeMounts:
             - name: oidc-ca
               mountPath: /etc/hivebook/tls

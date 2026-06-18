@@ -25,10 +25,12 @@ export const useCases = [
   { id: "other", label: "Something else" },
 ]
 
+// code is an ISO alpha-2 country code for the region's flag ("EU" → European Union).
 export const regions = [
   {
     id: "us-east",
     country: "United States",
+    code: "US",
     city: "Washington DC",
     label: "us-east",
     recommended: true,
@@ -36,28 +38,51 @@ export const regions = [
   {
     id: "us-west",
     country: "United States",
+    code: "US",
     city: "San Francisco",
     label: "us-west",
   },
   {
     id: "eu-central",
+    // flagpack has no EU flag; Frankfurt is in Germany, so use the German flag.
     country: "European Union",
+    code: "DE",
     city: "Frankfurt",
     label: "eu-central",
   },
   {
     id: "eu-west",
     country: "United Kingdom",
+    code: "GBR",
     city: "London",
     label: "eu-west",
   },
-  { id: "asia-south", country: "India", city: "Mumbai", label: "asia-south" },
-  { id: "asia-east", country: "Japan", city: "Tokyo", label: "asia-east" },
+  {
+    id: "asia-south",
+    country: "India",
+    code: "IN",
+    city: "Mumbai",
+    label: "asia-south",
+  },
+  {
+    id: "asia-east",
+    country: "Japan",
+    code: "JP",
+    city: "Tokyo",
+    label: "asia-east",
+  },
   {
     id: "asia-southeast",
     country: "Singapore",
+    code: "SG",
     city: "Singapore",
     label: "asia-southeast",
   },
-  { id: "oceania", country: "Australia", city: "Sydney", label: "oceania" },
+  {
+    id: "oceania",
+    country: "Australia",
+    code: "AU",
+    city: "Sydney",
+    label: "oceania",
+  },
 ]

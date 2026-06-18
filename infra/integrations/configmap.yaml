@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: integrations-config
+  namespace: hivebook
+data:
+  HIVEBOOK_INTEGRATIONS_PORT: "8080"
+  # The integrations service owns its own database on the shared Postgres instance
+  # (design-doc 0009); same host/user/password as the API, different database.
+  HIVEBOOK_DB_HOST: "postgres"
+  HIVEBOOK_DB_PORT: "5432"
+  HIVEBOOK_DB_DATABASE: "integrations"
+  HIVEBOOK_DB_SCHEMA: "public"
+  # Object storage (RustFS in-cluster; S3 in production — ADR-0024).
+  HIVEBOOK_S3_ENDPOINT: "http://rustfs:9000"
+  HIVEBOOK_S3_REGION: "us-east-1"
+  HIVEBOOK_S3_BUCKET_ENV: "local"
+  # The API hosts the OAuth callback; integrations builds redirect URLs against it.
+  HIVEBOOK_INTEGRATIONS_CALLBACK_BASE: "https://api.hivebook.localhost"
+  # Temporal: the durable sync backbone (design-doc 0012, ADR-0034). The server is
+  # a client (RPC → signals) and the worker polls the task queues; both dial the
+  # in-cluster dev frontend. Namespace is pre-created by the dev server (infra/temporal).
+  HIVEBOOK_TEMPORAL_HOSTPORT: "temporal-frontend.hivebook.svc.cluster.local:7233"
+  HIVEBOOK_TEMPORAL_NAMESPACE: "hivebook"
+  # Tracing is OFF until a collector exists: HIVEBOOK_OTLP_ENDPOINT is left UNSET so
+  # the OTel interceptor is a no-op (internal/temporal/tracing.go). To enable, set e.g.
+  #   HIVEBOOK_OTLP_ENDPOINT: "otel-collector.observability.svc.cluster.local:4317"
+  # Sync concurrency caps (rate-limit guards) — per connector, env-tunable. On Temporal
+  # the cap is the worker's per-queue activity concurrency, not a queue-wide River lease.
+  # The per-(tenant, connector) cap is the real rate-limit guard (a source's limits are
+  # scoped to one token/installation). Set and roll out the worker to throttle a source, e.g.:
+  #   HIVEBOOK_GITHUB_SYNC_CONCURRENCY: "8"
+  #   HIVEBOOK_GITHUB_TENANT_SYNC_CONCURRENCY: "3"

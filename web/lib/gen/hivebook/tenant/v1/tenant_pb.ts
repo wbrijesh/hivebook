@@ -9,13 +9,15 @@
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../../buf/validate/validate_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hivebook/tenant/v1/tenant.proto.
  */
 export const file_hivebook_tenant_v1_tenant: GenFile = /*@__PURE__*/
-  fileDesc("Ch9oaXZlYm9vay90ZW5hbnQvdjEvdGVuYW50LnByb3RvEhJoaXZlYm9vay50ZW5hbnQudjEiLwoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJIsIBCgZUZW5hbnQSCgoCaWQYASABKAkSEQoEbmFtZRgCIAEoCUgAiAEBEhEKBHNpemUYAyABKAlIAYgBARITCgZyZWdpb24YBCABKAlIAogBARIRCgl1c2VfY2FzZXMYBSADKAkSGwoOdXNlX2Nhc2Vfb3RoZXIYBiABKAlIA4gBARIRCglvbmJvYXJkZWQYByABKAhCBwoFX25hbWVCBwoFX3NpemVCCQoHX3JlZ2lvbkIRCg9fdXNlX2Nhc2Vfb3RoZXIiEwoRR2V0U2Vzc2lvblJlcXVlc3QiaAoSR2V0U2Vzc2lvblJlc3BvbnNlEiYKBHVzZXIYASABKAsyGC5oaXZlYm9vay50ZW5hbnQudjEuVXNlchIqCgZ0ZW5hbnQYAiABKAsyGi5oaXZlYm9vay50ZW5hbnQudjEuVGVuYW50IqQBChlDb21wbGV0ZU9uYm9hcmRpbmdSZXF1ZXN0EhkKBnJlZ2lvbhgBIAEoCUIJukgGcgQQARgyEhYKBG5hbWUYAiABKAlCCLpIBXIDGMgBEhUKBHNpemUYAyABKAlCB7pIBHICGDISGwoJdXNlX2Nhc2VzGAQgAygJQgi6SAWSAQIQIBIgCg51c2VfY2FzZV9vdGhlchgFIAEoCUIIukgFcgMY9AMiSAoaQ29tcGxldGVPbmJvYXJkaW5nUmVzcG9uc2USKgoGdGVuYW50GAEgASgLMhouaGl2ZWJvb2sudGVuYW50LnYxLlRlbmFudDLhAQoNVGVuYW50U2VydmljZRJbCgpHZXRTZXNzaW9uEiUuaGl2ZWJvb2sudGVuYW50LnYxLkdldFNlc3Npb25SZXF1ZXN0GiYuaGl2ZWJvb2sudGVuYW50LnYxLkdldFNlc3Npb25SZXNwb25zZRJzChJDb21wbGV0ZU9uYm9hcmRpbmcSLS5oaXZlYm9vay50ZW5hbnQudjEuQ29tcGxldGVPbmJvYXJkaW5nUmVxdWVzdBouLmhpdmVib29rLnRlbmFudC52MS5Db21wbGV0ZU9uYm9hcmRpbmdSZXNwb25zZWIGcHJvdG8z", [file_buf_validate_validate]);
+  fileDesc("Ch9oaXZlYm9vay90ZW5hbnQvdjEvdGVuYW50LnByb3RvEhJoaXZlYm9vay50ZW5hbnQudjEiLwoEVXNlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJIsIBCgZUZW5hbnQSCgoCaWQYASABKAkSEQoEbmFtZRgCIAEoCUgAiAEBEhEKBHNpemUYAyABKAlIAYgBARITCgZyZWdpb24YBCABKAlIAogBARIRCgl1c2VfY2FzZXMYBSADKAkSGwoOdXNlX2Nhc2Vfb3RoZXIYBiABKAlIA4gBARIRCglvbmJvYXJkZWQYByABKAhCBwoFX25hbWVCBwoFX3NpemVCCQoHX3JlZ2lvbkIRCg9fdXNlX2Nhc2Vfb3RoZXIiEwoRR2V0U2Vzc2lvblJlcXVlc3QiaAoSR2V0U2Vzc2lvblJlc3BvbnNlEiYKBHVzZXIYASABKAsyGC5oaXZlYm9vay50ZW5hbnQudjEuVXNlchIqCgZ0ZW5hbnQYAiABKAsyGi5oaXZlYm9vay50ZW5hbnQudjEuVGVuYW50IqQBChlDb21wbGV0ZU9uYm9hcmRpbmdSZXF1ZXN0EhkKBnJlZ2lvbhgBIAEoCUIJukgGcgQQARgyEhYKBG5hbWUYAiABKAlCCLpIBXIDGMgBEhUKBHNpemUYAyABKAlCB7pIBHICGDISGwoJdXNlX2Nhc2VzGAQgAygJQgi6SAWSAQIQIBIgCg51c2VfY2FzZV9vdGhlchgFIAEoCUIIukgFcgMY9AMiSAoaQ29tcGxldGVPbmJvYXJkaW5nUmVzcG9uc2USKgoGdGVuYW50GAEgASgLMhouaGl2ZWJvb2sudGVuYW50LnYxLlRlbmFudCKFAQoTVXBkYXRlVGVuYW50UmVxdWVzdBIYCgRuYW1lGAEgASgJQgq6SAdyBRABGMgBEhUKBHNpemUYAiABKAlCB7pIBHICGDISGwoJdXNlX2Nhc2VzGAMgAygJQgi6SAWSAQIQIBIgCg51c2VfY2FzZV9vdGhlchgEIAEoCUIIukgFcgMY9AMiQgoUVXBkYXRlVGVuYW50UmVzcG9uc2USKgoGdGVuYW50GAEgASgLMhouaGl2ZWJvb2sudGVuYW50LnYxLlRlbmFudCJACgZNZW1iZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRINCgVlbWFpbBgDIAEoCRINCgVyb2xlcxgEIAMoCSIUChJMaXN0TWVtYmVyc1JlcXVlc3QiVgoTTGlzdE1lbWJlcnNSZXNwb25zZRIrCgdtZW1iZXJzGAEgAygLMhouaGl2ZWJvb2sudGVuYW50LnYxLk1lbWJlchISCgpjb25maWd1cmVkGAIgASgIIpABCgpBdWRpdEV2ZW50EgoKAmlkGAEgASgJEi8KC29jY3VycmVkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIQCghhY3Rvcl9pZBgDIAEoCRITCgthY3Rvcl9lbWFpbBgEIAEoCRIOCgZhY3Rpb24YBSABKAkSDgoGdGFyZ2V0GAYgASgJIkwKFkxpc3RBdWRpdEV2ZW50c1JlcXVlc3QSGQoFbGltaXQYASABKAVCCrpIBxoFGMgBKAASFwoGb2Zmc2V0GAIgASgFQge6SAQaAigAIlgKF0xpc3RBdWRpdEV2ZW50c1Jlc3BvbnNlEi4KBmV2ZW50cxgBIAMoCzIeLmhpdmVib29rLnRlbmFudC52MS5BdWRpdEV2ZW50Eg0KBXRvdGFsGAIgASgFIk4KC0ZlYXR1cmVGbGFnEgsKA2tleRgBIAEoCRIMCgRuYW1lGAIgASgJEhMKC2Rlc2NyaXB0aW9uGAMgASgJEg8KB2VuYWJsZWQYBCABKAgiGQoXTGlzdEZlYXR1cmVGbGFnc1JlcXVlc3QiSgoYTGlzdEZlYXR1cmVGbGFnc1Jlc3BvbnNlEi4KBWZsYWdzGAEgAygLMh8uaGl2ZWJvb2sudGVuYW50LnYxLkZlYXR1cmVGbGFnIkAKFVNldEZlYXR1cmVGbGFnUmVxdWVzdBIWCgNrZXkYASABKAlCCbpIBnIEEAEYZBIPCgdlbmFibGVkGAIgASgIIkcKFlNldEZlYXR1cmVGbGFnUmVzcG9uc2USLQoEZmxhZxgBIAEoCzIfLmhpdmVib29rLnRlbmFudC52MS5GZWF0dXJlRmxhZzLoBQoNVGVuYW50U2VydmljZRJbCgpHZXRTZXNzaW9uEiUuaGl2ZWJvb2sudGVuYW50LnYxLkdldFNlc3Npb25SZXF1ZXN0GiYuaGl2ZWJvb2sudGVuYW50LnYxLkdldFNlc3Npb25SZXNwb25zZRJzChJDb21wbGV0ZU9uYm9hcmRpbmcSLS5oaXZlYm9vay50ZW5hbnQudjEuQ29tcGxldGVPbmJvYXJkaW5nUmVxdWVzdBouLmhpdmVib29rLnRlbmFudC52MS5Db21wbGV0ZU9uYm9hcmRpbmdSZXNwb25zZRJhCgxVcGRhdGVUZW5hbnQSJy5oaXZlYm9vay50ZW5hbnQudjEuVXBkYXRlVGVuYW50UmVxdWVzdBooLmhpdmVib29rLnRlbmFudC52MS5VcGRhdGVUZW5hbnRSZXNwb25zZRJeCgtMaXN0TWVtYmVycxImLmhpdmVib29rLnRlbmFudC52MS5MaXN0TWVtYmVyc1JlcXVlc3QaJy5oaXZlYm9vay50ZW5hbnQudjEuTGlzdE1lbWJlcnNSZXNwb25zZRJqCg9MaXN0QXVkaXRFdmVudHMSKi5oaXZlYm9vay50ZW5hbnQudjEuTGlzdEF1ZGl0RXZlbnRzUmVxdWVzdBorLmhpdmVib29rLnRlbmFudC52MS5MaXN0QXVkaXRFdmVudHNSZXNwb25zZRJtChBMaXN0RmVhdHVyZUZsYWdzEisuaGl2ZWJvb2sudGVuYW50LnYxLkxpc3RGZWF0dXJlRmxhZ3NSZXF1ZXN0GiwuaGl2ZWJvb2sudGVuYW50LnYxLkxpc3RGZWF0dXJlRmxhZ3NSZXNwb25zZRJnCg5TZXRGZWF0dXJlRmxhZxIpLmhpdmVib29rLnRlbmFudC52MS5TZXRGZWF0dXJlRmxhZ1JlcXVlc3QaKi5oaXZlYm9vay50ZW5hbnQudjEuU2V0RmVhdHVyZUZsYWdSZXNwb25zZWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * User is the caller's identity, resolved from the OIDC token/userinfo.
@@ -192,6 +194,337 @@ export const CompleteOnboardingResponseSchema: GenMessage<CompleteOnboardingResp
   messageDesc(file_hivebook_tenant_v1_tenant, 5);
 
 /**
+ * UpdateTenantRequest carries the editable workspace profile. Region is absent by
+ * design (write-once, ADR-0014); name is required so the workspace can't be left
+ * nameless.
+ *
+ * @generated from message hivebook.tenant.v1.UpdateTenantRequest
+ */
+export type UpdateTenantRequest = Message<"hivebook.tenant.v1.UpdateTenantRequest"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string size = 2;
+   */
+  size: string;
+
+  /**
+   * @generated from field: repeated string use_cases = 3;
+   */
+  useCases: string[];
+
+  /**
+   * @generated from field: string use_case_other = 4;
+   */
+  useCaseOther: string;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.UpdateTenantRequest.
+ * Use `create(UpdateTenantRequestSchema)` to create a new message.
+ */
+export const UpdateTenantRequestSchema: GenMessage<UpdateTenantRequest> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 6);
+
+/**
+ * @generated from message hivebook.tenant.v1.UpdateTenantResponse
+ */
+export type UpdateTenantResponse = Message<"hivebook.tenant.v1.UpdateTenantResponse"> & {
+  /**
+   * @generated from field: hivebook.tenant.v1.Tenant tenant = 1;
+   */
+  tenant?: Tenant | undefined;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.UpdateTenantResponse.
+ * Use `create(UpdateTenantResponseSchema)` to create a new message.
+ */
+export const UpdateTenantResponseSchema: GenMessage<UpdateTenantResponse> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 7);
+
+/**
+ * Member is one person in the workspace, projected from the identity provider.
+ *
+ * @generated from message hivebook.tenant.v1.Member
+ */
+export type Member = Message<"hivebook.tenant.v1.Member"> & {
+  /**
+   * ZITADEL user id
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * display name (falls back to login name)
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string email = 3;
+   */
+  email: string;
+
+  /**
+   * org roles, e.g. "ORG_OWNER"
+   *
+   * @generated from field: repeated string roles = 4;
+   */
+  roles: string[];
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.Member.
+ * Use `create(MemberSchema)` to create a new message.
+ */
+export const MemberSchema: GenMessage<Member> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 8);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListMembersRequest
+ */
+export type ListMembersRequest = Message<"hivebook.tenant.v1.ListMembersRequest"> & {
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListMembersRequest.
+ * Use `create(ListMembersRequestSchema)` to create a new message.
+ */
+export const ListMembersRequestSchema: GenMessage<ListMembersRequest> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 9);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListMembersResponse
+ */
+export type ListMembersResponse = Message<"hivebook.tenant.v1.ListMembersResponse"> & {
+  /**
+   * @generated from field: repeated hivebook.tenant.v1.Member members = 1;
+   */
+  members: Member[];
+
+  /**
+   * configured is false when the ZITADEL management integration isn't set up; the
+   * members list is empty and the UI shows a setup hint instead of "no members".
+   *
+   * @generated from field: bool configured = 2;
+   */
+  configured: boolean;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListMembersResponse.
+ * Use `create(ListMembersResponseSchema)` to create a new message.
+ */
+export const ListMembersResponseSchema: GenMessage<ListMembersResponse> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 10);
+
+/**
+ * AuditEvent is one recorded privileged action in the workspace.
+ *
+ * @generated from message hivebook.tenant.v1.AuditEvent
+ */
+export type AuditEvent = Message<"hivebook.tenant.v1.AuditEvent"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp occurred_at = 2;
+   */
+  occurredAt?: Timestamp | undefined;
+
+  /**
+   * ZITADEL user id of who acted
+   *
+   * @generated from field: string actor_id = 3;
+   */
+  actorId: string;
+
+  /**
+   * @generated from field: string actor_email = 4;
+   */
+  actorEmail: string;
+
+  /**
+   * stable code, e.g. "tenant.updated", "source.disconnected"
+   *
+   * @generated from field: string action = 5;
+   */
+  action: string;
+
+  /**
+   * human label of the thing acted on
+   *
+   * @generated from field: string target = 6;
+   */
+  target: string;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.AuditEvent.
+ * Use `create(AuditEventSchema)` to create a new message.
+ */
+export const AuditEventSchema: GenMessage<AuditEvent> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 11);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListAuditEventsRequest
+ */
+export type ListAuditEventsRequest = Message<"hivebook.tenant.v1.ListAuditEventsRequest"> & {
+  /**
+   * @generated from field: int32 limit = 1;
+   */
+  limit: number;
+
+  /**
+   * @generated from field: int32 offset = 2;
+   */
+  offset: number;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListAuditEventsRequest.
+ * Use `create(ListAuditEventsRequestSchema)` to create a new message.
+ */
+export const ListAuditEventsRequestSchema: GenMessage<ListAuditEventsRequest> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 12);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListAuditEventsResponse
+ */
+export type ListAuditEventsResponse = Message<"hivebook.tenant.v1.ListAuditEventsResponse"> & {
+  /**
+   * @generated from field: repeated hivebook.tenant.v1.AuditEvent events = 1;
+   */
+  events: AuditEvent[];
+
+  /**
+   * total rows for the tenant, for pagination
+   *
+   * @generated from field: int32 total = 2;
+   */
+  total: number;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListAuditEventsResponse.
+ * Use `create(ListAuditEventsResponseSchema)` to create a new message.
+ */
+export const ListAuditEventsResponseSchema: GenMessage<ListAuditEventsResponse> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 13);
+
+/**
+ * FeatureFlag is one toggleable capability. key/name/description come from the
+ * server-side catalog; enabled is the tenant's effective value (override or default).
+ *
+ * @generated from message hivebook.tenant.v1.FeatureFlag
+ */
+export type FeatureFlag = Message<"hivebook.tenant.v1.FeatureFlag"> & {
+  /**
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string description = 3;
+   */
+  description: string;
+
+  /**
+   * @generated from field: bool enabled = 4;
+   */
+  enabled: boolean;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.FeatureFlag.
+ * Use `create(FeatureFlagSchema)` to create a new message.
+ */
+export const FeatureFlagSchema: GenMessage<FeatureFlag> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 14);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListFeatureFlagsRequest
+ */
+export type ListFeatureFlagsRequest = Message<"hivebook.tenant.v1.ListFeatureFlagsRequest"> & {
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListFeatureFlagsRequest.
+ * Use `create(ListFeatureFlagsRequestSchema)` to create a new message.
+ */
+export const ListFeatureFlagsRequestSchema: GenMessage<ListFeatureFlagsRequest> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 15);
+
+/**
+ * @generated from message hivebook.tenant.v1.ListFeatureFlagsResponse
+ */
+export type ListFeatureFlagsResponse = Message<"hivebook.tenant.v1.ListFeatureFlagsResponse"> & {
+  /**
+   * @generated from field: repeated hivebook.tenant.v1.FeatureFlag flags = 1;
+   */
+  flags: FeatureFlag[];
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.ListFeatureFlagsResponse.
+ * Use `create(ListFeatureFlagsResponseSchema)` to create a new message.
+ */
+export const ListFeatureFlagsResponseSchema: GenMessage<ListFeatureFlagsResponse> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 16);
+
+/**
+ * @generated from message hivebook.tenant.v1.SetFeatureFlagRequest
+ */
+export type SetFeatureFlagRequest = Message<"hivebook.tenant.v1.SetFeatureFlagRequest"> & {
+  /**
+   * @generated from field: string key = 1;
+   */
+  key: string;
+
+  /**
+   * @generated from field: bool enabled = 2;
+   */
+  enabled: boolean;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.SetFeatureFlagRequest.
+ * Use `create(SetFeatureFlagRequestSchema)` to create a new message.
+ */
+export const SetFeatureFlagRequestSchema: GenMessage<SetFeatureFlagRequest> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 17);
+
+/**
+ * @generated from message hivebook.tenant.v1.SetFeatureFlagResponse
+ */
+export type SetFeatureFlagResponse = Message<"hivebook.tenant.v1.SetFeatureFlagResponse"> & {
+  /**
+   * @generated from field: hivebook.tenant.v1.FeatureFlag flag = 1;
+   */
+  flag?: FeatureFlag | undefined;
+};
+
+/**
+ * Describes the message hivebook.tenant.v1.SetFeatureFlagResponse.
+ * Use `create(SetFeatureFlagResponseSchema)` to create a new message.
+ */
+export const SetFeatureFlagResponseSchema: GenMessage<SetFeatureFlagResponse> = /*@__PURE__*/
+  messageDesc(file_hivebook_tenant_v1_tenant, 18);
+
+/**
  * @generated from service hivebook.tenant.v1.TenantService
  */
 export const TenantService: GenService<{
@@ -218,6 +551,65 @@ export const TenantService: GenService<{
     methodKind: "unary";
     input: typeof CompleteOnboardingRequestSchema;
     output: typeof CompleteOnboardingResponseSchema;
+  },
+  /**
+   * UpdateTenant edits the mutable workspace profile from settings (name, size,
+   * use cases). The storage region is intentionally absent — it is write-once
+   * (ADR-0014) and can never be changed here.
+   *
+   * @generated from rpc hivebook.tenant.v1.TenantService.UpdateTenant
+   */
+  updateTenant: {
+    methodKind: "unary";
+    input: typeof UpdateTenantRequestSchema;
+    output: typeof UpdateTenantResponseSchema;
+  },
+  /**
+   * ListMembers returns the people in the workspace, read live from the identity
+   * provider (ZITADEL is the directory, ADR-0012). `configured` is false when the
+   * directory integration isn't set up, so the UI can explain rather than show an
+   * empty list.
+   *
+   * @generated from rpc hivebook.tenant.v1.TenantService.ListMembers
+   */
+  listMembers: {
+    methodKind: "unary";
+    input: typeof ListMembersRequestSchema;
+    output: typeof ListMembersResponseSchema;
+  },
+  /**
+   * ListAuditEvents returns the workspace's audit trail, newest first, paginated.
+   * Queryable, not exportable (roadmap v0.1; audit is a day-zero primitive,
+   * ADR-0010).
+   *
+   * @generated from rpc hivebook.tenant.v1.TenantService.ListAuditEvents
+   */
+  listAuditEvents: {
+    methodKind: "unary";
+    input: typeof ListAuditEventsRequestSchema;
+    output: typeof ListAuditEventsResponseSchema;
+  },
+  /**
+   * ListFeatureFlags returns the workspace's feature flags — the catalog (defined
+   * server-side) merged with the tenant's overrides, so the UI can render toggles
+   * with names + descriptions and the current state.
+   *
+   * @generated from rpc hivebook.tenant.v1.TenantService.ListFeatureFlags
+   */
+  listFeatureFlags: {
+    methodKind: "unary";
+    input: typeof ListFeatureFlagsRequestSchema;
+    output: typeof ListFeatureFlagsResponseSchema;
+  },
+  /**
+   * SetFeatureFlag turns one flag on/off for the workspace.
+   *
+   * @generated from rpc hivebook.tenant.v1.TenantService.SetFeatureFlag
+   */
+  setFeatureFlag: {
+    methodKind: "unary";
+    input: typeof SetFeatureFlagRequestSchema;
+    output: typeof SetFeatureFlagResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hivebook_tenant_v1_tenant, 0);

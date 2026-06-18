@@ -1,0 +1,49 @@
+= 0034 — Temporal is the sync orchestrator
+:adr-id: 0034
+:status: proposed
+:date: 2026-06-18
+:supersedes: adrs/0028-river-job-queue.adoc, adrs/0030-keda-scaled-workers.adoc
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+The River-based sync (xref:ROOT:adrs/0028-river-job-queue.adoc[ADR-0028],
+xref:ROOT:adrs/0030-keda-scaled-workers.adoc[ADR-0030]) hand-rolled connection
+orchestration on a job queue: an `inflight_jobs` counter for "`am I done`", a
+snooze gate for concurrency, and a KEDA query over queue depth. A traced run found
+the failure class this produces — snooze serialization, a scale-to-zero deadlock
+where parked jobs are invisible to the scaler and no process revives them, and
+connections stuck in `syncing`. The defect is structural: a job queue gives durable
+*jobs*, not durable *orchestration*, and the gap was filled with counters and timers
+that scale with work items.
+
+== Decision
+
+A durable-execution engine, *Temporal*, owns sync orchestration. One long-lived
+`ConnectionWorkflow` per connection holds the lifecycle (schedule, trigger, auth
+state, retries, cancellation, sync driver); the unit of orchestration is the
+*connection*, never the container/file. Temporal is a control plane — it knows a
+connection exists and a sync is running / failed / should-retry, and nothing about
+files, repos, or documents. Workers are a KEDA-scaled, scale-to-zero Temporal worker
+deployment with per-connector task queues.
+
+== Alternatives considered
+
+* *Fix River in place* (lease + atomic CAS claim + deadline reaper + self-heal
+sweeper) — closes the bugs without new infra, but keeps us hand-rolling orchestration,
+where the failure modes recur as edge cases. Kept only as a stop-gap.
+* *DBOS / Postgres-native durable execution* — lighter to operate and Postgres-first,
+but Temporal is the battle-tested standard (and what Airbyte runs for this exact
+problem); the rewrite is when that earns its keep.
+* *Keep River* — the status quo deadlocks on real data.
+
+== Consequences
+
+Stuck states, inflight-counter races, the snooze gate, and the KEDA-on-queue-depth
+deadlock cease to exist — durable timers and state live server-side, so scale-to-zero
+is safe and a due sync is pollable regardless of worker count. The cost: a Temporal
+cluster / namespaces to operate (or Temporal Cloud's per-action billing), and a hard
+discipline that workflow state and activity payloads stay tiny — required by Temporal's
+event-history limit, and (xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012])
+load-bearing for residency. River is removed from the sync path.

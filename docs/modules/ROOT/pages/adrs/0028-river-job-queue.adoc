@@ -1,0 +1,49 @@
+= 0028 — River (Postgres) is the connector-sync job queue
+:adr-id: 0028
+:status: superseded
+:date: 2026-06-14
+:supersedes:
+:superseded-by: adrs/0034-temporal-sync-orchestrator.adoc
+:related-design-doc: design-docs/0010-connector-sync-jobs.adoc
+
+[NOTE]
+====
+*Superseded by xref:ROOT:adrs/0034-temporal-sync-orchestrator.adoc[ADR-0034]* — sync
+orchestration moves from River to Temporal (xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012]).
+Recorded for history; do not build on it.
+====
+
+== Context
+
+The v0.1 integrations service synced on an in-process ticker (design-doc 0009):
+not crash-safe (a dead worker strands `status='syncing'`), not scalable (the
+scan→mark sequence is not an atomic claim), and with no retries, backoff, DLQ, or
+dedup. Productionizing pull-based sync needs a durable job queue. Ingestion stays
+pull-only — no webhooks.
+
+== Decision
+
+Connector sync runs as jobs on *River*, a Postgres-backed job queue for Go. It
+provides durability, retries with exponential backoff, a dead-letter queue
+(discarded jobs), unique/dedup jobs, periodic jobs, per-queue concurrency, and
+crash-safe leases (a dead worker's jobs requeue after a timeout), all over
+`SELECT … FOR UPDATE SKIP LOCKED` so many workers drain it safely. The queue lives
+in the integrations database; no new datastore is introduced.
+
+== Alternatives considered
+
+* *Hand-rolled `SELECT … FOR UPDATE SKIP LOCKED`* — same infra, but we would
+rebuild retries, backoff, DLQ, periodic scheduling, and unique-dedup that River
+already provides, tested.
+* *External broker (Redis / NATS / SQS)* — a second datastore and more ops,
+against the Postgres-first ethos; durability/DLQ semantics still need building.
+* *Temporal* — strong reliability/observability but a heavy dependency for what is
+a job queue.
+
+== Consequences
+
+Sync gains durability, retries, DLQ, and safe multi-worker draining with no new
+infrastructure. River's tables join the integrations schema, and its job lifecycle
+becomes the source of truth for retry/backoff state (not our own columns).
+Postgres is now also the queue — ample at our scale, a contention point only at
+extreme volume, to revisit if measured.

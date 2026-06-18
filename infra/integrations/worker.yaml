@@ -1,0 +1,117 @@
+# The Temporal sync worker (design-doc 0012, ADR-0034): one deployment polls the
+# connection control queue plus every per-connector sync queue. Crash-safe via
+# Temporal durable state — workflow history and timers live in Temporal, not here,
+# so a killed worker resumes mid-sync (design-doc 0012). Same image as the server,
+# different entrypoint (./worker). KEDA scales this 0→N off the Temporal task-queue
+# backlog (keda/scaledobject.yaml); replicas:1 here is the floor used when KEDA is
+# absent — once the ScaledObject exists KEDA owns the replica count (down to 0).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integrations-worker
+  namespace: hivebook
+  labels:
+    app: integrations-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integrations-worker
+  template:
+    metadata:
+      labels:
+        app: integrations-worker
+    spec:
+      containers:
+        - name: worker
+          image: hivebook-integrations:dev
+          imagePullPolicy: IfNotPresent
+          command: ["./worker"]
+          # The worker serves /metrics + /health on HIVEBOOK_WORKER_PORT (default 8081,
+          # cmd/worker/main.go) — distinct from the server's 8080. It exposes no RPC.
+          ports:
+            - name: http
+              containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: integrations-config
+          env:
+            - name: HIVEBOOK_DB_USERNAME
+              valueFrom:
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_USER }
+            - name: HIVEBOOK_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_PASSWORD }
+            - name: HIVEBOOK_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: rustfs-creds, key: ACCESS_KEY }
+            - name: HIVEBOOK_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: rustfs-creds, key: SECRET_KEY }
+            - name: HIVEBOOK_INTEGRATIONS_TOKEN_KEY
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: TOKEN_KEY }
+            # The worker refreshes OAuth tokens mid-sync, so it needs the connector
+            # client credentials too (optional until the OAuth apps are registered).
+            - name: HIVEBOOK_GDOCS_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GDOCS_CLIENT_ID, optional: true }
+            - name: HIVEBOOK_GDOCS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GDOCS_CLIENT_SECRET, optional: true }
+            - name: HIVEBOOK_GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_CLIENT_ID, optional: true }
+            - name: HIVEBOOK_GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_CLIENT_SECRET, optional: true }
+            # GitHub App private key (PEM) — the worker mints installation tokens
+            # to sync repos/projects.
+            - name: HIVEBOOK_GITHUB_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_PRIVATE_KEY, optional: true }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # Liveness only — a worker has no readiness role (no Service traffic to
+          # gate). /health is process-alive only, NOT DB-dependent (cmd/worker/main.go):
+          # a DB blip must not restart a worker whose Temporal activities self-retry.
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: "1", memory: 512Mi }
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      # Give an in-flight activity time to finish on scale-down before SIGKILL; the
+      # worker stops polling and drains on SIGTERM, then Temporal reschedules the rest.
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# ClusterIP so vmagent can scrape the worker's /metrics. No inbound RPC — the worker
+# only polls the Temporal task queues and emits the mechanism metrics (artifacts_ingested).
+apiVersion: v1
+kind: Service
+metadata:
+  name: integrations-worker
+  namespace: hivebook
+  labels:
+    app: integrations-worker
+spec:
+  selector:
+    app: integrations-worker
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http

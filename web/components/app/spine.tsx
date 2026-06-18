@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   RiBarChartFill,
   RiBook2Fill,
+  RiFile2Fill,
   RiFileList3Fill,
   RiFileSearchFill,
   RiLayoutGrid2Fill,
@@ -15,7 +16,6 @@ import {
   RiSettings3Fill,
   RiShieldKeyholeFill,
   RiSidebarFoldLine,
-  RiSidebarUnfoldLine,
   RiSparkling2Fill,
   RiTeamFill,
   RiUser6Fill,
@@ -106,6 +106,7 @@ const FILL: Record<string, React.ElementType> = {
   ask: RiSparkling2Fill,
   book: RiBook2Fill,
   sources: RiLayoutGrid2Fill,
+  files: RiFile2Fill,
   entities: RiNodeTree,
   review: RiFileSearchFill,
   members: RiTeamFill,
@@ -121,7 +122,7 @@ const SETTINGS = NAV.find((n) => n.key === "settings")!
 
 export function AppSpine() {
   const pathname = usePathname()
-  const { expanded } = useSpine()
+  const { expanded, setExpanded } = useSpine()
   const isActive = (href: string) =>
     href === "/book" ? pathname.startsWith("/book") : pathname.startsWith(href)
 
@@ -129,14 +130,18 @@ export function AppSpine() {
     <TooltipProvider delayDuration={300}>
       <nav
         data-state={expanded ? "expanded" : "collapsed"}
+        // Collapsed, the whole rail is the expand trigger: a resize cursor
+        // everywhere, and a click on any empty space opens it. Items stop the
+        // click from bubbling here, so they navigate instead of expanding.
+        onClick={expanded ? undefined : () => setExpanded(true)}
         className={cn(
-          "group/spine flex shrink-0 flex-col overflow-y-auto border-r border-spine-border bg-spine py-2 transition-[width] duration-200 ease-linear motion-reduce:transition-none",
-          expanded ? "w-60" : "w-14"
+          "group/spine flex shrink-0 flex-col overflow-y-auto border-r border-spine-border bg-spine pb-2 transition-[width] duration-200 ease-linear motion-reduce:transition-none",
+          expanded ? "w-60" : "w-14 cursor-e-resize"
         )}
       >
         <SpineHeader />
 
-        <Divider />
+        <div className="h-2 shrink-0" />
 
         {KNOWLEDGE.map((item) => (
           <SpineLink key={item.href} item={item} active={isActive(item.href)} />
@@ -162,7 +167,7 @@ export function AppSpine() {
 // sits in a 28px slot with CONSTANT row padding, so it's centered when collapsed
 // (14 + 28 + 14 = 56) and stays at the exact same x when expanded — no movement.
 const rowBase =
-  "flex h-9 w-full items-center gap-2.5 px-3.5 text-[13px] font-medium transition-colors"
+  "flex h-8 w-full cursor-pointer items-center gap-2.5 px-3.5 text-[13px] font-medium transition-colors"
 
 // Fixed-width slot for the leading icon/badge so collapsed centering is uniform.
 function Glyph({ children }: { children: React.ReactNode }) {
@@ -190,11 +195,14 @@ function SpineLink({ item, active }: { item: NavItem; active: boolean }) {
         <Link
           href={item.href}
           aria-current={active ? "page" : undefined}
+          onClick={(e) => e.stopPropagation()}
           className={cn(
             rowBase,
+            // Active/hover colour the text + icon with the accent — no background
+            // block. The icon inherits currentColor, so it tints with the label.
             active
-              ? "bg-spine-accent text-spine-foreground"
-              : "text-spine-muted hover:bg-spine-accent/60 hover:text-spine-foreground"
+              ? "text-spine-active"
+              : "text-spine-muted hover:text-spine-hover"
           )}
         >
           <Glyph>
@@ -208,10 +216,6 @@ function SpineLink({ item, active }: { item: NavItem; active: boolean }) {
       </TooltipContent>
     </Tooltip>
   )
-}
-
-function Divider() {
-  return <div className="my-1 h-px w-full bg-spine-border" />
 }
 
 // A section divider with a fixed height in BOTH states — the label when open,
@@ -228,39 +232,53 @@ function SectionBreak({ label }: { label: string }) {
   )
 }
 
-// Top of the spine. Collapsed: a centered unfold glyph that expands the spine.
-// Expanded: the logo with a right-aligned fold button that collapses it — the
-// toggle lives next to what it controls, so the context bar carries none.
+// Top of the spine. The logo links home in both states. Collapsed: just the mark
+// (the rail's empty space is the expand trigger; the logo navigates, so it stops
+// the click from bubbling to the expand handler). Expanded: the full logo plus a
+// right-aligned fold button that collapses it.
+//
+// The header is h-11 and flush to the top so its bottom border lands exactly on
+// the context bar's (both h-11, both border-border) — one continuous hairline
+// across the top of the app, same colour on both surfaces.
+const headerBase =
+  "flex h-11 w-full items-center gap-2.5 border-b border-spine-border px-3.5"
+
 function SpineHeader() {
   const { expanded, toggle } = useSpine()
 
   if (!expanded) {
     return (
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label="Expand sidebar"
+      <Link
+        href="/home"
+        aria-label="Home"
+        onClick={(e) => e.stopPropagation()}
         className={cn(
-          rowBase,
-          "text-spine-muted transition-colors hover:bg-spine-accent hover:text-spine-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+          headerBase,
+          "cursor-pointer text-spine-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         )}
       >
         <Glyph>
-          <RiSidebarUnfoldLine className="size-4.5" />
+          <Logo variant="mark" size="sm" />
         </Glyph>
-      </button>
+      </Link>
     )
   }
 
   return (
-    <div className={cn(rowBase, "text-spine-foreground")}>
-      <Logo size="sm" className="px-0.5" />
+    <div className={cn(headerBase, "text-spine-foreground")}>
+      <Link
+        href="/home"
+        aria-label="Home"
+        className="flex cursor-pointer items-center rounded-md focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+      >
+        <Logo size="sm" className="px-0.5" />
+      </Link>
       <div className="min-w-0 flex-1" />
       <button
         type="button"
         onClick={toggle}
         aria-label="Collapse sidebar"
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-spine-muted transition-colors hover:bg-spine-accent hover:text-spine-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-spine-muted transition-colors hover:bg-spine-accent hover:text-spine-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
       >
         <RiSidebarFoldLine className="size-4.5" />
       </button>
@@ -275,9 +293,10 @@ function Notifications() {
       <DropdownMenu>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger
+            onClick={(e) => e.stopPropagation()}
             className={cn(
               rowBase,
-              "text-spine-muted hover:bg-spine-accent/60 hover:text-spine-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              "text-spine-muted hover:text-spine-hover focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
             )}
           >
             <Glyph>
@@ -316,13 +335,16 @@ function ProfileMenu() {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
+        onClick={(e) => e.stopPropagation()}
         className={cn(
           rowBase,
           "mt-0.5 text-spine-foreground hover:bg-spine-accent focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
         )}
       >
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-[12px] font-semibold text-brand-subtle-foreground">
-          {initial || <RiUser6Fill className="size-4" />}
+        <span className="flex size-7 shrink-0 items-center justify-center">
+          <span className="flex size-5 items-center justify-center rounded-full bg-brand-subtle text-[10px] font-semibold text-brand-subtle-foreground">
+            {initial || <RiUser6Fill className="size-3.5" />}
+          </span>
         </span>
         <span className="min-w-0 flex-1 truncate text-left group-data-[state=collapsed]/spine:hidden">
           {name}

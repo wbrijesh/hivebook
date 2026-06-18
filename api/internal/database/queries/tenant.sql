@@ -29,3 +29,41 @@ ON CONFLICT (zitadel_org_id) DO UPDATE SET
     updated_at     = now()
 WHERE tenants.region IS NULL OR tenants.region = EXCLUDED.region
 RETURNING id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, created_at, updated_at;
+
+-- name: GetFeatureFlags :one
+-- The tenant's flag overrides (key → bool). Merged with the code catalog by the
+-- service to produce effective values.
+SELECT feature_flags FROM tenants WHERE zitadel_org_id = $1;
+
+-- name: SetFeatureFlag :exec
+-- Set one flag override for the tenant, creating the key if absent. We store only
+-- deviations from the catalog default (see RemoveFeatureFlag), so this is called
+-- only when the requested value differs from the default.
+UPDATE tenants
+SET feature_flags = jsonb_set(
+        COALESCE(feature_flags, '{}'::jsonb),
+        ARRAY[@key::text],
+        to_jsonb(@enabled::boolean),
+        true
+    ),
+    updated_at = now()
+WHERE zitadel_org_id = @zitadel_org_id;
+
+-- name: RemoveFeatureFlag :exec
+-- Drop a flag override so the tenant falls back to the catalog default — keeping
+-- the stored map to deviations only (smaller, and global default changes apply).
+UPDATE tenants
+SET feature_flags = feature_flags - @key::text, updated_at = now()
+WHERE zitadel_org_id = @zitadel_org_id;
+
+-- name: UpdateTenantProfile :one
+-- Edits the mutable profile from settings. Deliberately never touches region
+-- (write-once, ADR-0014) or onboarded_at. The tenant must already exist.
+UPDATE tenants SET
+    name           = @name,
+    size           = @size,
+    use_cases      = @use_cases,
+    use_case_other = NULLIF(@use_case_other::text, ''),
+    updated_at     = now()
+WHERE zitadel_org_id = @zitadel_org_id
+RETURNING id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, created_at, updated_at;

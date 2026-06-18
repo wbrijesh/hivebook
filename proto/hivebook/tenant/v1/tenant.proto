@@ -6,6 +6,7 @@ syntax = "proto3";
 package hivebook.tenant.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 
 service TenantService {
   // GetSession returns the authenticated caller's identity and their tenant,
@@ -17,6 +18,30 @@ service TenantService {
   // CompleteOnboarding records the onboarding answers and marks the tenant
   // onboarded. Idempotent; the storage region is write-once (ADR-0014).
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (CompleteOnboardingResponse);
+
+  // UpdateTenant edits the mutable workspace profile from settings (name, size,
+  // use cases). The storage region is intentionally absent — it is write-once
+  // (ADR-0014) and can never be changed here.
+  rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse);
+
+  // ListMembers returns the people in the workspace, read live from the identity
+  // provider (ZITADEL is the directory, ADR-0012). `configured` is false when the
+  // directory integration isn't set up, so the UI can explain rather than show an
+  // empty list.
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+
+  // ListAuditEvents returns the workspace's audit trail, newest first, paginated.
+  // Queryable, not exportable (roadmap v0.1; audit is a day-zero primitive,
+  // ADR-0010).
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
+
+  // ListFeatureFlags returns the workspace's feature flags — the catalog (defined
+  // server-side) merged with the tenant's overrides, so the UI can render toggles
+  // with names + descriptions and the current state.
+  rpc ListFeatureFlags(ListFeatureFlagsRequest) returns (ListFeatureFlagsResponse);
+
+  // SetFeatureFlag turns one flag on/off for the workspace.
+  rpc SetFeatureFlag(SetFeatureFlagRequest) returns (SetFeatureFlagResponse);
 }
 
 // User is the caller's identity, resolved from the OIDC token/userinfo.
@@ -62,4 +87,88 @@ message CompleteOnboardingRequest {
 
 message CompleteOnboardingResponse {
   Tenant tenant = 1;
+}
+
+// UpdateTenantRequest carries the editable workspace profile. Region is absent by
+// design (write-once, ADR-0014); name is required so the workspace can't be left
+// nameless.
+message UpdateTenantRequest {
+  string name = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  string size = 2 [(buf.validate.field).string.max_len = 50];
+  repeated string use_cases = 3 [(buf.validate.field).repeated.max_items = 32];
+  string use_case_other = 4 [(buf.validate.field).string.max_len = 500];
+}
+
+message UpdateTenantResponse {
+  Tenant tenant = 1;
+}
+
+// Member is one person in the workspace, projected from the identity provider.
+message Member {
+  string id = 1; // ZITADEL user id
+  string name = 2; // display name (falls back to login name)
+  string email = 3;
+  repeated string roles = 4; // org roles, e.g. "ORG_OWNER"
+}
+
+message ListMembersRequest {}
+
+message ListMembersResponse {
+  repeated Member members = 1;
+  // configured is false when the ZITADEL management integration isn't set up; the
+  // members list is empty and the UI shows a setup hint instead of "no members".
+  bool configured = 2;
+}
+
+// AuditEvent is one recorded privileged action in the workspace.
+message AuditEvent {
+  string id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string actor_id = 3; // ZITADEL user id of who acted
+  string actor_email = 4;
+  string action = 5; // stable code, e.g. "tenant.updated", "source.disconnected"
+  string target = 6; // human label of the thing acted on
+}
+
+message ListAuditEventsRequest {
+  int32 limit = 1 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 200
+  }];
+  int32 offset = 2 [(buf.validate.field).int32.gte = 0];
+}
+
+message ListAuditEventsResponse {
+  repeated AuditEvent events = 1;
+  int32 total = 2; // total rows for the tenant, for pagination
+}
+
+// FeatureFlag is one toggleable capability. key/name/description come from the
+// server-side catalog; enabled is the tenant's effective value (override or default).
+message FeatureFlag {
+  string key = 1;
+  string name = 2;
+  string description = 3;
+  bool enabled = 4;
+}
+
+message ListFeatureFlagsRequest {}
+
+message ListFeatureFlagsResponse {
+  repeated FeatureFlag flags = 1;
+}
+
+message SetFeatureFlagRequest {
+  string key = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100
+  }];
+  bool enabled = 2;
+}
+
+message SetFeatureFlagResponse {
+  FeatureFlag flag = 1;
 }

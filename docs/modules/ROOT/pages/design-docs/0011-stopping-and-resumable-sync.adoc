@@ -1,0 +1,305 @@
+= 0011 — Stopping and resumable connector sync (cancel + delta)
+:design-id: 0011
+:status: implemented
+:date: 2026-06-17
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by:
+:related-adrs: adrs/0028-river-job-queue.adoc, adrs/0029-per-container-sync-jobs.adoc, adrs/0024-raw-corpus-object-storage.adoc, adrs/0031-high-water-mark-cursor.adoc, adrs/0032-cooperative-sync-cancellation.adoc, adrs/0033-committed-at-visibility.adoc
+
+== Context
+
+xref:ROOT:design-docs/0010-connector-sync-jobs.adoc[Design-doc 0010] made sync a
+fan-out of durable per-container River jobs with per-container watermarks and
+content-hash dedup. Two operator-facing capabilities are still missing, and a
+real sync of a 68-project GitHub account exposed why they matter:
+
+* *No stop.* Once a sync is running there is no way to cancel it. A large or
+mistaken sync (wrong account, too many projects) runs to completion or must be
+waited out. Disconnect is the only lever, and it destroys the connection.
+* *Delta is only half-built, and not stop-safe.* The watermark exists, but the
+issue cursor advances to `max(updatedAt)` over a page *without ordering the
+query*. If a run is interrupted (crash, DLQ, or — once we add it — a stop), the
+cursor can sit ahead of items that were never synced, so the next `since=cursor`
+fetch *skips* them. Today that gap is a latent crash bug; a stop button makes
+interruption routine, so it must be fixed first.
+
+The user's instinct was a *staging area*: sync each project to a staging copy,
+promote to real storage only on completion, discard on stop. That cleanly avoids
+exposing partial data — but it also discards in-progress work, so a stop forces a
+full re-sync, which defeats delta. This doc takes the opposite, more durable line:
+*partial data is fine and resumable* if the cursor never claims more than is
+committed, and partial data is *hidden until a project's first full pass
+completes* via a cheap visibility flag — no second copy of the bytes.
+
+== Goals
+
+* *Stop the whole sync for a connection*, mid-flight, cleanly — queued, scheduled,
+and running jobs all cease; the connection settles deterministically to a resting
+state; no corruption and no stranded `syncing`.
+* *Resume is delta.* A later sync continues from where it stopped, per container —
+already-synced items are not re-fetched (cursor sources) or not re-written
+(cursorless sources). Stopping never wastes completed work.
+* *No partial data is ever exposed* to the corpus/readers: a project that has
+never finished a full pass (initial backfill, in progress or stopped) is
+invisible until it completes once.
+* *Idempotent and crash-equivalent.* Stop is just an *intentional* interruption;
+it uses the same correctness machinery as a crash, retry, or DLQ.
+
+== Non-goals
+
+* *A staging area / second copy of artifact bytes* — explicitly rejected below.
+* *Per-delta atomic visibility (MVCC).* Once a project is committed, steady-state
+deltas are visible as they land (additive and individually correct). Hiding an
+in-flight *delta* of an already-committed project would need per-item generations;
+not worth the cost (see Tradeoffs).
+* *Pausing/cancelling a single container from the UI.* Stop is per connection.
+* *Webhooks / push.* Ingestion stays pull (0010).
+
+== Proposal
+
+The design rests on one invariant and three mechanisms.
+
+=== The invariant: the cursor is a true high-water mark
+
+> A container's watermark is the `updatedAt` of the newest item that is *fully
+committed* (bytes written **and** manifest upserted), and items are processed in
+`updatedAt`-*ascending* order.
+
+With this, "everything with `updatedAt \<= watermark` is synced" holds *at every
+instant*, not only at the end of a run. So an interruption at any point leaves a
+correct resume point: the next run fetches `since=watermark` (inclusive; the
+boundary item re-appears and content-hash dedup absorbs it) and never skips
+anything. This is what makes partial data safe and staging unnecessary.
+
+Concretely for GitHub issues: query `sort=updated&direction=asc&since=<watermark>`,
+and advance the watermark to an item's `updatedAt` only *after* that item is
+committed. (Today's code orders by the API default and takes the page max — the
+latent gap. Fixing it is a prerequisite, not an add-on.)
+
+*Cursorless sources (GitHub Projects v2).* GitHub exposes no `updatedAt` filter
+for Projects v2, so a board is a full re-fetch each run, made cheap by content-hash
+dedup (unchanged items are not re-written). There is no within-board resume point:
+a stop mid-board means the next run re-fetches the whole board (idempotent,
+self-healing). This is acceptable — boards are small relative to repo issues — and
+is the one place "resume mid-unit" does not apply.
+
+=== Mechanism 1 — Stopping (cooperative cancellation + authoritative settle)
+
+[d2]
+----
+direction: right
+connected -> syncing: "Sync now / scheduled"
+syncing -> connected: "all containers done"
+syncing -> stopping: "Stop"
+stopping -> connected: "jobs cancelled + settled"
+syncing -> error: "all attempts failed"
+----
+
+. *Stop action.* A user-facing `StopSync(connection)` RPC (proxied like the
+others, tenant-scoped) sets the connection to `stopping` and notifies watchers, so
+the UI flips to "Stopping…" immediately.
+. *Cancel the jobs.* River cancels this connection's jobs — select `river_job`
+where `kind in ('discover_connection','sync_container')` and
+`args->>'connection_id' = $1` in any active state (available, scheduled, pending,
+retryable, running), and `JobCancel` each. Queued jobs are removed; a *running*
+job has its work context cancelled.
+. *Cooperative worker.* `SyncContainer` checks `ctx.Err()` between items/pages.
+On cancellation it stops, having committed everything so far and persisted the
+watermark up to the last committed item, and returns without marking the container
+`error` (a stop is not a failure).
+. *Authoritative settle.* `StopSync` owns the connection's resting state — after
+issuing the cancels it sets `inflight_jobs = 0`, `status = 'connected'`, and
+normalizes container status (`syncing`/`queued` → `idle`; `synced` stays). We do
+*not* rely on each cancelled job to decrement `inflight` (racy). The idempotent
+invariant makes the small race benign: a job that commits one more item as we
+settle has also advanced its cursor, so the next run still resumes correctly.
+
+Stop is therefore the same as a crash from the data's point of view — the only
+new thing is that we *initiate* it and settle the connection promptly.
+
+=== Mechanism 2 — Delta (resume from the watermark)
+
+A later `Sync now` (or the periodic scan) re-runs discovery and fans out per
+container; each `SyncContainer` reads its watermark and continues. Already-synced
+items are not re-fetched (cursor sources) or not re-written (dedup). Stopping a
+sync of 10k issues at issue 6k and resuming fetches ~4k, not 10k. This is the
+payoff that staging would have thrown away.
+
+=== Mechanism 3 — Atomic visibility without a staging copy
+
+To honor "never expose partial data" *without* a second copy of the bytes, gate
+*visibility*, not *storage*:
+
+* Add `committed_at timestamptz` to the project (container) row — the time of its
+most recent *completed full pass*; `NULL` until the first pass ever finishes.
+* Readers of the corpus (the Files surface today; filing/retrieval later) see a
+project's artifacts only when `committed_at IS NOT NULL`.
+* Effect: a project's *initial backfill* — the dangerous case, where a stop or
+crash could leave 3 of 5,000 issues — is *invisible* until it completes once.
+Stopping mid-backfill preserves the work (cursor advanced) and keeps it hidden;
+resume completes the pass and sets `committed_at`, at which point it appears.
+* After the first commit, steady-state deltas are written into the same store and
+are visible as they land — additive and individually correct.
+
+The bytes are written once, to the real store, incrementally. The flag is the
+whole cost — no staging bucket, no copy/move, no GC of abandoned staging.
+
+The gate joins an artifact to its project on the *sync* container, not the
+manifest container — these differ for Google Docs (sync = the drive, manifest =
+the folder), so a column `raw_artifact.sync_container_id` records the sync unit and
+every artifact↔project query keys on it. *Rollout note:* the backfill sets
+`sync_container_id = container_id`, which is correct only where the two coincide
+(GitHub); it is forward-only and cannot retroactively heal pre-existing rows of a
+connector whose containers differ. No Google Docs data existed at rollout, so
+nothing is stranded, and gdocs is correct from its first sync (emit stamps the
+drive). A future connector with the split must be onboarded before it has data, or
+re-synced.
+
+=== Data-model changes
+
+* `connector_connection`: a transient `stopping` status (UI affordance); resting
+state returns to `connected`. (`StopSync` settles `inflight_jobs`/status.)
+* project (container): `committed_at timestamptz` (visibility gate). Stopped
+in-progress containers return to `idle`; `committed_at` is untouched.
+* `raw_artifact`: unchanged — already idempotent (`(connection_id, external_id)`
+upsert + content hash) and carries `connection_id`/`container_id` to join for the
+visibility filter.
+* Retry/backoff/cancellation state lives in River, not our schema.
+
+== Alternatives considered
+
+* *Staging area (the original idea).* Sync a project to a staging copy; promote on
+completion; discard on stop. Cleanly hides partial data, but *discards in-progress
+work*, so every stop forces a full re-sync — directly against the delta goal — and
+adds a second byte store, a promote/move step, and GC of abandoned staging. The
+visibility-flag approach gives the same "no partial data exposed" guarantee for
+the cost of one column, while *keeping* the work. Rejected.
+* *Per-item generations / MVCC for full atomic visibility.* Tag every artifact
+with a sync generation and flip a pointer atomically, so even an in-flight delta
+of a committed project is hidden until done. Truly atomic, but heavy: versioned
+keys, pointer management, GC of superseded generations. Deltas are additive and
+each item is correct, so the value doesn't justify the cost at v0.1. Deferred
+(non-goal).
+* *Hard-cancel (just kill the jobs).* Cancel River jobs and ignore in-flight
+writes. Without the high-water-mark invariant this is exactly the gap bug — the
+cursor can claim unsynced items. Rejected in favor of cooperative + ordered.
+* *Do nothing.* No stop; a wrong/huge sync runs to completion or forces a
+destructive Disconnect; the latent cursor gap stays. Rejected — this doc exists
+to fix it.
+
+== Tradeoffs
+
+* *No per-delta atomicity.* An in-flight *delta* of an already-committed project
+is visible as items land (additive, correct, but not all-or-nothing). Buying full
+atomicity costs MVCC; we accept additive deltas instead.
+* *Cooperative cancellation has a small window.* A running job stops at the next
+item/page boundary, not instantly. Idempotency makes the extra commits harmless;
+worst case is a few seconds of extra work after Stop.
+* *Correctness now depends on ordered iteration.* The cursor contract requires
+`updatedAt`-ascending fetches; a connector that can't order by update time can't
+offer mid-unit resume (it falls back to full-refetch + dedup, like Projects v2).
+* *A `stopping` state and a settle path to maintain* — modest, and it removes the
+"stuck in syncing" failure mode rather than adding one.
+
+== Open questions
+
+* *Stop granularity in the UI.* Per-connection stop is the v1; do we ever want to
+deselect/stop a single in-flight container? (Deselect already exists for future
+runs; stopping one running container is the open part.)
+* *Surfacing "partial".* Should a stopped, never-committed project read as
+`idle`, or a distinct `partial`/`stopped` label so the operator knows it's
+hidden? Lean to a quiet label; decide against the real UI.
+* *Backfill chunking interaction.* 0010's "chunk the first backfill across bounded
+jobs" composes with the high-water-mark cursor; the chunk budget is still a
+constant to tune (ADR-0011).
+* *Empty-discovery signal.* Discovery is never allowed to prune on an empty result
+(P0), so a connection whose access was fully revoked now settles as a clean
+"synced just now" rather than surfacing a problem. A fully-empty discovery on a
+connection that previously had containers probably deserves a distinct signal —
+this ties into deletion propagation (see the tradeoff above on no tombstones).
+* *NetworkPolicy assumes kubelet probes are allowed (P3-8).* The integrations
+server and worker both expose readiness/liveness probes on `:8080`, run by the
+kubelet from the node — which matches neither `from` rule in the ingress policies.
+Most CNIs permit host→pod traffic by default (so probes pass); a CNI that *enforces*
+host→pod would deny them and CrashLoop both pods. The policies are inert on the
+local (policy-less) cluster. *Verify on the first policy-CNI deploy that probes
+pass; if the CNI enforces host→pod, add a node-CIDR `ipBlock` ingress on `:8080`
+(or the CNI's probe-allow mechanism) to both policies.*
+* *`updated_at` reliability boundary.* `raw_artifact.updated_at` (added in
+migration 000010 for a "last changed" time, so a re-synced old item no longer
+jumps to the top of Files) is trustworthy *only for changes after migration
+000011*. 000010 added the column with `DEFAULT now()`, which a later migration
+cannot retroactively correct: the 000011 corrective can only flatten values to
+`ingested_at` and cannot distinguish a legacy default from a genuine interim
+change, so it reset both. The column is currently unread (not sorted on, not in the
+proto); before wiring it to anything, treat pre-000011 values as `ingested_at`, not
+a real last-change. Lesson: a `DEFAULT now()` backfill column must be set correctly
+in the migration that adds it, never patched afterwards.
+* *Comment edit/delete fidelity.* GitHub issue comments are folded into the issue
+artifact and re-pulled when the issue's `updatedAt` bumps — which it does on a new
+comment, but not reliably when a comment is edited or deleted. So a corrected or
+removed comment may not propagate until the issue is otherwise touched. Acceptable
+for v0.1; another facet of the no-tombstones deletion-propagation gap above. A
+per-issue comment fetch that fails terminally (deleted issue, oversized thread)
+degrades to the issue without comments rather than failing the repo (ADR-0029
+isolation), so a transient blip can likewise drop a thread's comments until the
+issue next changes.
+
+== Deferred work
+
+Surfaced in review and consciously deferred (not hot-patched mid-phase):
+
+* *Backpressure as real admission control (P3-2).* The gate admits every container
+job to River then bounces the excess with `JobSnooze` (parked as `scheduled`). The
+rank-by-id gate keeps that livelock-free and P3-1 stops KEDA scaling on parked
+jobs, but it is still busy-polling. The end state is real admission control —
+River partitioned concurrency, a Postgres advisory-lock semaphore, or per-
+connection queues — so jobs aren't admitted-then-bounced.
+* *Silent data caps (P3-10).* `ghMaxRepos = 100` syncs only the first 100 repos of
+a larger org, in undefined order; GitHub Projects v2 has no cursor, so its
+~1000-item per-run budget is a hard ceiling (not a resumable chunk) — items beyond
+it are never synced. Both are logged + metered, but the partial-coverage behaviour
+needs a real fix: paginated repo discovery without a hard cap, and number- or
+GraphQL-cursor pagination for boards.
+* *Deletion propagation (P3-11).* A source item deleted/trashed after sync is never
+removed — the cursor only moves forward, and gdocs filters `trashed=false` so a
+trashed doc is simply never seen again. For a trusted corpus this needs a
+tombstone / reconcile strategy (a periodic full reconcile diffing the live set
+against the corpus, or source delete-events). Adjacent: comment edit/delete
+fidelity and the empty-discovery signal above.
+* *Structured-error reach (P3-5).* `httpGet` now returns typed
+`StatusError`/`TooLargeError`, used to degrade GitHub comment fetches only on
+terminal per-issue conditions (404/410/size-cap/per-request timeout) and to retry
+on transient ones. The same typing could refine error handling in discovery and
+project sync if those paths ever need the terminal/transient distinction.
+* *Artifact content streaming (P3-12).* `GetArtifactContent` loads an artifact's
+full bytes into one unary response (bounded by the size cap, then base64 over
+JSON). A streamed or redirect-through-our-API path would be lighter for large
+artifacts.
+* *Connection uniqueness vs soft-delete (P3-9).* `(tenant_id, connector_id,
+external_id)` is a FULL unique by design, not partial. Reconnect resurrects a
+soft-deleted row via `ON CONFLICT … DO UPDATE SET deleted_at = NULL`, which only
+fires if the soft-deleted row participates in the unique; a partial
+`WHERE deleted_at IS NULL` would exclude it and orphan it on reconnect, creating a
+duplicate — so the partial form is deliberately rejected. Consequence: migration
+0007's down cannot restore the old one-per-`(tenant, connector)` unique once a
+tenant has multiple connections of a connector. That is inherent to the feature
+(the schema genuinely can't be reverted with duplicates present); a rollback would
+require manual dedup, which we accept over silently dropping connections.
+
+== Decisions recorded as ADRs
+
+* xref:ROOT:adrs/0031-high-water-mark-cursor.adoc[ADR-0031] — the cursor is a true
+high-water mark: watermarks advance only past fully-committed items, fetched in
+`updatedAt`-ascending order, so interruption (crash or stop) is always a gapless
+resume point. (Refines xref:ROOT:adrs/0029-per-container-sync-jobs.adoc[ADR-0029].)
+* xref:ROOT:adrs/0032-cooperative-sync-cancellation.adoc[ADR-0032] — Stop is
+cooperative cancellation with an authoritative settle: it cancels the connection's
+River jobs and settles the connection state directly; workers stop at item/page
+boundaries and persist progress; a stop is not a failure.
+* xref:ROOT:adrs/0033-committed-at-visibility.adoc[ADR-0033] — atomic visibility
+via `committed_at`, not staging: partial data is written to the real store
+incrementally but hidden until a project's first full pass completes; no second
+byte store.

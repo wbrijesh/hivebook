@@ -10,6 +10,17 @@ import (
 	"time"
 )
 
+type AuditEvent struct {
+	ID         string
+	TenantID   string
+	ActorID    string
+	ActorEmail sql.NullString
+	Action     string
+	Target     sql.NullString
+	Metadata   json.RawMessage
+	CreatedAt  time.Time
+}
+
 type Tenant struct {
 	ID           string
 	ZitadelOrgID string
@@ -21,4 +32,5 @@ type Tenant struct {
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	UseCaseOther sql.NullString
+	FeatureFlags json.RawMessage
 }

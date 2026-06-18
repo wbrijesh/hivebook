@@ -30,3 +30,4 @@ next-env.d.ts
 
 # Antora build output
 /public/
+infra/github-app-private-key.pem

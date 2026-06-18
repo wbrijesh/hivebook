@@ -47,6 +47,26 @@ type Service interface {
 	// onboarded. Idempotent; the storage region is write-once.
 	CompleteOnboarding(ctx context.Context, orgID, name, size, region string, useCases []string, useCaseOther string) (Tenant, error)
 
+	// UpdateTenantProfile edits the mutable workspace profile from settings (name,
+	// size, use cases). Region is never changed (write-once).
+	UpdateTenantProfile(ctx context.Context, orgID, name, size string, useCases []string, useCaseOther string) (Tenant, error)
+
+	// RecordAuditEvent appends one event to the tenant's audit trail.
+	RecordAuditEvent(ctx context.Context, orgID, actorID, actorEmail, action, target string) error
+
+	// ListAuditEvents returns a page of the tenant's audit trail (newest first)
+	// and the total row count.
+	ListAuditEvents(ctx context.Context, orgID string, limit, offset int32) ([]AuditEvent, int32, error)
+
+	// GetFeatureFlags returns the tenant's flag overrides (key → enabled).
+	GetFeatureFlags(ctx context.Context, orgID string) (map[string]bool, error)
+
+	// SetFeatureFlag sets one flag override for the tenant (a deviation from default).
+	SetFeatureFlag(ctx context.Context, orgID, key string, enabled bool) error
+
+	// RemoveFeatureFlag drops a flag override (tenant falls back to the default).
+	RemoveFeatureFlag(ctx context.Context, orgID, key string) error
+
 	// Close terminates the database connection.
 	Close() error
 }

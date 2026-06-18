@@ -9,6 +9,10 @@ data:
   # Browser origins allowed to call the Connect API (comma-separated, explicit —
   # never a wildcard with credentials). The web app is served from app.*.
   HIVEBOOK_CORS_ORIGINS: "https://app.hivebook.localhost"
+  # The internal integrations service (design-doc 0009) and where the OAuth
+  # callback bounces the browser back to.
+  HIVEBOOK_INTEGRATIONS_URL: "http://integrations:8080"
+  HIVEBOOK_WEB_BASE_URL: "https://app.hivebook.localhost"
   HIVEBOOK_DB_HOST: "postgres"
   HIVEBOOK_DB_PORT: "5432"
   HIVEBOOK_DB_SCHEMA: "public"

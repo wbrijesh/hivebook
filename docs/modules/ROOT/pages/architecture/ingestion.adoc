@@ -97,8 +97,17 @@ xref:ROOT:design-docs/0003-entity-reconciliation.adoc[]).
 
 * Connector failures (auth lapse, rate limit, source outage) surface to admins
 via the control plane, not silent infinite retry.
-* Partial syncs are explicit: the watermark advances only after a window is
-fully ingested.
+* Partial syncs are safe by design: the watermark is a true high-water mark — it
+advances past an item only once that item is fully committed, over an
+update-ascending stream — so any interruption (crash, DLQ, or a Stop) is a gapless
+resume point (xref:ROOT:adrs/0031-high-water-mark-cursor.adoc[ADR-0031]).
+* A sync can be *stopped* per connection: queued and running jobs are cancelled
+cooperatively and the connection settles back to connected; a later sync resumes
+from each container's watermark (delta), and a never-completed project's partial
+data stays hidden until its first full pass finishes
+(xref:ROOT:design-docs/0011-stopping-and-resumable-sync.adoc[design-doc 0011];
+xref:ROOT:adrs/0032-cooperative-sync-cancellation.adoc[ADR-0032],
+xref:ROOT:adrs/0033-committed-at-visibility.adoc[ADR-0033]).
 * Raw artifacts persist before any downstream stage runs, so normalization and
 filing failures lose no data and their retries are idempotent (see
 xref:ROOT:design-docs/0001-continuous-ingestion-and-filing.adoc[0001]).

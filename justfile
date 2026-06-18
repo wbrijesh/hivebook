@@ -30,6 +30,7 @@ help:
       "just setup                 first-time setup — local CA, secrets, full install" \
       "just start  [service]      turn ON  — everything, or one service" \
       "just stop   [service]      turn OFF — everything, or one service" \
+      "just reset-data            wipe ALL local data for a clean test (then just start)" \
       "just update [service...]   rebuild image(s) & roll out — after code changes" \
       "just check                 run all checks (web + api) via Dagger — the gate" \
       "just status [service]      what's running (pod readiness)" \
@@ -136,6 +137,9 @@ start service="all":
           kubectl -n "$n" patch "$ds" --type merge -p '{"spec":{"template":{"spec":{"nodeSelector":{"hivebook.io/stopped":null}}}}}' >/dev/null 2>&1 || true
         done
       done
+      # Prototype is opt-in (not part of the managed set, image often unbuilt) —
+      # keep it parked unless started explicitly with `just start prototype`.
+      kubectl -n hivebook scale deploy/prototype --replicas=0 >/dev/null 2>&1 || true
       # Then watch all workloads come up together, live.
       if ui_progress {{ns}}; then
         ui_ok "all workloads ready"
@@ -192,6 +196,59 @@ stop service="all":
       kubectl -n "$n" scale deploy/{{service}} --replicas=0 >/dev/null 2>&1 || kubectl -n "$n" scale statefulset/{{service}} --replicas=0 >/dev/null 2>&1
       ui_ok "{{service}} stopped  ($n)"
     fi
+
+# Wipe ALL local app data for a clean test run: BOTH app databases — integrations
+# (connections, projects, synced items) and hivebook (the workspace tenant: region,
+# onboarding, feature flags, audit) — plus the object-storage volume and Temporal
+# workflows. Only your login (Zitadel, a separate database) survives. Run
+# `just reset-data`, then `just start`. Skip the prompt with `just reset-data force`.
+reset-data force="":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    . scripts/ui.sh
+    if ! kubectl get ns hivebook >/dev/null 2>&1; then
+      ui_fail "cluster unreachable — start OrbStack / run 'just start' first."
+      exit 1
+    fi
+    ui_header "Reset local data"
+    ui_subtle "Deletes: BOTH app databases (workspace · region · onboarding · feature flags · connections · projects · synced items) · object storage · Temporal workflows."
+    ui_subtle "Keeps:   only your login (Zitadel). You'll re-do onboarding (region) + re-enable feature flags after."
+    if [ "{{force}}" != force ]; then
+      read -r -p "  Type 'reset' to confirm: " ans
+      [ "$ans" = reset ] || { ui_fail "aborted — nothing changed."; exit 1; }
+    fi
+    # Postgres must be RUNNING to drop the databases. Bring it up (idempotent — it's
+    # scaled to zero if you ran 'just stop' first) and wait until it's ready; otherwise
+    # the psql exec below hangs/fails against a missing pod.
+    kubectl -n hivebook scale statefulset/postgres --replicas=1 >/dev/null 2>&1 || true
+    if ! kubectl -n hivebook rollout status statefulset/postgres --timeout=120s >/dev/null 2>&1; then
+      ui_fail "postgres didn't come up — can't reset. Run 'just start', then retry."
+      exit 1
+    fi
+    ui_ok "postgres is up"
+    # Stop everything that holds a Postgres connection (api owns the hivebook DB;
+    # integrations + worker own the integrations DB) so the databases can be dropped.
+    kubectl -n hivebook scale deploy/api deploy/integrations deploy/integrations-worker --replicas=0 >/dev/null 2>&1 || true
+    sleep 2
+    # Drop + recreate BOTH app databases (each re-migrated on next start). pg() runs
+    # against the 'postgres' maintenance DB so it never holds open the DB being dropped.
+    PW=$(kubectl -n hivebook get secret hivebook-db -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d)
+    pg() { kubectl -n hivebook exec statefulset/postgres -- env PGPASSWORD="$PW" psql -U hivebook -d postgres -tAc "$1" >/dev/null 2>&1; }
+    drop_db() {  # $1 = db name → terminate stragglers, drop, recreate owned by hivebook
+      pg "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$1' AND pid<>pg_backend_pid();" || true
+      pg "DROP DATABASE IF EXISTS \"$1\";" || true
+      pg "CREATE DATABASE \"$1\" OWNER hivebook;"
+    }
+    if drop_db integrations; then ui_ok "integrations database wiped"; else ui_fail "couldn't recreate the integrations database"; fi
+    if drop_db hivebook; then ui_ok "app database wiped (workspace · region · flags)"; else ui_fail "couldn't recreate the app database"; fi
+    # Wipe the object-storage volume (recreated fresh on next start).
+    kubectl -n hivebook scale statefulset/rustfs --replicas=0 >/dev/null 2>&1 || true
+    kubectl -n hivebook wait --for=delete pod/rustfs-0 --timeout=60s >/dev/null 2>&1 || true
+    if kubectl -n hivebook delete pvc data-rustfs-0 >/dev/null 2>&1; then ui_ok "object storage wiped"; else ui_subtle "object-storage volume already absent"; fi
+    # Clear Temporal's in-memory workflows (dev server) by recreating the pod.
+    kubectl -n hivebook rollout restart deploy/temporal >/dev/null 2>&1 || true
+    ui_ok "Temporal workflows cleared"
+    ui_box "Cleared — both app databases, object storage, and Temporal are empty." "Run 'just start', then re-do onboarding (region) + reconnect your source."
 
 # Logs — follow one service, or recent lines from everything
 logs service="all":
@@ -258,8 +315,8 @@ update *services:
       ui_fail "Kubernetes isn't reachable — run 'just start' first."
       exit 1
     fi
-    buildable="api web prototype docs"
-    targets="{{services}}"; [ -z "${targets// /}" ] && targets="api web docs" # prototype is opt-in
+    buildable="api web integrations prototype docs"
+    targets="{{services}}"; [ -z "${targets// /}" ] && targets="api web integrations docs" # prototype is opt-in
     for s in $targets; do
       case " $buildable " in *" $s "*) ;; *) ui_fail "can't build '$s' — buildable: $buildable"; exit 1 ;; esac
     done
@@ -315,11 +372,13 @@ format:
     @bash -c '. scripts/ui.sh && ui_ok "formatted web/"'
 
 # Regenerate typed query code from SQL (sqlc). Runs in Docker — no local sqlc.
-# Edit api/internal/database/queries/*.sql, run this, commit the result.
+# Both Go modules own queries; edit */internal/database/queries/*.sql, run this,
+# commit the result.
 gen:
     @bash -c '. scripts/ui.sh && ui_header "Generate · sqlc"'
     docker run --rm -v "{{justfile_directory()}}/api":/src -w /src sqlc/sqlc generate
-    @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/database/gen"'
+    docker run --rm -v "{{justfile_directory()}}/integrations":/src -w /src sqlc/sqlc generate
+    @bash -c '. scripts/ui.sh && ui_ok "generated api + integrations database/gen"'
 
 # Regenerate the Connect contract (Go + TS) from proto/. Runs buf in Docker — no
 # local buf/protoc. Edit proto/**/*.proto, run this, commit api/internal/gen +
@@ -330,8 +389,9 @@ proto:
     @bash -c '. scripts/ui.sh && ui_header "Generate · buf"'
     docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 lint
     docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.go.yaml
-    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.es.yaml --include-imports
-    @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/gen + web/lib/gen"'
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.integrations.yaml --path proto/hivebook/integration
+    docker run --rm -v "{{justfile_directory()}}":/work -w /work bufbuild/buf:1.70.0 generate --template buf.gen.es.yaml --include-imports --exclude-path proto/hivebook/integration/v1/integration_internal.proto
+    @bash -c '. scripts/ui.sh && ui_ok "generated api/internal/gen + integrations/internal/gen + web/lib/gen"'
 
 # Update proto dependencies (rewrites buf.lock). Separate from `just proto` so the
 # regen path stays reproducible; bump deliberately, then re-run `just proto` and
@@ -396,6 +456,14 @@ _build service:
           --from-literal=POSTGRES_PASSWORD="$HIVEBOOK_DB_PASSWORD" \
           --dry-run=client -o yaml | kubectl apply -f -
         kubectl apply -f postgres/
+        # ZITADEL management token (Members surface), patched into the provisioned
+        # hivebook-oidc secret so we don't clobber its other keys. Default to the
+        # iam-admin PAT the FirstInstance bootstrap creates (IAM_OWNER — reads any
+        # org's members); override with HIVEBOOK_ZITADEL_MGMT_TOKEN in infra/.env to
+        # use a dedicated least-privilege machine user (recommended for prod).
+        MGMT_TOKEN="${HIVEBOOK_ZITADEL_MGMT_TOKEN:-$(kubectl -n zitadel get secret iam-admin-pat -o jsonpath='{.data.pat}' 2>/dev/null | base64 -d)}"
+        [ -n "$MGMT_TOKEN" ] && \
+          kubectl -n hivebook patch secret hivebook-oidc -p "{\"stringData\":{\"MGMT_TOKEN\":\"$MGMT_TOKEN\"}}" || true
         kubectl apply -f api/
         kubectl -n hivebook rollout restart deployment/api
         kubectl -n hivebook rollout status deployment/api --timeout=180s
@@ -422,6 +490,43 @@ _build service:
         kubectl -n hivebook rollout restart deployment/docs
         kubectl -n hivebook rollout status deployment/docs --timeout=180s
         ;;
+      integrations)
+        docker build -t hivebook-integrations:dev ../integrations
+        # Object-storage credentials, shared by RustFS and the integrations pod.
+        kubectl -n hivebook create secret generic rustfs-creds \
+          --from-literal=ACCESS_KEY="${HIVEBOOK_S3_ACCESS_KEY:-rustfsadmin}" \
+          --from-literal=SECRET_KEY="${HIVEBOOK_S3_SECRET_KEY:-rustfsadmin}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        # Token/state keys: create once, never rotate (rotating would orphan every
+        # stored OAuth token). The connector OAuth creds, by contrast, are synced
+        # from infra/.env on every deploy so you can change apps without recreating
+        # the whole secret (registering/replacing an OAuth or GitHub App).
+        kubectl -n hivebook get secret integrations-secrets >/dev/null 2>&1 || \
+          kubectl -n hivebook create secret generic integrations-secrets \
+            --from-literal=TOKEN_KEY="$(openssl rand -base64 32)" \
+            --from-literal=STATE_KEY="$(openssl rand -base64 32)"
+        kubectl -n hivebook patch secret integrations-secrets -p "{\"stringData\":{\"GDOCS_CLIENT_ID\":\"${HIVEBOOK_GDOCS_CLIENT_ID:-}\",\"GDOCS_CLIENT_SECRET\":\"${HIVEBOOK_GDOCS_CLIENT_SECRET:-}\",\"GITHUB_CLIENT_ID\":\"${HIVEBOOK_GITHUB_CLIENT_ID:-}\",\"GITHUB_CLIENT_SECRET\":\"${HIVEBOOK_GITHUB_CLIENT_SECRET:-}\",\"GITHUB_APP_SLUG\":\"${HIVEBOOK_GITHUB_APP_SLUG:-}\"}}"
+        # GitHub App private key (PEM) for installation tokens — kept as a gitignored
+        # file (multi-line, awkward in .env). Synced into the secret when present.
+        [ -f github-app-private-key.pem ] && kubectl -n hivebook patch secret integrations-secrets --type merge -p "$(python3 -c "import json;print(json.dumps({'stringData':{'GITHUB_PRIVATE_KEY':open('github-app-private-key.pem').read()}}))")" || true
+        kubectl apply -f rustfs/
+        # The integrations service owns its own database on the shared instance.
+        kubectl -n hivebook exec statefulset/postgres -- \
+          psql -U hivebook -d hivebook -tc "SELECT 1 FROM pg_database WHERE datname='integrations'" | grep -q 1 || \
+          kubectl -n hivebook exec statefulset/postgres -- psql -U hivebook -d hivebook -c "CREATE DATABASE integrations"
+        # Server + worker + scrape configs (non-recursive: skips integrations/keda/).
+        kubectl apply -f integrations/
+        # Worker autoscaling. The ScaledObject needs the KEDA operator (just infra);
+        # without it the worker just runs at its Deployment replica count.
+        if kubectl get crd scaledobjects.keda.sh >/dev/null 2>&1; then
+          kubectl apply -f integrations/keda/
+        else
+          echo "KEDA operator not found — worker runs at fixed replicas (run 'just infra' for scale-to-zero)"
+        fi
+        kubectl -n hivebook rollout restart deployment/integrations deployment/integrations-worker
+        kubectl -n hivebook rollout status deployment/integrations --timeout=180s
+        kubectl -n hivebook rollout status deployment/integrations-worker --timeout=180s
+        ;;
       *) echo "unknown buildable service: {{service}}" >&2; exit 1 ;;
     esac
 
@@ -433,7 +538,7 @@ _ns service:
     echo "$n"
 
 [private]
-install: infra coredns auth provision api web docs observability
+install: infra coredns auth provision api integrations web docs observability
     #!/usr/bin/env bash
     . scripts/ui.sh
     ui_logo
@@ -478,6 +583,7 @@ repos:
     helm repo add zitadel https://charts.zitadel.com
     helm repo add victoriametrics https://victoriametrics.github.io/helm-charts/
     helm repo add vector https://helm.vector.dev
+    helm repo add kedacore https://kedacore.github.io/charts
     helm repo update
 
 [private]
@@ -489,6 +595,9 @@ infra: repos
     kubectl apply -f cert-manager/clusterissuer-mkcert.yaml
     helm upgrade --install traefik traefik/traefik --namespace traefik --values helm-values/traefik.yaml --wait
     kubectl apply -f cert-manager/certificate-wildcard.yaml
+    # KEDA: scales the integrations sync worker 0→N off the Temporal task-queue
+    # backlog (ADR-0030, design-doc 0012; infra/integrations/keda/scaledobject.yaml).
+    helm upgrade --install keda kedacore/keda --namespace keda --create-namespace --wait
     @bash -c '. scripts/ui.sh && ui_ok "infra ready"'
 
 [private]
@@ -547,6 +656,38 @@ docs:
     @bash -c '. scripts/ui.sh && ui_header "Deploy · docs (Antora)"'
     just _build docs
     @bash -c '. scripts/ui.sh && ui_ok "docs deployed on https://docs.hivebook.localhost"'
+
+[private]
+integrations: temporal
+    @bash -c '. scripts/ui.sh && ui_header "Deploy · integrations (Go)"'
+    just _build integrations
+    @bash -c '. scripts/ui.sh && ui_ok "integrations deployed (internal ClusterIP)"'
+
+# Deploy the Temporal dev server (sync orchestration backbone, design-doc 0012)
+temporal:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . scripts/ui.sh
+    ui_header "Deploy · Temporal (dev server)"
+    kubectl get ns hivebook >/dev/null 2>&1 || kubectl create ns hivebook
+    kubectl apply -f temporal/
+    kubectl -n hivebook rollout status deployment/temporal --timeout=180s
+    ui_ok "Temporal up — frontend temporal-frontend:7233, UI via 'just temporal-ui'"
+
+# Port-forward the Temporal Web UI to http://localhost:8233
+temporal-ui:
+    @bash -c '. scripts/ui.sh && ui_info "Temporal Web UI → http://localhost:8233 (Ctrl-C to stop)"'
+    kubectl -n hivebook port-forward svc/temporal-ui 8233:8233
+
+# Run the Temporal sync worker locally (set HIVEBOOK_TEMPORAL_HOSTPORT, default localhost:7233)
+worker-run:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    . scripts/ui.sh
+    ui_header "Run · Temporal sync worker (local)"
+    : "${HIVEBOOK_TEMPORAL_HOSTPORT:=localhost:7233}"
+    ui_info "dialing Temporal at $HIVEBOOK_TEMPORAL_HOSTPORT (override HIVEBOOK_TEMPORAL_HOSTPORT)"
+    cd ../integrations && HIVEBOOK_TEMPORAL_HOSTPORT="$HIVEBOOK_TEMPORAL_HOSTPORT" go run ./cmd/worker
 
 [private]
 observability: repos

@@ -1,0 +1,44 @@
+= 0038 — Cursor write order: storage first, then manifest + cursor in one transaction
+:adr-id: 0038
+:status: proposed
+:date: 2026-06-18
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+xref:ROOT:adrs/0031-high-water-mark-cursor.adoc[ADR-0031] requires the cursor to advance
+only past *fully committed* items — bytes written and manifest upserted — so any
+interruption is a gapless resume point. But object storage is not transactional with
+Postgres, and Temporal executes activities *at least once*, so "`atomic`" has to be
+spelled out as a concrete order and the whole path made replay-safe. Get it subtly wrong
+and a crash either skips an item (cursor ahead of storage) or exposes a manifest row
+pointing at bytes that were never written.
+
+== Decision
+
+Within an activity, in this order: (1) write the artifact to object storage first —
+content-addressed, so a re-write is identical and idempotent; (2) then, in a *single
+Postgres transaction*, write the manifest row and advance the `sync_unit` cursor. The
+cursor lives only in `sync_unit`, never in workflow state or Temporal history. Every
+activity action is idempotent, so an at-least-once replay is a no-op absorbed by
+content-hash dedup.
+
+== Alternatives considered
+
+* *Advance the cursor in workflow state / activity result* — puts cursor (and item
+metadata) into Temporal history, violating the tiny-state and residency rules, and
+splits the cursor from the manifest it must be atomic with.
+* *Manifest before storage* — a manifest row can point at bytes that a crash prevented
+from ever being written.
+* *Two-phase commit across storage and Postgres* — unavailable (object storage is not a
+transactional participant) and unnecessary given content-addressing.
+
+== Consequences
+
+A crash between the storage write and the transaction leaves a harmless orphan object
+(rewritten identically on retry) and an un-advanced cursor (the chunk is re-done) — never
+a gap, never a dangling manifest. The high-water-mark invariant holds at every instant.
+The cost: an occasional orphan object until the next reconcile/GC notices it, and a hard
+rule that connectors emit content-addressable artifacts.

@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: integrations
+  namespace: hivebook
+  labels:
+    app: integrations
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: integrations
+  template:
+    metadata:
+      labels:
+        app: integrations
+    spec:
+      containers:
+        - name: integrations
+          image: hivebook-integrations:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: integrations-config
+          env:
+            # DB user/password from the shared Postgres secret; the database name
+            # (integrations) is in the configmap.
+            - name: HIVEBOOK_DB_USERNAME
+              valueFrom:
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_USER }
+            - name: HIVEBOOK_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: hivebook-db, key: POSTGRES_PASSWORD }
+            # Object-storage credentials, shared with the RustFS deployment.
+            - name: HIVEBOOK_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef: { name: rustfs-creds, key: ACCESS_KEY }
+            - name: HIVEBOOK_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: rustfs-creds, key: SECRET_KEY }
+            # Token-at-rest and OAuth-state keys (ADR-0027).
+            - name: HIVEBOOK_INTEGRATIONS_TOKEN_KEY
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: TOKEN_KEY }
+            - name: HIVEBOOK_INTEGRATIONS_STATE_KEY
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: STATE_KEY }
+            # Connector OAuth client credentials. Optional so the pod starts before
+            # the OAuth apps are registered; the connect flow needs them set.
+            - name: HIVEBOOK_GDOCS_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GDOCS_CLIENT_ID, optional: true }
+            - name: HIVEBOOK_GDOCS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GDOCS_CLIENT_SECRET, optional: true }
+            - name: HIVEBOOK_GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_CLIENT_ID, optional: true }
+            - name: HIVEBOOK_GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_CLIENT_SECRET, optional: true }
+            # GitHub App slug — routes Connect to the install (repo-picker) flow.
+            - name: HIVEBOOK_GITHUB_APP_SLUG
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_APP_SLUG, optional: true }
+            # GitHub App private key (PEM) — mints installation access tokens.
+            - name: HIVEBOOK_GITHUB_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef: { name: integrations-secrets, key: GITHUB_PRIVATE_KEY, optional: true }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # Readiness gates on the DB (/health → 503 when down); liveness stays on
+          # "/" so a transient DB blip doesn't restart an otherwise-healthy pod.
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          # Static Go binary — full hardening is free. /tmp is a writable emptyDir
+          # since the root filesystem is read-only.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+// Internal integrations surface — implemented by the integrations service, called
+// only by the API (the OAuth callback hands the code here). Never exposed to the
+// browser, so it is generated for Go but excluded from the web client.
+package hivebook.integration.v1;
+
+import "buf/validate/validate.proto";
+import "hivebook/integration/v1/integration.proto";
+
+message CompleteConnectionRequest {
+  // The OAuth authorization code (OAuth connectors) and the signed state. Code is
+  // optional: a GitHub App install/reconfigure redirect may carry only the
+  // installation id, no code.
+  string code = 1;
+  string state = 2 [(buf.validate.field).string.min_len = 1];
+  // GitHub App installation id from the install redirect — present for GitHub-App
+  // connectors, empty otherwise. Drives installation-token auth.
+  string installation_id = 3;
+}
+
+message CompleteConnectionResponse {
+  Connection connection = 1;
+}
+
+// CompleteTokenConnectionRequest creates a connection from a user-supplied token
+// (e.g. a GitHub personal access token) — no OAuth redirect, no signed state. The
+// tenant + region ride as internal-hop headers, like the other API→integrations
+// calls. The API enforces the feature flag before calling this.
+message CompleteTokenConnectionRequest {
+  string connector_id = 1 [(buf.validate.field).string.min_len = 1];
+  string token = 2 [(buf.validate.field).string.min_len = 1];
+  string name = 3 [(buf.validate.field).string.max_len = 100]; // human label; falls back to login
+}
+
+message CompleteTokenConnectionResponse {
+  Connection connection = 1;
+}
+
+service IntegrationInternalService {
+  rpc CompleteConnection(CompleteConnectionRequest) returns (CompleteConnectionResponse);
+  rpc CompleteTokenConnection(CompleteTokenConnectionRequest) returns (CompleteTokenConnectionResponse);
+}

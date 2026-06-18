@@ -1,0 +1,47 @@
+= 0037 — Discovery is a mark-and-sweep reconcile with a degraded-discovery guard
+:adr-id: 0037
+:status: proposed
+:date: 2026-06-18
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+Sync units are persisted (xref:ROOT:adrs/0035-connector-defined-sync-units.adoc[ADR-0035])
+so discovery does not re-list 5000 repos every run and operators can query unit state.
+A persisted set diverges from the source — repos are added, deleted, access revoked —
+so it needs a reconcile, and the reconcile must propagate deletions (the corpus is a
+source of truth that must converge to the source). Webhooks cannot be that mechanism:
+deliveries drop, providers have downtime, replays happen. The reconcile is also where a
+classic footgun lives — a degraded discovery (expired token, a bad provider minute)
+returning 0 or 50 of 5000 units can sweep a tenant's whole corpus into deletion.
+
+== Decision
+
+Discovery is a periodic *mark-and-sweep reconcile*, mandatory regardless of webhooks
+(which arrive later, per connector, as a freshness layer only). Each reconcile stamps
+`generation` / `last_seen_at` on every observed unit; units not seen this pass go
+`active -> removed` (a soft tombstone with a timestamp); a separate GC purges removed
+units and their artifacts only after a grace period. Cadence is adaptive per connector.
+A *degraded-discovery guard* gates the sweep: an empty result, or a drop beyond a
+threshold versus the last known-good count, is treated as a *failed* reconcile — no
+sweep, surfaced — so a transient blip can never tombstone a corpus.
+
+== Alternatives considered
+
+* *Webhooks as the source of truth* — a dropped delivery is silent data loss; webhooks
+can only reduce staleness between reconciles.
+* *Rediscover-everything each sync run* — hundreds of API calls against the budget every
+run; the persisted table plus periodic reconcile is far cheaper.
+* *Hard-delete on first absence (no tombstone, no guard)* — turns any transient discovery
+blip into permanent data loss.
+
+== Consequences
+
+The corpus converges to the source, including deletions, without trusting webhooks. The
+don't-sweep-on-suspicious-discovery rule is the first line of defence against
+blip-induced loss and the grace period is the second. The cost: a unit lifecycle to
+maintain (`active` / `removed` / GC) and a per-connector threshold to tune. Erasure of
+tombstoned artifacts is itself reliability-critical and is handled as a deletion outbox
+(xref:ROOT:adrs/0039-erasure-deletion-outbox.adoc[ADR-0039]).

@@ -1,0 +1,47 @@
+= 0036 — One multi-dimensional adaptive admission controller
+:adr-id: 0036
+:status: proposed
+:date: 2026-06-18
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+With orchestration fixed, the next production failure is *API-budget starvation*, not
+a scheduler bug. Twenty parallel activities against a 5000-request/hour GitHub token
+are slower than four — they trip secondary rate limits and back off fighting each
+other. A source's binding limit (secondary / concurrent / GraphQL points) is opaque,
+time-varying, and discoverable only by hitting it, so a fixed parallelism constant is
+wrong for almost every connector. Concurrency must be derived from a budget, and the
+budget must be learned. Separately, at 1000 tenants one whale must not starve the rest.
+
+== Decision
+
+A single multi-dimensional admission controller gates work; a batch's size is
+`min(credential_budget, tenant_inflight_cap, global_worker_capacity)`. The credential
+budget is *adaptive (AIMD)*: the connector supplies a seed and hard caps via
+`RateBudget()`, and the platform additively increases on sustained success and
+multiplicatively decreases on `429` / secondary-`403` / `Retry-After`. It acts at two
+levels — the workflow (macro) sizes each batch from the current limit `L` via a cheap
+activity (never I/O in deterministic workflow code), and each activity's HTTP client
+(micro) throttles against a Postgres credential-keyed token bucket and honours
+`Retry-After`. Tenant fairness is the *same* limiter keyed by tenant: a hard in-flight
+cap, not a second component and not a per-tenant queue.
+
+== Alternatives considered
+
+* *A fixed parallelism constant* (`P = 20`) — wrong for every connector; ignores the
+source's real, shifting ceiling.
+* *Per-tenant / weighted task queues for fairness* — 1000 queues is real operational
+weight, justified only at SLA tiers; a hard cap on the existing limiter suffices now.
+* *Publish-only rate limits from connector config* — secondary limits are undocumented
+and dynamic; only feedback finds them.
+
+== Consequences
+
+Throughput is *discovered*, not declared — first runs are slower while `L` finds the
+ceiling, in exchange for never collapsing into retry storms. The hard tenant cap is not
+work-conserving (a lone tenant stays capped while the pool idles); the later, additive
+fix is a burstable cap, not a queue redesign. GraphQL points (Projects v2) are a second
+budget dimension to add when boards become the bottleneck.

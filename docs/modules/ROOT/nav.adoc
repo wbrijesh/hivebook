@@ -27,6 +27,9 @@
 * xref:design-docs/0007-configuration-pattern.adoc[0007 · Configuration pattern]
 * xref:design-docs/0008-raw-ingestion-and-object-storage.adoc[0008 · Raw ingestion & object storage]
 * xref:design-docs/0009-integrations-service.adoc[0009 · The integrations service]
+* xref:design-docs/0010-connector-sync-jobs.adoc[0010 · Connector sync jobs & workers (superseded)]
+* xref:design-docs/0011-stopping-and-resumable-sync.adoc[0011 · Stopping & resumable sync]
+* xref:design-docs/0012-sync-architecture-on-temporal.adoc[0012 · Sync architecture on Temporal]
 * xref:design-docs/0000-template.adoc[Template]
 
 .Decision records (ADRs)
@@ -58,6 +61,19 @@
 * xref:adrs/0025-integrations-service.adoc[0025 · Integrations service]
 * xref:adrs/0026-integrations-independent-service.adoc[0026 · Integrations is an independent service]
 * xref:adrs/0027-connector-oauth.adoc[0027 · Connector OAuth2]
+* xref:adrs/0028-river-job-queue.adoc[0028 · River job queue (superseded)]
+* xref:adrs/0029-per-container-sync-jobs.adoc[0029 · Per-container sync jobs (superseded)]
+* xref:adrs/0030-keda-scaled-workers.adoc[0030 · KEDA-scaled sync workers (superseded)]
+* xref:adrs/0031-high-water-mark-cursor.adoc[0031 · High-water-mark cursor]
+* xref:adrs/0032-cooperative-sync-cancellation.adoc[0032 · Cooperative sync cancellation (superseded)]
+* xref:adrs/0033-committed-at-visibility.adoc[0033 · committed_at visibility]
+* xref:adrs/0034-temporal-sync-orchestrator.adoc[0034 · Temporal sync orchestrator]
+* xref:adrs/0035-connector-defined-sync-units.adoc[0035 · Connector-defined sync units]
+* xref:adrs/0036-adaptive-admission-controller.adoc[0036 · Adaptive admission controller]
+* xref:adrs/0037-mark-and-sweep-discovery.adoc[0037 · Mark-and-sweep discovery]
+* xref:adrs/0038-cursor-write-order.adoc[0038 · Cursor write order]
+* xref:adrs/0039-erasure-deletion-outbox.adoc[0039 · Erasure deletion outbox]
+* xref:adrs/0040-cooperative-cancellation-temporal.adoc[0040 · Cooperative cancellation (Temporal)]
 * xref:adrs/0000-template.adoc[Template]
 
 .Standards

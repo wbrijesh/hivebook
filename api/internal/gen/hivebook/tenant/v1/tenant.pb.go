@@ -14,6 +14,7 @@ import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -393,11 +394,720 @@ func (x *CompleteOnboardingResponse) GetTenant() *Tenant {
 	return nil
 }
 
+// UpdateTenantRequest carries the editable workspace profile. Region is absent by
+// design (write-once, ADR-0014); name is required so the workspace can't be left
+// nameless.
+type UpdateTenantRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Size          string                 `protobuf:"bytes,2,opt,name=size,proto3" json:"size,omitempty"`
+	UseCases      []string               `protobuf:"bytes,3,rep,name=use_cases,json=useCases,proto3" json:"use_cases,omitempty"`
+	UseCaseOther  string                 `protobuf:"bytes,4,opt,name=use_case_other,json=useCaseOther,proto3" json:"use_case_other,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTenantRequest) Reset() {
+	*x = UpdateTenantRequest{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTenantRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTenantRequest) ProtoMessage() {}
+
+func (x *UpdateTenantRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTenantRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTenantRequest) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdateTenantRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateTenantRequest) GetSize() string {
+	if x != nil {
+		return x.Size
+	}
+	return ""
+}
+
+func (x *UpdateTenantRequest) GetUseCases() []string {
+	if x != nil {
+		return x.UseCases
+	}
+	return nil
+}
+
+func (x *UpdateTenantRequest) GetUseCaseOther() string {
+	if x != nil {
+		return x.UseCaseOther
+	}
+	return ""
+}
+
+type UpdateTenantResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tenant        *Tenant                `protobuf:"bytes,1,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTenantResponse) Reset() {
+	*x = UpdateTenantResponse{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTenantResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTenantResponse) ProtoMessage() {}
+
+func (x *UpdateTenantResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTenantResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTenantResponse) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *UpdateTenantResponse) GetTenant() *Tenant {
+	if x != nil {
+		return x.Tenant
+	}
+	return nil
+}
+
+// Member is one person in the workspace, projected from the identity provider.
+type Member struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`     // ZITADEL user id
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"` // display name (falls back to login name)
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Roles         []string               `protobuf:"bytes,4,rep,name=roles,proto3" json:"roles,omitempty"` // org roles, e.g. "ORG_OWNER"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Member) Reset() {
+	*x = Member{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Member) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Member) ProtoMessage() {}
+
+func (x *Member) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Member.ProtoReflect.Descriptor instead.
+func (*Member) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Member) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Member) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Member) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *Member) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+type ListMembersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersRequest) Reset() {
+	*x = ListMembersRequest{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersRequest) ProtoMessage() {}
+
+func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListMembersRequest) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{9}
+}
+
+type ListMembersResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Members []*Member              `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
+	// configured is false when the ZITADEL management integration isn't set up; the
+	// members list is empty and the UI shows a setup hint instead of "no members".
+	Configured    bool `protobuf:"varint,2,opt,name=configured,proto3" json:"configured,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersResponse) Reset() {
+	*x = ListMembersResponse{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersResponse) ProtoMessage() {}
+
+func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListMembersResponse) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListMembersResponse) GetMembers() []*Member {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+func (x *ListMembersResponse) GetConfigured() bool {
+	if x != nil {
+		return x.Configured
+	}
+	return false
+}
+
+// AuditEvent is one recorded privileged action in the workspace.
+type AuditEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	ActorId       string                 `protobuf:"bytes,3,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"` // ZITADEL user id of who acted
+	ActorEmail    string                 `protobuf:"bytes,4,opt,name=actor_email,json=actorEmail,proto3" json:"actor_email,omitempty"`
+	Action        string                 `protobuf:"bytes,5,opt,name=action,proto3" json:"action,omitempty"` // stable code, e.g. "tenant.updated", "source.disconnected"
+	Target        string                 `protobuf:"bytes,6,opt,name=target,proto3" json:"target,omitempty"` // human label of the thing acted on
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuditEvent) Reset() {
+	*x = AuditEvent{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditEvent) ProtoMessage() {}
+
+func (x *AuditEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditEvent.ProtoReflect.Descriptor instead.
+func (*AuditEvent) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AuditEvent) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetOccurredAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *AuditEvent) GetActorId() string {
+	if x != nil {
+		return x.ActorId
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetActorEmail() string {
+	if x != nil {
+		return x.ActorEmail
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+type ListAuditEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditEventsRequest) Reset() {
+	*x = ListAuditEventsRequest{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditEventsRequest) ProtoMessage() {}
+
+func (x *ListAuditEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditEventsRequest.ProtoReflect.Descriptor instead.
+func (*ListAuditEventsRequest) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListAuditEventsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListAuditEventsRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+type ListAuditEventsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*AuditEvent          `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"` // total rows for the tenant, for pagination
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAuditEventsResponse) Reset() {
+	*x = ListAuditEventsResponse{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAuditEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAuditEventsResponse) ProtoMessage() {}
+
+func (x *ListAuditEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAuditEventsResponse.ProtoReflect.Descriptor instead.
+func (*ListAuditEventsResponse) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListAuditEventsResponse) GetEvents() []*AuditEvent {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+func (x *ListAuditEventsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+// FeatureFlag is one toggleable capability. key/name/description come from the
+// server-side catalog; enabled is the tenant's effective value (override or default).
+type FeatureFlag struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Enabled       bool                   `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FeatureFlag) Reset() {
+	*x = FeatureFlag{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeatureFlag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeatureFlag) ProtoMessage() {}
+
+func (x *FeatureFlag) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeatureFlag.ProtoReflect.Descriptor instead.
+func (*FeatureFlag) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FeatureFlag) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *FeatureFlag) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *FeatureFlag) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *FeatureFlag) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+type ListFeatureFlagsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFeatureFlagsRequest) Reset() {
+	*x = ListFeatureFlagsRequest{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFeatureFlagsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFeatureFlagsRequest) ProtoMessage() {}
+
+func (x *ListFeatureFlagsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFeatureFlagsRequest.ProtoReflect.Descriptor instead.
+func (*ListFeatureFlagsRequest) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{15}
+}
+
+type ListFeatureFlagsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Flags         []*FeatureFlag         `protobuf:"bytes,1,rep,name=flags,proto3" json:"flags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFeatureFlagsResponse) Reset() {
+	*x = ListFeatureFlagsResponse{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFeatureFlagsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFeatureFlagsResponse) ProtoMessage() {}
+
+func (x *ListFeatureFlagsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFeatureFlagsResponse.ProtoReflect.Descriptor instead.
+func (*ListFeatureFlagsResponse) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListFeatureFlagsResponse) GetFlags() []*FeatureFlag {
+	if x != nil {
+		return x.Flags
+	}
+	return nil
+}
+
+type SetFeatureFlagRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFeatureFlagRequest) Reset() {
+	*x = SetFeatureFlagRequest{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFeatureFlagRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFeatureFlagRequest) ProtoMessage() {}
+
+func (x *SetFeatureFlagRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFeatureFlagRequest.ProtoReflect.Descriptor instead.
+func (*SetFeatureFlagRequest) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SetFeatureFlagRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SetFeatureFlagRequest) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+type SetFeatureFlagResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Flag          *FeatureFlag           `protobuf:"bytes,1,opt,name=flag,proto3" json:"flag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetFeatureFlagResponse) Reset() {
+	*x = SetFeatureFlagResponse{}
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFeatureFlagResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFeatureFlagResponse) ProtoMessage() {}
+
+func (x *SetFeatureFlagResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hivebook_tenant_v1_tenant_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFeatureFlagResponse.ProtoReflect.Descriptor instead.
+func (*SetFeatureFlagResponse) Descriptor() ([]byte, []int) {
+	return file_hivebook_tenant_v1_tenant_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SetFeatureFlagResponse) GetFlag() *FeatureFlag {
+	if x != nil {
+		return x.Flag
+	}
+	return nil
+}
+
 var File_hivebook_tenant_v1_tenant_proto protoreflect.FileDescriptor
 
 const file_hivebook_tenant_v1_tenant_proto_rawDesc = "" +
 	"\n" +
-	"\x1fhivebook/tenant/v1/tenant.proto\x12\x12hivebook.tenant.v1\x1a\x1bbuf/validate/validate.proto\"@\n" +
+	"\x1fhivebook/tenant/v1/tenant.proto\x12\x12hivebook.tenant.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"@\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -425,11 +1135,65 @@ const file_hivebook_tenant_v1_tenant_proto_rawDesc = "" +
 	"\tuse_cases\x18\x04 \x03(\tB\b\xbaH\x05\x92\x01\x02\x10 R\buseCases\x12.\n" +
 	"\x0euse_case_other\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\fuseCaseOther\"P\n" +
 	"\x1aCompleteOnboardingResponse\x122\n" +
-	"\x06tenant\x18\x01 \x01(\v2\x1a.hivebook.tenant.v1.TenantR\x06tenant2\xe1\x01\n" +
+	"\x06tenant\x18\x01 \x01(\v2\x1a.hivebook.tenant.v1.TenantR\x06tenant\"\xa9\x01\n" +
+	"\x13UpdateTenantRequest\x12\x1e\n" +
+	"\x04name\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12\x1b\n" +
+	"\x04size\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x182R\x04size\x12%\n" +
+	"\tuse_cases\x18\x03 \x03(\tB\b\xbaH\x05\x92\x01\x02\x10 R\buseCases\x12.\n" +
+	"\x0euse_case_other\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\fuseCaseOther\"J\n" +
+	"\x14UpdateTenantResponse\x122\n" +
+	"\x06tenant\x18\x01 \x01(\v2\x1a.hivebook.tenant.v1.TenantR\x06tenant\"X\n" +
+	"\x06Member\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
+	"\x05roles\x18\x04 \x03(\tR\x05roles\"\x14\n" +
+	"\x12ListMembersRequest\"k\n" +
+	"\x13ListMembersResponse\x124\n" +
+	"\amembers\x18\x01 \x03(\v2\x1a.hivebook.tenant.v1.MemberR\amembers\x12\x1e\n" +
+	"\n" +
+	"configured\x18\x02 \x01(\bR\n" +
+	"configured\"\xc5\x01\n" +
+	"\n" +
+	"AuditEvent\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12;\n" +
+	"\voccurred_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12\x19\n" +
+	"\bactor_id\x18\x03 \x01(\tR\aactorId\x12\x1f\n" +
+	"\vactor_email\x18\x04 \x01(\tR\n" +
+	"actorEmail\x12\x16\n" +
+	"\x06action\x18\x05 \x01(\tR\x06action\x12\x16\n" +
+	"\x06target\x18\x06 \x01(\tR\x06target\"[\n" +
+	"\x16ListAuditEventsRequest\x12 \n" +
+	"\x05limit\x18\x01 \x01(\x05B\n" +
+	"\xbaH\a\x1a\x05\x18\xc8\x01(\x00R\x05limit\x12\x1f\n" +
+	"\x06offset\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\"g\n" +
+	"\x17ListAuditEventsResponse\x126\n" +
+	"\x06events\x18\x01 \x03(\v2\x1e.hivebook.tenant.v1.AuditEventR\x06events\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"o\n" +
+	"\vFeatureFlag\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\"\x19\n" +
+	"\x17ListFeatureFlagsRequest\"Q\n" +
+	"\x18ListFeatureFlagsResponse\x125\n" +
+	"\x05flags\x18\x01 \x03(\v2\x1f.hivebook.tenant.v1.FeatureFlagR\x05flags\"N\n" +
+	"\x15SetFeatureFlagRequest\x12\x1b\n" +
+	"\x03key\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x03key\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\"M\n" +
+	"\x16SetFeatureFlagResponse\x123\n" +
+	"\x04flag\x18\x01 \x01(\v2\x1f.hivebook.tenant.v1.FeatureFlagR\x04flag2\xe8\x05\n" +
 	"\rTenantService\x12[\n" +
 	"\n" +
 	"GetSession\x12%.hivebook.tenant.v1.GetSessionRequest\x1a&.hivebook.tenant.v1.GetSessionResponse\x12s\n" +
-	"\x12CompleteOnboarding\x12-.hivebook.tenant.v1.CompleteOnboardingRequest\x1a..hivebook.tenant.v1.CompleteOnboardingResponseB\xbd\x01\n" +
+	"\x12CompleteOnboarding\x12-.hivebook.tenant.v1.CompleteOnboardingRequest\x1a..hivebook.tenant.v1.CompleteOnboardingResponse\x12a\n" +
+	"\fUpdateTenant\x12'.hivebook.tenant.v1.UpdateTenantRequest\x1a(.hivebook.tenant.v1.UpdateTenantResponse\x12^\n" +
+	"\vListMembers\x12&.hivebook.tenant.v1.ListMembersRequest\x1a'.hivebook.tenant.v1.ListMembersResponse\x12j\n" +
+	"\x0fListAuditEvents\x12*.hivebook.tenant.v1.ListAuditEventsRequest\x1a+.hivebook.tenant.v1.ListAuditEventsResponse\x12m\n" +
+	"\x10ListFeatureFlags\x12+.hivebook.tenant.v1.ListFeatureFlagsRequest\x1a,.hivebook.tenant.v1.ListFeatureFlagsResponse\x12g\n" +
+	"\x0eSetFeatureFlag\x12).hivebook.tenant.v1.SetFeatureFlagRequest\x1a*.hivebook.tenant.v1.SetFeatureFlagResponseB\xbd\x01\n" +
 	"\x16com.hivebook.tenant.v1B\vTenantProtoP\x01Z,api/internal/gen/hivebook/tenant/v1;tenantv1\xa2\x02\x03HTX\xaa\x02\x12Hivebook.Tenant.V1\xca\x02\x12Hivebook\\Tenant\\V1\xe2\x02\x1eHivebook\\Tenant\\V1\\GPBMetadata\xea\x02\x14Hivebook::Tenant::V1b\x06proto3"
 
 var (
@@ -444,7 +1208,7 @@ func file_hivebook_tenant_v1_tenant_proto_rawDescGZIP() []byte {
 	return file_hivebook_tenant_v1_tenant_proto_rawDescData
 }
 
-var file_hivebook_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_hivebook_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_hivebook_tenant_v1_tenant_proto_goTypes = []any{
 	(*User)(nil),                       // 0: hivebook.tenant.v1.User
 	(*Tenant)(nil),                     // 1: hivebook.tenant.v1.Tenant
@@ -452,20 +1216,50 @@ var file_hivebook_tenant_v1_tenant_proto_goTypes = []any{
 	(*GetSessionResponse)(nil),         // 3: hivebook.tenant.v1.GetSessionResponse
 	(*CompleteOnboardingRequest)(nil),  // 4: hivebook.tenant.v1.CompleteOnboardingRequest
 	(*CompleteOnboardingResponse)(nil), // 5: hivebook.tenant.v1.CompleteOnboardingResponse
+	(*UpdateTenantRequest)(nil),        // 6: hivebook.tenant.v1.UpdateTenantRequest
+	(*UpdateTenantResponse)(nil),       // 7: hivebook.tenant.v1.UpdateTenantResponse
+	(*Member)(nil),                     // 8: hivebook.tenant.v1.Member
+	(*ListMembersRequest)(nil),         // 9: hivebook.tenant.v1.ListMembersRequest
+	(*ListMembersResponse)(nil),        // 10: hivebook.tenant.v1.ListMembersResponse
+	(*AuditEvent)(nil),                 // 11: hivebook.tenant.v1.AuditEvent
+	(*ListAuditEventsRequest)(nil),     // 12: hivebook.tenant.v1.ListAuditEventsRequest
+	(*ListAuditEventsResponse)(nil),    // 13: hivebook.tenant.v1.ListAuditEventsResponse
+	(*FeatureFlag)(nil),                // 14: hivebook.tenant.v1.FeatureFlag
+	(*ListFeatureFlagsRequest)(nil),    // 15: hivebook.tenant.v1.ListFeatureFlagsRequest
+	(*ListFeatureFlagsResponse)(nil),   // 16: hivebook.tenant.v1.ListFeatureFlagsResponse
+	(*SetFeatureFlagRequest)(nil),      // 17: hivebook.tenant.v1.SetFeatureFlagRequest
+	(*SetFeatureFlagResponse)(nil),     // 18: hivebook.tenant.v1.SetFeatureFlagResponse
+	(*timestamppb.Timestamp)(nil),      // 19: google.protobuf.Timestamp
 }
 var file_hivebook_tenant_v1_tenant_proto_depIdxs = []int32{
-	0, // 0: hivebook.tenant.v1.GetSessionResponse.user:type_name -> hivebook.tenant.v1.User
-	1, // 1: hivebook.tenant.v1.GetSessionResponse.tenant:type_name -> hivebook.tenant.v1.Tenant
-	1, // 2: hivebook.tenant.v1.CompleteOnboardingResponse.tenant:type_name -> hivebook.tenant.v1.Tenant
-	2, // 3: hivebook.tenant.v1.TenantService.GetSession:input_type -> hivebook.tenant.v1.GetSessionRequest
-	4, // 4: hivebook.tenant.v1.TenantService.CompleteOnboarding:input_type -> hivebook.tenant.v1.CompleteOnboardingRequest
-	3, // 5: hivebook.tenant.v1.TenantService.GetSession:output_type -> hivebook.tenant.v1.GetSessionResponse
-	5, // 6: hivebook.tenant.v1.TenantService.CompleteOnboarding:output_type -> hivebook.tenant.v1.CompleteOnboardingResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: hivebook.tenant.v1.GetSessionResponse.user:type_name -> hivebook.tenant.v1.User
+	1,  // 1: hivebook.tenant.v1.GetSessionResponse.tenant:type_name -> hivebook.tenant.v1.Tenant
+	1,  // 2: hivebook.tenant.v1.CompleteOnboardingResponse.tenant:type_name -> hivebook.tenant.v1.Tenant
+	1,  // 3: hivebook.tenant.v1.UpdateTenantResponse.tenant:type_name -> hivebook.tenant.v1.Tenant
+	8,  // 4: hivebook.tenant.v1.ListMembersResponse.members:type_name -> hivebook.tenant.v1.Member
+	19, // 5: hivebook.tenant.v1.AuditEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	11, // 6: hivebook.tenant.v1.ListAuditEventsResponse.events:type_name -> hivebook.tenant.v1.AuditEvent
+	14, // 7: hivebook.tenant.v1.ListFeatureFlagsResponse.flags:type_name -> hivebook.tenant.v1.FeatureFlag
+	14, // 8: hivebook.tenant.v1.SetFeatureFlagResponse.flag:type_name -> hivebook.tenant.v1.FeatureFlag
+	2,  // 9: hivebook.tenant.v1.TenantService.GetSession:input_type -> hivebook.tenant.v1.GetSessionRequest
+	4,  // 10: hivebook.tenant.v1.TenantService.CompleteOnboarding:input_type -> hivebook.tenant.v1.CompleteOnboardingRequest
+	6,  // 11: hivebook.tenant.v1.TenantService.UpdateTenant:input_type -> hivebook.tenant.v1.UpdateTenantRequest
+	9,  // 12: hivebook.tenant.v1.TenantService.ListMembers:input_type -> hivebook.tenant.v1.ListMembersRequest
+	12, // 13: hivebook.tenant.v1.TenantService.ListAuditEvents:input_type -> hivebook.tenant.v1.ListAuditEventsRequest
+	15, // 14: hivebook.tenant.v1.TenantService.ListFeatureFlags:input_type -> hivebook.tenant.v1.ListFeatureFlagsRequest
+	17, // 15: hivebook.tenant.v1.TenantService.SetFeatureFlag:input_type -> hivebook.tenant.v1.SetFeatureFlagRequest
+	3,  // 16: hivebook.tenant.v1.TenantService.GetSession:output_type -> hivebook.tenant.v1.GetSessionResponse
+	5,  // 17: hivebook.tenant.v1.TenantService.CompleteOnboarding:output_type -> hivebook.tenant.v1.CompleteOnboardingResponse
+	7,  // 18: hivebook.tenant.v1.TenantService.UpdateTenant:output_type -> hivebook.tenant.v1.UpdateTenantResponse
+	10, // 19: hivebook.tenant.v1.TenantService.ListMembers:output_type -> hivebook.tenant.v1.ListMembersResponse
+	13, // 20: hivebook.tenant.v1.TenantService.ListAuditEvents:output_type -> hivebook.tenant.v1.ListAuditEventsResponse
+	16, // 21: hivebook.tenant.v1.TenantService.ListFeatureFlags:output_type -> hivebook.tenant.v1.ListFeatureFlagsResponse
+	18, // 22: hivebook.tenant.v1.TenantService.SetFeatureFlag:output_type -> hivebook.tenant.v1.SetFeatureFlagResponse
+	16, // [16:23] is the sub-list for method output_type
+	9,  // [9:16] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_hivebook_tenant_v1_tenant_proto_init() }
@@ -480,7 +1274,7 @@ func file_hivebook_tenant_v1_tenant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hivebook_tenant_v1_tenant_proto_rawDesc), len(file_hivebook_tenant_v1_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

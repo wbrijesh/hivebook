@@ -42,6 +42,21 @@ const (
 	// TenantServiceCompleteOnboardingProcedure is the fully-qualified name of the TenantService's
 	// CompleteOnboarding RPC.
 	TenantServiceCompleteOnboardingProcedure = "/hivebook.tenant.v1.TenantService/CompleteOnboarding"
+	// TenantServiceUpdateTenantProcedure is the fully-qualified name of the TenantService's
+	// UpdateTenant RPC.
+	TenantServiceUpdateTenantProcedure = "/hivebook.tenant.v1.TenantService/UpdateTenant"
+	// TenantServiceListMembersProcedure is the fully-qualified name of the TenantService's ListMembers
+	// RPC.
+	TenantServiceListMembersProcedure = "/hivebook.tenant.v1.TenantService/ListMembers"
+	// TenantServiceListAuditEventsProcedure is the fully-qualified name of the TenantService's
+	// ListAuditEvents RPC.
+	TenantServiceListAuditEventsProcedure = "/hivebook.tenant.v1.TenantService/ListAuditEvents"
+	// TenantServiceListFeatureFlagsProcedure is the fully-qualified name of the TenantService's
+	// ListFeatureFlags RPC.
+	TenantServiceListFeatureFlagsProcedure = "/hivebook.tenant.v1.TenantService/ListFeatureFlags"
+	// TenantServiceSetFeatureFlagProcedure is the fully-qualified name of the TenantService's
+	// SetFeatureFlag RPC.
+	TenantServiceSetFeatureFlagProcedure = "/hivebook.tenant.v1.TenantService/SetFeatureFlag"
 )
 
 // TenantServiceClient is a client for the hivebook.tenant.v1.TenantService service.
@@ -54,6 +69,25 @@ type TenantServiceClient interface {
 	// CompleteOnboarding records the onboarding answers and marks the tenant
 	// onboarded. Idempotent; the storage region is write-once (ADR-0014).
 	CompleteOnboarding(context.Context, *connect.Request[v1.CompleteOnboardingRequest]) (*connect.Response[v1.CompleteOnboardingResponse], error)
+	// UpdateTenant edits the mutable workspace profile from settings (name, size,
+	// use cases). The storage region is intentionally absent — it is write-once
+	// (ADR-0014) and can never be changed here.
+	UpdateTenant(context.Context, *connect.Request[v1.UpdateTenantRequest]) (*connect.Response[v1.UpdateTenantResponse], error)
+	// ListMembers returns the people in the workspace, read live from the identity
+	// provider (ZITADEL is the directory, ADR-0012). `configured` is false when the
+	// directory integration isn't set up, so the UI can explain rather than show an
+	// empty list.
+	ListMembers(context.Context, *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error)
+	// ListAuditEvents returns the workspace's audit trail, newest first, paginated.
+	// Queryable, not exportable (roadmap v0.1; audit is a day-zero primitive,
+	// ADR-0010).
+	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	// ListFeatureFlags returns the workspace's feature flags — the catalog (defined
+	// server-side) merged with the tenant's overrides, so the UI can render toggles
+	// with names + descriptions and the current state.
+	ListFeatureFlags(context.Context, *connect.Request[v1.ListFeatureFlagsRequest]) (*connect.Response[v1.ListFeatureFlagsResponse], error)
+	// SetFeatureFlag turns one flag on/off for the workspace.
+	SetFeatureFlag(context.Context, *connect.Request[v1.SetFeatureFlagRequest]) (*connect.Response[v1.SetFeatureFlagResponse], error)
 }
 
 // NewTenantServiceClient constructs a client for the hivebook.tenant.v1.TenantService service. By
@@ -79,6 +113,36 @@ func NewTenantServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(tenantServiceMethods.ByName("CompleteOnboarding")),
 			connect.WithClientOptions(opts...),
 		),
+		updateTenant: connect.NewClient[v1.UpdateTenantRequest, v1.UpdateTenantResponse](
+			httpClient,
+			baseURL+TenantServiceUpdateTenantProcedure,
+			connect.WithSchema(tenantServiceMethods.ByName("UpdateTenant")),
+			connect.WithClientOptions(opts...),
+		),
+		listMembers: connect.NewClient[v1.ListMembersRequest, v1.ListMembersResponse](
+			httpClient,
+			baseURL+TenantServiceListMembersProcedure,
+			connect.WithSchema(tenantServiceMethods.ByName("ListMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		listAuditEvents: connect.NewClient[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse](
+			httpClient,
+			baseURL+TenantServiceListAuditEventsProcedure,
+			connect.WithSchema(tenantServiceMethods.ByName("ListAuditEvents")),
+			connect.WithClientOptions(opts...),
+		),
+		listFeatureFlags: connect.NewClient[v1.ListFeatureFlagsRequest, v1.ListFeatureFlagsResponse](
+			httpClient,
+			baseURL+TenantServiceListFeatureFlagsProcedure,
+			connect.WithSchema(tenantServiceMethods.ByName("ListFeatureFlags")),
+			connect.WithClientOptions(opts...),
+		),
+		setFeatureFlag: connect.NewClient[v1.SetFeatureFlagRequest, v1.SetFeatureFlagResponse](
+			httpClient,
+			baseURL+TenantServiceSetFeatureFlagProcedure,
+			connect.WithSchema(tenantServiceMethods.ByName("SetFeatureFlag")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -86,6 +150,11 @@ func NewTenantServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 type tenantServiceClient struct {
 	getSession         *connect.Client[v1.GetSessionRequest, v1.GetSessionResponse]
 	completeOnboarding *connect.Client[v1.CompleteOnboardingRequest, v1.CompleteOnboardingResponse]
+	updateTenant       *connect.Client[v1.UpdateTenantRequest, v1.UpdateTenantResponse]
+	listMembers        *connect.Client[v1.ListMembersRequest, v1.ListMembersResponse]
+	listAuditEvents    *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
+	listFeatureFlags   *connect.Client[v1.ListFeatureFlagsRequest, v1.ListFeatureFlagsResponse]
+	setFeatureFlag     *connect.Client[v1.SetFeatureFlagRequest, v1.SetFeatureFlagResponse]
 }
 
 // GetSession calls hivebook.tenant.v1.TenantService.GetSession.
@@ -98,6 +167,31 @@ func (c *tenantServiceClient) CompleteOnboarding(ctx context.Context, req *conne
 	return c.completeOnboarding.CallUnary(ctx, req)
 }
 
+// UpdateTenant calls hivebook.tenant.v1.TenantService.UpdateTenant.
+func (c *tenantServiceClient) UpdateTenant(ctx context.Context, req *connect.Request[v1.UpdateTenantRequest]) (*connect.Response[v1.UpdateTenantResponse], error) {
+	return c.updateTenant.CallUnary(ctx, req)
+}
+
+// ListMembers calls hivebook.tenant.v1.TenantService.ListMembers.
+func (c *tenantServiceClient) ListMembers(ctx context.Context, req *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error) {
+	return c.listMembers.CallUnary(ctx, req)
+}
+
+// ListAuditEvents calls hivebook.tenant.v1.TenantService.ListAuditEvents.
+func (c *tenantServiceClient) ListAuditEvents(ctx context.Context, req *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
+	return c.listAuditEvents.CallUnary(ctx, req)
+}
+
+// ListFeatureFlags calls hivebook.tenant.v1.TenantService.ListFeatureFlags.
+func (c *tenantServiceClient) ListFeatureFlags(ctx context.Context, req *connect.Request[v1.ListFeatureFlagsRequest]) (*connect.Response[v1.ListFeatureFlagsResponse], error) {
+	return c.listFeatureFlags.CallUnary(ctx, req)
+}
+
+// SetFeatureFlag calls hivebook.tenant.v1.TenantService.SetFeatureFlag.
+func (c *tenantServiceClient) SetFeatureFlag(ctx context.Context, req *connect.Request[v1.SetFeatureFlagRequest]) (*connect.Response[v1.SetFeatureFlagResponse], error) {
+	return c.setFeatureFlag.CallUnary(ctx, req)
+}
+
 // TenantServiceHandler is an implementation of the hivebook.tenant.v1.TenantService service.
 type TenantServiceHandler interface {
 	// GetSession returns the authenticated caller's identity and their tenant,
@@ -108,6 +202,25 @@ type TenantServiceHandler interface {
 	// CompleteOnboarding records the onboarding answers and marks the tenant
 	// onboarded. Idempotent; the storage region is write-once (ADR-0014).
 	CompleteOnboarding(context.Context, *connect.Request[v1.CompleteOnboardingRequest]) (*connect.Response[v1.CompleteOnboardingResponse], error)
+	// UpdateTenant edits the mutable workspace profile from settings (name, size,
+	// use cases). The storage region is intentionally absent — it is write-once
+	// (ADR-0014) and can never be changed here.
+	UpdateTenant(context.Context, *connect.Request[v1.UpdateTenantRequest]) (*connect.Response[v1.UpdateTenantResponse], error)
+	// ListMembers returns the people in the workspace, read live from the identity
+	// provider (ZITADEL is the directory, ADR-0012). `configured` is false when the
+	// directory integration isn't set up, so the UI can explain rather than show an
+	// empty list.
+	ListMembers(context.Context, *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error)
+	// ListAuditEvents returns the workspace's audit trail, newest first, paginated.
+	// Queryable, not exportable (roadmap v0.1; audit is a day-zero primitive,
+	// ADR-0010).
+	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
+	// ListFeatureFlags returns the workspace's feature flags — the catalog (defined
+	// server-side) merged with the tenant's overrides, so the UI can render toggles
+	// with names + descriptions and the current state.
+	ListFeatureFlags(context.Context, *connect.Request[v1.ListFeatureFlagsRequest]) (*connect.Response[v1.ListFeatureFlagsResponse], error)
+	// SetFeatureFlag turns one flag on/off for the workspace.
+	SetFeatureFlag(context.Context, *connect.Request[v1.SetFeatureFlagRequest]) (*connect.Response[v1.SetFeatureFlagResponse], error)
 }
 
 // NewTenantServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -129,12 +242,52 @@ func NewTenantServiceHandler(svc TenantServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(tenantServiceMethods.ByName("CompleteOnboarding")),
 		connect.WithHandlerOptions(opts...),
 	)
+	tenantServiceUpdateTenantHandler := connect.NewUnaryHandler(
+		TenantServiceUpdateTenantProcedure,
+		svc.UpdateTenant,
+		connect.WithSchema(tenantServiceMethods.ByName("UpdateTenant")),
+		connect.WithHandlerOptions(opts...),
+	)
+	tenantServiceListMembersHandler := connect.NewUnaryHandler(
+		TenantServiceListMembersProcedure,
+		svc.ListMembers,
+		connect.WithSchema(tenantServiceMethods.ByName("ListMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	tenantServiceListAuditEventsHandler := connect.NewUnaryHandler(
+		TenantServiceListAuditEventsProcedure,
+		svc.ListAuditEvents,
+		connect.WithSchema(tenantServiceMethods.ByName("ListAuditEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
+	tenantServiceListFeatureFlagsHandler := connect.NewUnaryHandler(
+		TenantServiceListFeatureFlagsProcedure,
+		svc.ListFeatureFlags,
+		connect.WithSchema(tenantServiceMethods.ByName("ListFeatureFlags")),
+		connect.WithHandlerOptions(opts...),
+	)
+	tenantServiceSetFeatureFlagHandler := connect.NewUnaryHandler(
+		TenantServiceSetFeatureFlagProcedure,
+		svc.SetFeatureFlag,
+		connect.WithSchema(tenantServiceMethods.ByName("SetFeatureFlag")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hivebook.tenant.v1.TenantService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TenantServiceGetSessionProcedure:
 			tenantServiceGetSessionHandler.ServeHTTP(w, r)
 		case TenantServiceCompleteOnboardingProcedure:
 			tenantServiceCompleteOnboardingHandler.ServeHTTP(w, r)
+		case TenantServiceUpdateTenantProcedure:
+			tenantServiceUpdateTenantHandler.ServeHTTP(w, r)
+		case TenantServiceListMembersProcedure:
+			tenantServiceListMembersHandler.ServeHTTP(w, r)
+		case TenantServiceListAuditEventsProcedure:
+			tenantServiceListAuditEventsHandler.ServeHTTP(w, r)
+		case TenantServiceListFeatureFlagsProcedure:
+			tenantServiceListFeatureFlagsHandler.ServeHTTP(w, r)
+		case TenantServiceSetFeatureFlagProcedure:
+			tenantServiceSetFeatureFlagHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -150,4 +303,24 @@ func (UnimplementedTenantServiceHandler) GetSession(context.Context, *connect.Re
 
 func (UnimplementedTenantServiceHandler) CompleteOnboarding(context.Context, *connect.Request[v1.CompleteOnboardingRequest]) (*connect.Response[v1.CompleteOnboardingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.CompleteOnboarding is not implemented"))
+}
+
+func (UnimplementedTenantServiceHandler) UpdateTenant(context.Context, *connect.Request[v1.UpdateTenantRequest]) (*connect.Response[v1.UpdateTenantResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.UpdateTenant is not implemented"))
+}
+
+func (UnimplementedTenantServiceHandler) ListMembers(context.Context, *connect.Request[v1.ListMembersRequest]) (*connect.Response[v1.ListMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.ListMembers is not implemented"))
+}
+
+func (UnimplementedTenantServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.ListAuditEvents is not implemented"))
+}
+
+func (UnimplementedTenantServiceHandler) ListFeatureFlags(context.Context, *connect.Request[v1.ListFeatureFlagsRequest]) (*connect.Response[v1.ListFeatureFlagsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.ListFeatureFlags is not implemented"))
+}
+
+func (UnimplementedTenantServiceHandler) SetFeatureFlag(context.Context, *connect.Request[v1.SetFeatureFlagRequest]) (*connect.Response[v1.SetFeatureFlagResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hivebook.tenant.v1.TenantService.SetFeatureFlag is not implemented"))
 }

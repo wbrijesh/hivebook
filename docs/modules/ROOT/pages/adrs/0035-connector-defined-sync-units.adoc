@@ -1,0 +1,47 @@
+= 0035 — Sync units are connector-defined; orchestration scales O(connections)
+:adr-id: 0035
+:status: proposed
+:date: 2026-06-18
+:supersedes: adrs/0029-per-container-sync-jobs.adoc
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+xref:ROOT:adrs/0029-per-container-sync-jobs.adoc[ADR-0029] made the container the
+unit of work — one River job per container, fanned out at discovery. That keeps
+per-container isolation and delta, but it scales orchestration objects with *data*:
+a GitHub org of 5000 repos is 5000 jobs, and a Drive modelled per-folder would be
+tens of thousands. On Temporal the same shape is fatal — a parent awaiting 10,000
+child workflows exceeds the ~51k-event history limit. The benefits we split for
+(independent cursors, failure isolation) are data and error-handling concerns, not
+reasons to create orchestration objects.
+
+== Decision
+
+A connector defines its own sync units via `DiscoverUnits` / `SyncUnit` /
+`Checkpoint` / `RateBudget`, and the platform runs *one* drain path over them with the
+count ranging from one to many: Google Docs is *one* unit (the Drive `changes` feed —
+folders are metadata), GitHub is one unit per repo, Jira one per project, Slack one
+per channel. Units are rows in a `sync_unit` table (cursor, status, generation,
+`committed_at`); the `ConnectionWorkflow` drains the table in batches and never holds
+the unit list. Orchestration objects scale `O(connections)`; items are processed in
+batches inside activities, chunked by estimated runtime (~30–90s) with cursor
+heartbeats — no activity owns an unbounded stream.
+
+== Alternatives considered
+
+* *Workflow / child-workflow per container* — the `O(units)` trap; blows Temporal's
+history limit at enterprise scale.
+* *A platform-imposed unit granularity* — would force a bad shape on some source
+(per-folder Drive, per-file anything); the connector knows its real partition.
+* *One giant activity per connection* — no parallelism and unbounded runtime; a huge
+unit must be paged across invocations, not streamed in one call.
+
+== Consequences
+
+Delta and isolation are preserved as *data and code* (a cursor is a row; a poison unit
+is a `status='error'` row that backs off), not as workflows. A persisted `sync_unit`
+table is connector state to reconcile and GC (xref:ROOT:adrs/0037-mark-and-sweep-discovery.adoc[ADR-0037]),
+and it buys operator visibility (`SELECT … WHERE status='error'`) and unit-level
+operations (pause / disable / re-sync one repo). Per-container River fan-out is removed.

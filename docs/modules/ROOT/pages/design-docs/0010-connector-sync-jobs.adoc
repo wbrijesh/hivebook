@@ -1,0 +1,205 @@
+= 0010 — Productionizing Connector Sync: durable jobs, workers, backpressure
+:design-id: 0010
+:status: superseded
+:date: 2026-06-14
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes:
+:superseded-by: design-docs/0012-sync-architecture-on-temporal.adoc
+:related-adrs: adrs/0028-river-job-queue.adoc, adrs/0029-per-container-sync-jobs.adoc, adrs/0030-keda-scaled-workers.adoc
+
+[NOTE]
+====
+*Superseded by xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012]* —
+sync orchestration moves from durable River jobs + KEDA to Temporal. The connector
+boundary (0008) and raw-first capture (0023) still hold; the durable-jobs *mechanism*
+specified here does not. Recorded for history.
+====
+
+== Context
+
+xref:ROOT:design-docs/0009-integrations-service.adoc[Design-doc 0009] shipped a
+*deliberately minimal* in-process ticker that scans due connections and syncs
+them serially. A review of that implementation found it is not production-shaped:
+
+* *Data loss.* A single watermark per connection means a connector with several
+containers (GitHub repos, Drive folders) advances one shared cursor — quieter
+containers silently skip items.
+* *Not crash-safe.* A worker dying mid-sync strands the connection in
+`status='syncing'` forever (the scan filters it out).
+* *Cannot scale.* The scan→mark sequence is not an atomic claim, so two replicas
+grab the same connection — the service is pinned to one replica.
+* *No retries/DLQ/backpressure/metrics.* A broken container retries forever on a
+fixed cadence with no backoff, no give-up, no visibility.
+
+This doc replaces the sync mechanism (not the rest of 0009) with a durable job
+queue, isolated per-container jobs, crash-safe scalable workers, and the
+concurrency/backpressure/observability a production pull-based pipeline needs.
+*Ingestion stays strictly pull* — no webhooks or event-driven sources.
+
+== Goals
+
+* Durable jobs with retries, exponential backoff, and a dead-letter queue.
+* Per-container isolation and per-container cursors — one broken or busy container
+never blocks or corrupts another.
+* Crash-safe workers: a dead worker's jobs return to the queue automatically.
+* Horizontal scale, including scale-to-zero when idle.
+* Concurrency controls and backpressure at global, per-connector, and per-tenant
+levels, plus respect for source rate limits.
+* Correct OAuth token lifecycle under long and concurrent syncs.
+* First-class metrics and observability.
+
+== Non-goals
+
+* Webhooks / event-driven ingestion — out of scope by design.
+* Canonicalization and filing (downstream — 0001/0008).
+* Cross-region work distribution; a second message broker.
+
+== Proposal
+
+=== A durable job queue on Postgres (River)
+
+Sync becomes a set of *jobs* on a *River* queue
+(xref:ROOT:adrs/0028-river-job-queue.adoc[ADR-0028]) — Postgres-backed, so no new
+datastore. River provides durability, retries with backoff, a DLQ (discarded
+jobs), unique/dedup jobs, periodic jobs, per-queue concurrency, and crash-safe
+leases (a dead worker's leased jobs requeue after a timeout). It uses
+`SELECT … FOR UPDATE SKIP LOCKED`, so many workers drain it safely — the fix for
+the single-replica limit.
+
+=== Discovery fans out into per-container jobs
+
+The unit of work is a *container*, not a connection
+(xref:ROOT:adrs/0029-per-container-sync-jobs.adoc[ADR-0029]):
+
+[d2]
+----
+direction: down
+enq: "Scheduler (River periodic)\nenqueue due connections"
+disc: "DiscoverConnection\nlist containers, fan out"
+s1: "SyncContainer\nacme/api — own cursor"
+s2: "SyncContainer\nacme/web — own cursor"
+s3: "SyncContainer\nacme/legacy — fails alone\nretry → DLQ"
+enq -> disc
+disc -> s1
+disc -> s2
+disc -> s3
+----
+
+* A *periodic* job enqueues a `DiscoverConnection` for each connection whose
+`next_sync_at` has passed (dedup-unique, so never double-queued).
+* `DiscoverConnection` is cheap: it lists the connection's containers and
+enqueues one `SyncContainer` job per container.
+* `SyncContainer` syncs exactly one container from *its own* watermark.
+* `CompleteConnection` (on connect) and `TriggerSync` (manual) enqueue a
+`DiscoverConnection` immediately.
+
+This makes the failure and scaling story right: `acme/legacy` (a deleted repo,
+404s) fails and DLQs *alone* — it neither re-walks `acme/api`'s 10k issues nor
+blocks `acme/web`; the three containers run on three workers in parallel; and each
+advances its *own* cursor, so nothing is skipped.
+
+=== Incremental, per-container, no full re-scan
+
+* Per-`(connection, container)` watermarks (the `watermark` table already
+supports this; v0.1 mis-used a single `''` row).
+* Cursor comparison is `>=` with content-hash dedup (we already dedup), so items
+sharing the boundary timestamp aren't lost.
+* *Backfill vs incremental* are distinct: the first sync of a large container is
+chunked across bounded jobs with a budget; steady-state jobs fetch small deltas.
+
+=== Crash-safe, scale-to-zero workers
+
+Workers run as a *separate `integrations-worker` Deployment* from the Connect
+server (the server only enqueues; workers only drain). River leases make a dead
+worker's jobs requeue automatically — no stranded state, and shutdown simply
+stops leasing. *KEDA* scales the worker Deployment on the available-job count
+(its Postgres scaler), *to zero* when the queue is empty
+(xref:ROOT:adrs/0030-keda-scaled-workers.adoc[ADR-0030]).
+
+=== Retries, DLQ, terminal states
+
+* River retries with exponential backoff + jitter; after N attempts → DLQ,
+surfaced to admins.
+* Errors are classified: *retryable* (rate limit, 5xx, network — honor
+`Retry-After`) vs *terminal* (revoked/invalid token → connection enters
+`needs_reauth`, jobs stop, admin is prompted to reconnect).
+
+=== Concurrency controls & backpressure
+
+* *Global*: worker concurrency (River queue size) and KEDA max replicas.
+* *Per-connector*: separate River queues so one connector can't starve others.
+* *Per-tenant*: a fair-share / max-in-flight gate at claim time, so one large
+tenant can't monopolize the pool.
+* *Source*: a per-connector rate limiter respecting provider quotas; 429s
+reschedule with `Retry-After`.
+
+=== OAuth token lifecycle
+
+* A *persisting, single-flight* `TokenSource` that refreshes mid-sync and writes
+the rotated token back — long syncs don't 401, concurrent refreshes don't clobber.
+* Never overwrite a good refresh token with an empty one on reconnect.
+* Revoked tokens → `needs_reauth` (terminal), surfaced to the admin.
+
+=== Metrics & observability
+
+* `hivebook_sync_jobs\{state}` gauge — *pending / running / retryable / discarded*
+(the queue-depth metric, and the KEDA trigger).
+* Counters: `sync_runs_total\{connector,result}`, `artifacts_ingested_total`,
+`token_refresh_total\{result}`, `source_rate_limited_total`, and a cap-hit counter
+(so truncation at caps is never silent).
+* Histograms: `sync_duration_seconds\{connector}`, artifacts-per-run.
+* A `sync_run` history (started/finished, attempt, artifacts, bytes, error) with a
+per-job correlation id, plus `last_attempt_at`/`last_success_at` split (today
+`last_synced_at` wrongly advances on failure). OTel spans per run/page.
+
+=== Reliability fixes folded in
+
+Per-sync and per-request timeouts; overflow detection instead of silently
+truncating large artifacts; require a tenant region before connecting; Drive
+Shared-Drives coverage; capture GitHub issue comments; an object-storage
+retention/lifecycle policy.
+
+=== Data-model changes
+
+`connector_connection`: `next_sync_at`, `last_attempt_at`/`last_success_at`,
+`consecutive_failures`, status incl. `needs_reauth`/`disabled`. Per-container
+`watermark` rows (already supported). A `sync_run` table. River's own tables.
+Retry/backoff state lives in River, not our schema.
+
+== Alternatives considered
+
+* *Raw `SELECT … FOR UPDATE SKIP LOCKED`.* Same infra, but we hand-roll retries,
+backoff, DLQ, periodic jobs, and unique-dedup — exactly what River already gives.
+* *External broker (Redis / NATS / SQS).* More operational surface and a second
+datastore, against the Postgres-first ethos; KEDA scalers exist for all but the
+durability/DLQ semantics still need building.
+* *Temporal.* Excellent reliability and observability, but a heavy new dependency
+for what is fundamentally a job queue.
+* *Keep the in-process loop.* Cannot scale, isn't crash-safe, loses data — the
+status quo this doc exists to replace.
+
+== Tradeoffs
+
+* River's tables and a worker Deployment to operate; KEDA becomes a dependency.
+* Postgres is the queue — fine at our scale, a contention point at extreme volume
+(revisit only if measured).
+* Scale-to-zero adds cold-start latency to the first sync after idle — acceptable
+for a background pipeline.
+
+== Open questions
+
+* The per-tenant fairness algorithm (strict max-in-flight vs weighted) — tune from
+telemetry.
+* Backfill chunk size / budget and KEDA min/max replica numbers — start as
+constants (ADR-0011), graduate later.
+* Object-storage retention policy for superseded artifact versions.
+
+== Decisions to be recorded as ADRs
+
+* xref:ROOT:adrs/0028-river-job-queue.adoc[ADR-0028] — River (Postgres) is the
+connector-sync job queue.
+* xref:ROOT:adrs/0029-per-container-sync-jobs.adoc[ADR-0029] — sync is per-container
+(discovery fans out) with per-container watermarks.
+* xref:ROOT:adrs/0030-keda-scaled-workers.adoc[ADR-0030] — sync runs in a separate
+worker Deployment, KEDA-scaled to zero on queue depth.

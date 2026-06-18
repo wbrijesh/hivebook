@@ -55,6 +55,19 @@ docs
 │           │   ├── 0025-integrations-service.adoc
 │           │   ├── 0026-integrations-independent-service.adoc
 │           │   ├── 0027-connector-oauth.adoc
+│           │   ├── 0028-river-job-queue.adoc
+│           │   ├── 0029-per-container-sync-jobs.adoc
+│           │   ├── 0030-keda-scaled-workers.adoc
+│           │   ├── 0031-high-water-mark-cursor.adoc
+│           │   ├── 0032-cooperative-sync-cancellation.adoc
+│           │   ├── 0033-committed-at-visibility.adoc
+│           │   ├── 0034-temporal-sync-orchestrator.adoc
+│           │   ├── 0035-connector-defined-sync-units.adoc
+│           │   ├── 0036-adaptive-admission-controller.adoc
+│           │   ├── 0037-mark-and-sweep-discovery.adoc
+│           │   ├── 0038-cursor-write-order.adoc
+│           │   ├── 0039-erasure-deletion-outbox.adoc
+│           │   ├── 0040-cooperative-cancellation-temporal.adoc
 │           │   └── index.adoc
 │           ├── architecture
 │           │   ├── corpus-and-index.adoc
@@ -77,6 +90,9 @@ docs
 │           │   ├── 0007-configuration-pattern.adoc
 │           │   ├── 0008-raw-ingestion-and-object-storage.adoc
 │           │   ├── 0009-integrations-service.adoc
+│           │   ├── 0010-connector-sync-jobs.adoc
+│           │   ├── 0011-stopping-and-resumable-sync.adoc
+│           │   ├── 0012-sync-architecture-on-temporal.adoc
 │           │   └── index.adoc
 │           ├── index.adoc
 │           ├── operations

@@ -25,3 +25,47 @@ export const getSession = TenantService.method.getSession;
  * @generated from rpc hivebook.tenant.v1.TenantService.CompleteOnboarding
  */
 export const completeOnboarding = TenantService.method.completeOnboarding;
+
+/**
+ * UpdateTenant edits the mutable workspace profile from settings (name, size,
+ * use cases). The storage region is intentionally absent — it is write-once
+ * (ADR-0014) and can never be changed here.
+ *
+ * @generated from rpc hivebook.tenant.v1.TenantService.UpdateTenant
+ */
+export const updateTenant = TenantService.method.updateTenant;
+
+/**
+ * ListMembers returns the people in the workspace, read live from the identity
+ * provider (ZITADEL is the directory, ADR-0012). `configured` is false when the
+ * directory integration isn't set up, so the UI can explain rather than show an
+ * empty list.
+ *
+ * @generated from rpc hivebook.tenant.v1.TenantService.ListMembers
+ */
+export const listMembers = TenantService.method.listMembers;
+
+/**
+ * ListAuditEvents returns the workspace's audit trail, newest first, paginated.
+ * Queryable, not exportable (roadmap v0.1; audit is a day-zero primitive,
+ * ADR-0010).
+ *
+ * @generated from rpc hivebook.tenant.v1.TenantService.ListAuditEvents
+ */
+export const listAuditEvents = TenantService.method.listAuditEvents;
+
+/**
+ * ListFeatureFlags returns the workspace's feature flags — the catalog (defined
+ * server-side) merged with the tenant's overrides, so the UI can render toggles
+ * with names + descriptions and the current state.
+ *
+ * @generated from rpc hivebook.tenant.v1.TenantService.ListFeatureFlags
+ */
+export const listFeatureFlags = TenantService.method.listFeatureFlags;
+
+/**
+ * SetFeatureFlag turns one flag on/off for the workspace.
+ *
+ * @generated from rpc hivebook.tenant.v1.TenantService.SetFeatureFlag
+ */
+export const setFeatureFlag = TenantService.method.setFeatureFlag;

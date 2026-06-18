@@ -41,8 +41,9 @@ func New(
 	return &Hivebook{Source: source}
 }
 
-// Check runs every enforcement check (proto + web + api) in parallel and reports
-// the result. Errors if any check fails. The CI and `just check` entrypoint.
+// Check runs every enforcement check (proto + web + api + integrations) in
+// parallel and reports the result. Errors if any check fails. The CI and
+// `just check` entrypoint.
 func (m *Hivebook) Check(ctx context.Context) (string, error) {
 	type result struct {
 		name string
@@ -56,6 +57,7 @@ func (m *Hivebook) Check(ctx context.Context) (string, error) {
 		{"proto", m.CheckProto},
 		{"web", m.CheckWeb},
 		{"api", m.CheckApi},
+		{"integrations", m.CheckIntegrations},
 	}
 
 	results := make([]result, len(checks))
@@ -103,19 +105,22 @@ func (m *Hivebook) CheckProto(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	// Regenerate with the same two templates `just proto` uses, then diff the
-	// fresh output against what's committed.
+	// Regenerate with the same templates `just proto` uses, then diff the fresh
+	// output against what's committed (Go for the api + integrations trees, TS for web).
 	regen := buf.
 		WithExec([]string{"buf", "generate", "--template", "buf.gen.go.yaml"}).
-		WithExec([]string{"buf", "generate", "--template", "buf.gen.es.yaml", "--include-imports"})
+		WithExec([]string{"buf", "generate", "--template", "buf.gen.integrations.yaml", "--path", "proto/hivebook/integration"}).
+		WithExec([]string{"buf", "generate", "--template", "buf.gen.es.yaml", "--include-imports", "--exclude-path", "proto/hivebook/integration/v1/integration_internal.proto"})
 
 	_, err := dag.Container().
 		From(alpineImage).
 		WithDirectory("/committed/go", m.Source.Directory("api/internal/gen")).
+		WithDirectory("/committed/ig", m.Source.Directory("integrations/internal/gen")).
 		WithDirectory("/committed/es", m.Source.Directory("web/lib/gen")).
 		WithDirectory("/fresh/go", regen.Directory("/work/api/internal/gen")).
+		WithDirectory("/fresh/ig", regen.Directory("/work/integrations/internal/gen")).
 		WithDirectory("/fresh/es", regen.Directory("/work/web/lib/gen")).
-		WithExec([]string{"sh", "-c", "diff -r /committed/go /fresh/go && diff -r /committed/es /fresh/es"}).
+		WithExec([]string{"sh", "-c", "diff -r /committed/go /fresh/go && diff -r /committed/ig /fresh/ig && diff -r /committed/es /fresh/es"}).
 		Sync(ctx)
 	if err != nil {
 		return "", fmt.Errorf("generated code is stale — run `just proto` and commit: %w", err)
@@ -136,17 +141,27 @@ func (m *Hivebook) CheckWeb(ctx context.Context) (string, error) {
 	return "prettier + eslint + tsc", nil
 }
 
-// CheckApi runs the API quality gate: go build, go vet, then the full test suite.
-// The tests use testcontainers, so a Docker-in-Docker engine is bound for them.
+// CheckApi runs the API module's quality gate.
 func (m *Hivebook) CheckApi(ctx context.Context) (string, error) {
-	if _, err := m.goBase().
+	return m.goModuleCheck(ctx, "api")
+}
+
+// CheckIntegrations runs the integrations module's quality gate.
+func (m *Hivebook) CheckIntegrations(ctx context.Context) (string, error) {
+	return m.goModuleCheck(ctx, "integrations")
+}
+
+// goModuleCheck runs go build, go vet, then the full test suite for a Go module.
+// The tests use testcontainers, so a Docker-in-Docker engine is bound for them.
+func (m *Hivebook) goModuleCheck(ctx context.Context, dir string) (string, error) {
+	if _, err := m.goBase(dir).
 		WithExec([]string{"go", "build", "./..."}).
 		WithExec([]string{"go", "vet", "./..."}).
 		Sync(ctx); err != nil {
 		return "", err
 	}
 
-	if _, err := m.goBase().
+	if _, err := m.goBase(dir).
 		WithServiceBinding("docker", m.dockerEngine()).
 		WithEnvVariable("DOCKER_HOST", "tcp://docker:2375").
 		WithEnvVariable("TESTCONTAINERS_RYUK_DISABLED", "true").
@@ -179,15 +194,16 @@ func (m *Hivebook) webBase() *dagger.Container {
 		WithExec([]string{"pnpm", "install", "--frozen-lockfile"})
 }
 
-// goBase is a Go container with the API source, module/build caches, and CGO off
-// (matching api/Dockerfile, so alpine needs no C toolchain).
-func (m *Hivebook) goBase() *dagger.Container {
+// goBase is a Go container with a module's source, module/build caches, and CGO
+// off (matching the service Dockerfiles, so alpine needs no C toolchain). dir is
+// the module directory ("api", "integrations").
+func (m *Hivebook) goBase(dir string) *dagger.Container {
 	return dag.Container().
 		From(goImage).
 		WithEnvVariable("CGO_ENABLED", "0").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("hivebook-go-mod")).
 		WithMountedCache("/root/.cache/go-build", dag.CacheVolume("hivebook-go-build")).
-		WithDirectory("/src", m.Source.Directory("api")).
+		WithDirectory("/src", m.Source.Directory(dir)).
 		WithWorkdir("/src").
 		WithExec([]string{"go", "mod", "download"})
 }

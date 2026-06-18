@@ -1,0 +1,46 @@
+= 0040 — Cooperative cancellation via Temporal cancellation and chunk-boundary heartbeat
+:adr-id: 0040
+:status: proposed
+:date: 2026-06-18
+:supersedes: adrs/0032-cooperative-sync-cancellation.adoc
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+xref:ROOT:adrs/0032-cooperative-sync-cancellation.adoc[ADR-0032] implemented Stop on the
+River design: cancel the connection's jobs and have `StopSync` *authoritatively settle*
+the connection state, because relying on each cancelled job to decrement the inflight
+counter was racy. With orchestration on Temporal
+(xref:ROOT:adrs/0034-temporal-sync-orchestrator.adoc[ADR-0034]) the inflight counter and
+the manual settle are gone, so cancellation must be re-expressed in Temporal's model —
+without losing ADR-0032's guarantees (cancel queued and running work, no stranded
+`syncing`, no corruption, a stop is not a failure).
+
+== Decision
+
+Stop is *Temporal workflow cancellation*. A `StopSync` signal cancels the
+`ConnectionWorkflow`'s cancellation scope; in-flight activities receive cancellation and
+stop *cooperatively at the next chunk boundary*, having committed everything so far and
+advanced the `sync_unit` cursor (xref:ROOT:adrs/0038-cursor-write-order.adoc[ADR-0038]).
+A stop is not a failure — no retry, no `error` status; the connection settles to its
+resting state through the workflow's normal completion path, not a separate settle. The
+settle is structural (the workflow ends), so there is no counter to race.
+
+== Alternatives considered
+
+* *Authoritative manual settle* (ADR-0032) — necessary only because the inflight counter
+was racy; Temporal makes settle structural, so it is now redundant.
+* *Hard cancel, ignore in-flight writes* — without the high-water-mark + chunk-boundary
+stop this is the cursor-gap bug; rejected, as in ADR-0032.
+* *Cancel at item granularity* — finer stop latency, but every item would need a
+heartbeat; the chunk boundary (~30–90s) is the right grain, and worst-case stop latency
+is one chunk.
+
+== Consequences
+
+Stop is the same as a crash from the data's point of view — an interruption the
+high-water-mark cursor already makes safe — with the only addition being that we initiate
+it. No stranded `syncing` (the workflow either ends or is retried by Temporal), no
+inflight counter, no manual settle path. Worst-case stop latency is one chunk; activities
+must heartbeat and check cancellation at chunk boundaries.

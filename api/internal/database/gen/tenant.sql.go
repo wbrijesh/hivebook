@@ -90,6 +90,19 @@ func (q *Queries) CreateTenantIfAbsent(ctx context.Context, zitadelOrgID string)
 	return err
 }
 
+const getFeatureFlags = `-- name: GetFeatureFlags :one
+SELECT feature_flags FROM tenants WHERE zitadel_org_id = $1
+`
+
+// The tenant's flag overrides (key → bool). Merged with the code catalog by the
+// service to produce effective values.
+func (q *Queries) GetFeatureFlags(ctx context.Context, zitadelOrgID string) (json.RawMessage, error) {
+	row := q.db.QueryRowContext(ctx, getFeatureFlags, zitadelOrgID)
+	var feature_flags json.RawMessage
+	err := row.Scan(&feature_flags)
+	return feature_flags, err
+}
+
 const getTenantByOrg = `-- name: GetTenantByOrg :one
 
 SELECT id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, created_at, updated_at
@@ -115,6 +128,108 @@ type GetTenantByOrgRow struct {
 func (q *Queries) GetTenantByOrg(ctx context.Context, zitadelOrgID string) (GetTenantByOrgRow, error) {
 	row := q.db.QueryRowContext(ctx, getTenantByOrg, zitadelOrgID)
 	var i GetTenantByOrgRow
+	err := row.Scan(
+		&i.ID,
+		&i.ZitadelOrgID,
+		&i.Name,
+		&i.Size,
+		&i.Region,
+		&i.UseCases,
+		&i.UseCaseOther,
+		&i.OnboardedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const removeFeatureFlag = `-- name: RemoveFeatureFlag :exec
+UPDATE tenants
+SET feature_flags = feature_flags - $1::text, updated_at = now()
+WHERE zitadel_org_id = $2
+`
+
+type RemoveFeatureFlagParams struct {
+	Key          string
+	ZitadelOrgID string
+}
+
+// Drop a flag override so the tenant falls back to the catalog default — keeping
+// the stored map to deviations only (smaller, and global default changes apply).
+func (q *Queries) RemoveFeatureFlag(ctx context.Context, arg RemoveFeatureFlagParams) error {
+	_, err := q.db.ExecContext(ctx, removeFeatureFlag, arg.Key, arg.ZitadelOrgID)
+	return err
+}
+
+const setFeatureFlag = `-- name: SetFeatureFlag :exec
+UPDATE tenants
+SET feature_flags = jsonb_set(
+        COALESCE(feature_flags, '{}'::jsonb),
+        ARRAY[$1::text],
+        to_jsonb($2::boolean),
+        true
+    ),
+    updated_at = now()
+WHERE zitadel_org_id = $3
+`
+
+type SetFeatureFlagParams struct {
+	Key          string
+	Enabled      bool
+	ZitadelOrgID string
+}
+
+// Set one flag override for the tenant, creating the key if absent. We store only
+// deviations from the catalog default (see RemoveFeatureFlag), so this is called
+// only when the requested value differs from the default.
+func (q *Queries) SetFeatureFlag(ctx context.Context, arg SetFeatureFlagParams) error {
+	_, err := q.db.ExecContext(ctx, setFeatureFlag, arg.Key, arg.Enabled, arg.ZitadelOrgID)
+	return err
+}
+
+const updateTenantProfile = `-- name: UpdateTenantProfile :one
+UPDATE tenants SET
+    name           = $1,
+    size           = $2,
+    use_cases      = $3,
+    use_case_other = NULLIF($4::text, ''),
+    updated_at     = now()
+WHERE zitadel_org_id = $5
+RETURNING id, zitadel_org_id, name, size, region, use_cases, use_case_other, onboarded_at, created_at, updated_at
+`
+
+type UpdateTenantProfileParams struct {
+	Name         sql.NullString
+	Size         sql.NullString
+	UseCases     json.RawMessage
+	UseCaseOther string
+	ZitadelOrgID string
+}
+
+type UpdateTenantProfileRow struct {
+	ID           string
+	ZitadelOrgID string
+	Name         sql.NullString
+	Size         sql.NullString
+	Region       sql.NullString
+	UseCases     json.RawMessage
+	UseCaseOther sql.NullString
+	OnboardedAt  sql.NullTime
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// Edits the mutable profile from settings. Deliberately never touches region
+// (write-once, ADR-0014) or onboarded_at. The tenant must already exist.
+func (q *Queries) UpdateTenantProfile(ctx context.Context, arg UpdateTenantProfileParams) (UpdateTenantProfileRow, error) {
+	row := q.db.QueryRowContext(ctx, updateTenantProfile,
+		arg.Name,
+		arg.Size,
+		arg.UseCases,
+		arg.UseCaseOther,
+		arg.ZitadelOrgID,
+	)
+	var i UpdateTenantProfileRow
 	err := row.Scan(
 		&i.ID,
 		&i.ZitadelOrgID,

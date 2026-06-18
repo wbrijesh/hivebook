@@ -1,0 +1,53 @@
+= 0032 — Stop is cooperative cancellation with an authoritative settle
+:adr-id: 0032
+:status: superseded
+:date: 2026-06-17
+:supersedes:
+:superseded-by: adrs/0040-cooperative-cancellation-temporal.adoc
+:related-design-doc: design-docs/0011-stopping-and-resumable-sync.adoc
+
+[NOTE]
+====
+*Superseded by xref:ROOT:adrs/0040-cooperative-cancellation-temporal.adoc[ADR-0040]* —
+cooperative, chunk-boundary cancellation survives, but Stop is now Temporal workflow
+cancellation with a *structural* settle; the authoritative manual settle here existed
+only because the River inflight counter was racy
+(xref:ROOT:design-docs/0012-sync-architecture-on-temporal.adoc[design-doc 0012]).
+====
+
+== Context
+
+A running sync had no stop — a large or mistaken sync ran to completion, and the
+only lever (Disconnect) destroyed the connection. Design-doc 0011 adds a per-
+connection Stop. It must cancel queued and running work, leave no stranded
+`syncing`, and corrupt nothing.
+
+== Decision
+
+Stop flags the connection `stopping` (the UI flips at once), cancels the
+connection's `discover_connection` + `sync_container` River jobs by the
+`connection_id` in their args (queued ones drop; running ones get their work
+context cancelled), then *authoritatively settles* the connection: `inflight_jobs`
+to zero, status back to `connected`, in-progress projects to `idle`.
+
+Workers cancel *cooperatively* — they check the context between items/pages, stop
+having committed everything so far and persisted the watermark, and return the
+cancellation (not a failure: no retry, no `error` status). The settle is
+authoritative rather than relying on each cancelled job to decrement `inflight`,
+which is racy. The high-water-mark cursor (ADR-0031) makes the small race benign:
+a job that commits one more item as we settle has also advanced its cursor, so a
+later sync still resumes correctly.
+
+== Alternatives considered
+
+* *Decrement-per-job settle* — racy across cancelled/finishing jobs; risks a
+connection stuck at `syncing` with a nonzero `inflight`.
+* *Hard kill (drop in-flight writes)* — fast but corrupts the cursor unless paired
+with ordered iteration; loses the partial work that makes resume cheap.
+
+== Consequences
+
+From the data's view a Stop is identical to a crash, so it reuses the same
+idempotency and resume machinery. The trade is a short cooperative window — a
+running job stops at the next item/page boundary, not instantly — which
+idempotency makes harmless.

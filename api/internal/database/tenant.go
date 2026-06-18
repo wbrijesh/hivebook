@@ -105,3 +105,25 @@ func (s *service) CompleteOnboarding(ctx context.Context, orgID, name, size, reg
 	}
 	return toTenant(r.ID, r.ZitadelOrgID, r.Name, r.Size, r.Region, r.UseCaseOther, r.UseCases, r.OnboardedAt), nil
 }
+
+// UpdateTenantProfile edits the mutable workspace profile (name, size, use cases)
+// from settings. Region is never touched — write-once (ADR-0014). The tenant must
+// already exist; sql.ErrNoRows surfaces if the org is unknown.
+func (s *service) UpdateTenantProfile(ctx context.Context, orgID, name, size string, useCases []string, useCaseOther string) (Tenant, error) {
+	if useCases == nil {
+		useCases = []string{}
+	}
+	useCasesJSON, _ := json.Marshal(useCases)
+
+	r, err := s.q.UpdateTenantProfile(ctx, gen.UpdateTenantProfileParams{
+		ZitadelOrgID: orgID,
+		Name:         sql.NullString{String: name, Valid: true},
+		Size:         sql.NullString{String: size, Valid: true},
+		UseCases:     useCasesJSON,
+		UseCaseOther: useCaseOther, // NULLIF(...,'') → NULL when empty
+	})
+	if err != nil {
+		return Tenant{}, err
+	}
+	return toTenant(r.ID, r.ZitadelOrgID, r.Name, r.Size, r.Region, r.UseCaseOther, r.UseCases, r.OnboardedAt), nil
+}

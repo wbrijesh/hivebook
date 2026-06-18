@@ -37,6 +37,30 @@ func (f *fakeDB) CompleteOnboarding(context.Context, string, string, string, str
 	return f.tenant, f.onboardErr
 }
 
+func (f *fakeDB) UpdateTenantProfile(context.Context, string, string, string, []string, string) (database.Tenant, error) {
+	return f.tenant, f.onboardErr
+}
+
+func (f *fakeDB) RecordAuditEvent(context.Context, string, string, string, string, string) error {
+	return nil
+}
+
+func (f *fakeDB) ListAuditEvents(context.Context, string, int32, int32) ([]database.AuditEvent, int32, error) {
+	return nil, 0, nil
+}
+
+func (f *fakeDB) GetFeatureFlags(context.Context, string) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
+
+func (f *fakeDB) SetFeatureFlag(context.Context, string, string, bool) error {
+	return nil
+}
+
+func (f *fakeDB) RemoveFeatureFlag(context.Context, string, string) error {
+	return nil
+}
+
 // fakeAuth stands in for the Authenticator: the configured identity/error is
 // returned regardless of the header, so tests drive the interceptor's mapping.
 type fakeAuth struct {

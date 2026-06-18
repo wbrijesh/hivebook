@@ -1,0 +1,19 @@
+version: v2
+# Go codegen for the integrations service. Same protovalidate handling as
+# buf.gen.go.yaml (canonical SDK, no local copy). Run with
+# --path proto/hivebook/integration so only the integration contract lands in the
+# integrations module; the rest of the protos belong to the API.
+managed:
+  enabled: true
+  disable:
+    - module: buf.build/bufbuild/protovalidate
+  override:
+    - file_option: go_package_prefix
+      value: integrations/internal/gen
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: integrations/internal/gen
+    opt: paths=source_relative
+  - remote: buf.build/connectrpc/go:v1.20.0
+    out: integrations/internal/gen
+    opt: paths=source_relative

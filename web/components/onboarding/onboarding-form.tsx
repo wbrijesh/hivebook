@@ -42,7 +42,12 @@ export function Field({
   )
 }
 
-export type Option = { id: string; label: string; detail?: string }
+export type Option = {
+  id: string
+  label: string
+  detail?: string
+  leading?: React.ReactNode
+}
 
 // The one selection pattern: bordered cells, accent border + check when chosen.
 // Restrained and systemic — not playful pills. Works for single- and
@@ -83,6 +88,7 @@ export function OptionGrid({
                 : "border-border bg-card hover:bg-muted"
             )}
           >
+            {o.leading && <span className="shrink-0">{o.leading}</span>}
             <span className="min-w-0 flex-1">
               <span className="block text-[14px] text-foreground">
                 {o.label}

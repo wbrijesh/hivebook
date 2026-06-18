@@ -1,0 +1,17 @@
+# Internal-only (ClusterIP): the API reaches the integrations service over
+# Connect at http://integrations:8080. No IngressRoute — never exposed publicly
+# (design-doc 0009).
+apiVersion: v1
+kind: Service
+metadata:
+  name: integrations
+  namespace: hivebook
+  labels:
+    app: integrations
+spec:
+  selector:
+    app: integrations
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

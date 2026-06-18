@@ -1,0 +1,380 @@
+= 0012 — Sync architecture on Temporal: a control plane over connector-defined units
+:design-id: 0012
+:status: draft
+:date: 2026-06-18
+:authors:
+//   - Brijesh <google@brijesh.dev>
+:supersedes: design-docs/0010-connector-sync-jobs.adoc
+:related-adrs: adrs/0034-temporal-sync-orchestrator.adoc, adrs/0035-connector-defined-sync-units.adoc, adrs/0036-adaptive-admission-controller.adoc, adrs/0037-mark-and-sweep-discovery.adoc, adrs/0038-cursor-write-order.adoc, adrs/0039-erasure-deletion-outbox.adoc, adrs/0040-cooperative-cancellation-temporal.adoc, adrs/0031-high-water-mark-cursor.adoc, adrs/0033-committed-at-visibility.adoc
+
+== Context
+
+xref:ROOT:design-docs/0010-connector-sync-jobs.adoc[Design-doc 0010] productionized
+sync as durable River jobs on KEDA-scaled workers; xref:ROOT:design-docs/0011-stopping-and-resumable-sync.adoc[design-doc 0011]
+added stop and resumable delta. A real sync of a 68-container GitHub account, traced
+end to end, found the mechanism is not production-shaped — and the failures are not
+bugs in the parts, they are the *shape*:
+
+* *Snooze serialization.* The per-connection concurrency gate admits container jobs
+then bounces the excess with `JobSnooze(15s)`. 68 containers drain at four per
+fifteen seconds.
+* *Scale-to-zero deadlock.* KEDA counts only `available` + `running` River jobs;
+snoozed jobs sit in `scheduled`, invisible to the scaler, so KEDA scales the worker
+to zero mid-run — and with no worker, nothing promotes the parked jobs. The sync
+hangs until the 15-minute periodic scan re-triggers it. Measured on a real run: a
+sync that should take under a minute took ~17 minutes, ~12 of them a pure stall.
+* *Hand-rolled state machine.* Connection lifecycle is reconstructed from an
+`inflight_jobs` counter plus a status column — races under concurrent triggers, and
+connections stuck in `syncing` after a crash.
+
+The root cause is a single decision: orchestration was hand-rolled on a job queue,
+and it scaled with *work items* (containers) rather than *connections*. This doc
+replaces the sync mechanism — and only the mechanism — with durable orchestration on
+*Temporal*, structured so the number of orchestration objects scales with the number
+of connections and *never* with the volume of repos, folders, files, or issues.
+
+The target scale is explicit: ~1000 tenants × ~50 connections; a single org of ~5000
+repos; a single Drive of ~700,000 files. The old design scaled `O(sync units)`; this
+one scales `O(connections)`.
+
+== Goals
+
+* Orchestration scales `O(connections)`, never `O(files / repos / issues)`.
+* Reliable in the true sense: no stuck states, gapless resume across any
+crash/deploy/scale event, convergence to corpus == source (including deletions),
+graceful degradation under source rate limits, and no cross-tenant starvation.
+* Residency holds end to end — a tenant's workflow, activities, Temporal *history*,
+and storage all reside in the tenant's region.
+* Observable on day one: freshness lag and backlog age are first-class SLOs, not an
+afterthought (this investigation took `psql` archaeology because they did not exist).
+
+== Non-goals
+
+* *Webhooks / push as the source of truth.* A periodic reconcile is the backstop and
+is mandatory; webhooks arrive later, per connector, as a freshness *layer* on top —
+never a replacement (a dropped delivery must never lose data).
+* *Canonicalization and embedding.* Downstream of raw capture, reading the manifest —
+an explicit boundary (below), not part of the sync activity.
+* *Weighted / per-tenant task queues.* A hard per-tenant in-flight cap now; a
+work-conserving burstable cap later, when SLA tiers exist — not a queue redesign.
+* *The residency mechanism.* The residency *invariant* is in scope and binding; the
+*topology* that satisfies it (Temporal Cloud regional namespaces vs. self-hosted
+per-region clusters) is an open question gated on a cost estimate.
+
+== Proposal
+
+The whole design rests on one rule:
+
+[NOTE]
+====
+*Temporal entities scale with orchestration structure, never with data volume.*
+Workflows = `O(connections)`. Activities in flight = `O(parallelism)` (tens). Items
+(files, issues) are processed in batches *inside* activities and checkpointed. History
+is bounded by `continueAsNew`. A folder, repo, issue, file, page, or channel never
+implies a workflow.
+====
+
+Everything below is an application of that rule. The decisions are recorded as ADRs
+(the list closes this doc); the prose here is the connective tissue.
+
+=== Topology
+
+[d2]
+----
+direction: right
+fe: Frontend
+api: API service
+ig: "Integrations svc\n(Temporal CLIENT)"
+tmp: "Temporal\n(durable backbone:\nstate · timers · signals)"
+wrk: "Temporal Workers\n(KEDA 0..N, in-region)"
+pg: "Postgres\nconnection · sync_unit · cursor · sync_run"
+s3: "Object storage\n<tenant>/<source>/artifacts"
+fe -> api: Connect
+api -> ig: "Connect (signals/queries)"
+ig -> tmp: "StartWorkflow / Signal"
+tmp -> wrk: "task queues (per connector)"
+wrk -> pg: "units · cursors · status"
+wrk -> s3: "raw bytes"
+----
+
+The frontend still talks only to the API; the API translates RPCs into Temporal
+*signals* and *queries* against the integrations service, which is a Temporal client.
+The integrations service no longer runs an enqueuer scan, a River client, or an
+inflight counter — those are deleted.
+
+=== The boundary: Temporal is a control plane
+
+Temporal knows only that a connection exists, that a sync is running, that it failed,
+that it should retry. It knows nothing about files, repos, folders, issues, or
+documents — those live in connector state (Postgres) and storage (object storage).
+Holding that boundary is what makes the River/KEDA bug class structurally impossible:
+the orchestration layer stops being a data-processing layer
+(xref:ROOT:adrs/0034-temporal-sync-orchestrator.adoc[ADR-0034]).
+
+One long-lived `ConnectionWorkflow` per connection owns the lifecycle: schedule,
+trigger, auth lifecycle, retry policy, cancellation, and the sync driver. Its state is
+tiny — `{ConnectionID, SyncRunID, Phase}` — and carries *no* cursors, *no* payloads,
+and *no* secrets. It `continueAsNew`s on whichever bound trips first: ~5,000 history
+events, ~15 minutes runtime, or ~1,000 units processed. The `sync_unit` table *is* the
+resumption state, so `continueAsNew` carries almost nothing.
+
+[d2]
+----
+direction: right
+sched: "SCHEDULED\n(durable sleep until due,\nwakes on Trigger signal)"
+run: "RUNNING\n(drain sync_unit in batches,\nbounded concurrency)"
+settle: "SETTLE\nbackfilling / connected /\nconnected+warnings /\nneeds_reauth / error"
+sched -> run: "due / Trigger"
+run -> settle: "batch drained"
+settle -> sched: "arm next run (continueAsNew)"
+run -> settle: "Stop signal → cancel scope"
+----
+
+Workers are a KEDA-scaled, scale-to-zero Temporal worker deployment, with *per-connector
+task queues* so a throttled GitHub never starves Drive's slots. Scale-to-zero is safe
+because durable timers and state live in Temporal, not the worker: a due sync becomes a
+pollable task server-side regardless of whether any worker exists, and KEDA scales on
+real task-queue backlog. The old deadlock — work parked in a state the scaler ignores,
+with no process to revive it — cannot recur.
+
+=== The unit model
+
+Sync units are *connector-defined*, not platform-imposed
+(xref:ROOT:adrs/0035-connector-defined-sync-units.adoc[ADR-0035]). A connector
+implements `DiscoverUnits`, `SyncUnit`, `Checkpoint`, and `RateBudget`; the platform
+runs *one drain path* over whatever units come back, with the count ranging from one to
+many:
+
+[cols="1,1,3"]
+|===
+| Connector | Units | Sync primitive
+
+| Google Docs | *1* | the Drive `changes` feed (folders are metadata, not units)
+| GitHub | per repo | issues since the repo's cursor
+| Jira | per project | issues since the project's cursor
+| Slack | per channel | history since the channel's cursor
+|===
+
+There is no Category-A/Category-B fork in the platform: Drive is simply
+`DiscoverUnits() -> [1 unit]`. Modelling a 700,000-file Drive as one unit on its change
+stream — rather than one unit per folder — is what keeps an enterprise tenant from
+spending the day managing folder state instead of ingesting documents.
+
+Discovered units are written to a `sync_unit` table (connector state: `external_id`,
+`cursor`, `status`, `generation`/`last_seen_at`, `last_error`, `next_retry_at`,
+`committed_at`). The workflow drains the table in batches and *never holds the unit
+list* — which is load-bearing for three reasons at once: the Temporal event-history
+limit, residency (the list never enters history), and a payload-free history. Discovery
+returns a pointer and a count, never the list.
+
+Activities chunk by *estimated runtime* (target ~30–90s), heartbeat the cursor, and
+return; no activity owns an unbounded stream. Small units are bin-packed into one
+activity; a huge unit (a 100k-issue repo, the Drive change stream) is paged across
+multiple activity invocations.
+
+=== Admission control
+
+This is where the next production incident would otherwise live: not a scheduler bug
+(Temporal fixes that) but *API-budget starvation*. Twenty parallel activities against a
+5000-request/hour GitHub token are slower than four, because they trip secondary rate
+limits and back off fighting each other.
+
+So there is *one* multi-dimensional admission controller, not several
+(xref:ROOT:adrs/0036-adaptive-admission-controller.adoc[ADR-0036]). A batch's size is:
+
+[source]
+----
+batch = min(credential_budget, tenant_inflight_cap, global_worker_capacity)
+----
+
+* *Credential budget is adaptive (AIMD).* The connector supplies a seed and hard caps
+via `RateBudget()`; the platform discovers the source's real, time-varying capacity
+from `429` / secondary-`403` / `Retry-After` feedback — additive increase on sustained
+success, multiplicative decrease on a limit. You cannot know GitHub's secondary limits
+a priori, so you learn them.
+* *Two levels.* The workflow (macro) sizes each batch from the current limit `L` —
+read via a cheap activity, never I/O in deterministic workflow code. Each activity's
+HTTP client (micro) throttles its actual requests against a Postgres credential-keyed
+token bucket and honours `Retry-After`.
+* *Tenant fairness is the same limiter, keyed by tenant* — a hard in-flight cap, not a
+new component and not a per-tenant queue. It is not work-conserving in v1 (a lone
+active tenant stays capped while the pool idles); the later fix is a burstable cap, not
+a queue redesign.
+
+=== Cursor and correctness
+
+Object storage is not transactional with Postgres, so "`the cursor advances atomically
+with the manifest`" means a specific order
+(xref:ROOT:adrs/0038-cursor-write-order.adoc[ADR-0038]): write the artifact to object
+storage first (content-addressed, idempotent), then, in a *single Postgres
+transaction*, write the manifest row and advance the `sync_unit` cursor. A crash between
+the two leaves a harmless orphan object (rewritten identically on retry, absorbed by
+content-hash dedup) and an un-advanced cursor (the chunk is re-done). The cursor lives
+only in `sync_unit`, never in workflow state. This preserves the high-water-mark
+invariant of xref:ROOT:adrs/0031-high-water-mark-cursor.adoc[ADR-0031].
+
+Everything an activity does is idempotent — Temporal executes activities at least once,
+so replays must be no-ops. A trigger or scheduled fire arriving mid-run is *coalesced*:
+it sets a re-run-requested flag, the current drain finishes, then one more run starts.
+Two concurrent syncs of one connection are structurally impossible, not merely
+discouraged. A *poison unit* (a repo that always fails) backs off on a per-unit
+`next_retry_at` (exponential) and is surfaced for manual intervention, so one dead repo
+does not burn a slot — and the rate budget — every pass.
+
+=== Discovery and unit lifecycle
+
+A persisted `sync_unit` table means discovery does not re-list 5000 repos every run, and
+operators can `SELECT … WHERE status='error'` instead of replaying workflow history. But
+a persisted set diverges from the source, so a periodic *mark-and-sweep reconcile* is
+mandatory (xref:ROOT:adrs/0037-mark-and-sweep-discovery.adoc[ADR-0037]): each reconcile
+stamps `generation`/`last_seen_at` on observed units; units not seen this pass go
+`active -> removed` (a soft tombstone with a timestamp); a separate GC purges removed
+units and their artifacts only after a grace period. The cadence is adaptive per
+connector — cheap connectors every run, a 5000-repo GitHub on a slower cadence.
+
+The dangerous failure mode is a *degraded discovery*: a token expires or GitHub has a
+bad minute, `list repos` returns 0 (or 50 instead of 5000), and a naive sweep tombstones
+the tenant's entire corpus — a transient blip turned into data loss. So reconcile has a
+*sanity gate*: an empty result, or a drop beyond a threshold versus the last known-good
+count, is treated as a *failed* reconcile — no sweep, surfaced. The tombstone grace
+period is the second line of defence; the don't-sweep-on-suspicious-discovery rule is the
+first and more important one.
+
+=== Token lifecycle
+
+Token refresh is an *activity* concern — the activity is the thing doing I/O. It fetches
+the credential fresh and refreshes mid-flight; a refresh failure returns a non-retryable
+error that flips the connection to `needs_reauth`. The workflow holds *zero* secret
+material — for security, and because credentials in history are both a leak and a
+residency violation.
+
+=== Visibility and status
+
+`committed_at` is *per unit*, which gives *progressive visibility*: a connection in its
+initial backfill exposes its fully-drained repos while hiding the ones still
+backfilling. That is the intended behaviour for "`a corpus you can trust`" — stated here
+as a *product* decision, not left to fall out of code (the alternative, hiding the whole
+connection until everything completes, is a legitimate other choice we are explicitly not
+taking). It preserves xref:ROOT:adrs/0033-committed-at-visibility.adoc[ADR-0033].
+
+Connection status is a fold of unit statuses *crossed with the run phase* — a connection
+doing its first 100k-issue backfill is neither `error` nor fully `connected`, it is
+`backfilling`:
+
+[source]
+----
+status = (unit-status fold) × phase
+       ∈ { backfilling, connected, connected+warnings, needs_reauth, error }
+----
+
+=== Erasure
+
+A failed delete that nobody sees is the original bug again, now with legal consequences.
+Erasure is a *deletion outbox*
+(xref:ROOT:adrs/0039-erasure-deletion-outbox.adoc[ADR-0039]): the manifest row is *not*
+dropped until the object delete is confirmed. The artifact is marked `purge_pending`, the
+delete attempted (`204` and `404`-already-gone both count as success), and only then the
+record removed; anything else stays `purge_pending` for GC retry with backoff. Because
+erasure is contractual (GDPR, typically a 30-day window), a `purge_pending` item that has
+not confirmed deletion within the SLA *pages* — it does not sit quietly in a retry loop.
+
+=== Observability
+
+Alert on *outcomes*, diagnose with *mechanism*. The SLOs we page on are *freshness lag*
+(now − last successful drain) and *backlog age* (oldest pending unit). The mechanism
+series — adaptive `L`, 429 rate, throughput, units-in-error — are for diagnosis *after*
+the page: healthy backoff (`L` dropping because GitHub is throttling us) is the system
+working and must not page; starvation (`L` stuck at 1 with backlog age climbing) is an
+incident. The signal that separates them is the outcome metric, not the mechanism.
+
+Cardinality has a hard split: you cannot emit per-connection time series for 50,000
+connections. Aggregate metrics bucketed by connector / region / tenant-tier carry the
+alerting; per-connection detail lives in the `sync_run` lineage, queried on demand.
+`connection_id` is never a metric label. Traces are OpenTelemetry via Temporal's
+interceptors — the thing whose absence made this investigation archaeology.
+
+=== Residency
+
+The invariant is binding: *a tenant's workflow, activities, Temporal history, and
+storage all reside in the tenant's region.* History is the subtle part — it holds signal
+and activity payloads, so EU workers polling a US-hosted cluster would put
+residency-relevant metadata in the wrong jurisdiction even if no document byte ever
+touches a US worker. So the *cluster/namespace itself* must be in-region, not just the
+worker pool. The tiny-state, payload-free-history discipline adopted for the
+event-history limit is therefore load-bearing for residency too — the same rule, paying
+off twice.
+
+== Alternatives considered
+
+* *Fix River in place* (lease-with-redelivery + atomic CAS claim + a deadline reaper +
+a self-heal sweeper). This genuinely closes the snooze serialization, the KEDA deadlock,
+and the stranded-job class, and needs no new infrastructure. Rejected for a ground-up
+rewrite: it keeps us hand-rolling orchestration, where the same failure modes recur as
+new edge cases. (It remains the right *stop-gap* if the rewrite slips.)
+* *DBOS / Postgres-native durable execution.* Lighter to operate (durable workflows
+inside Postgres, no cluster), and the closest fit to the Postgres-first ethos. Not
+chosen: Temporal is the battle-tested standard, is what Airbyte itself runs for exactly
+this problem, and a from-scratch rewrite is the moment its richer ecosystem and operator
+tooling earn their keep.
+* *Workflow (or child workflow) per container / file.* The scale trap this doc exists to
+avoid: `O(units)` workflows, and a parent that awaits 10,000 children exceeds Temporal's
+~51k-event history limit — infeasible, not merely costly.
+* *Adopt Airbyte or Nango wholesale.* Airbyte is warehouse-EL: it lands normalized
+records, which collides with raw-first capture (0008/0023), and its multi-tenant and
+ELv2 story does not fit an embedded SaaS. We steal its *patterns* (durable orchestration,
+opaque per-stream checkpoints, control-plane boundary), not the product. Nango stays an
+option for the OAuth/connector layer later.
+* *Do nothing.* The status quo deadlocks on real data; rejected.
+
+== Tradeoffs
+
+* A Temporal cluster / namespaces to operate (or Temporal Cloud's per-action cost) —
+bought for durable orchestration and the elimination of every stuck-state failure mode.
+* The hard per-tenant cap is not work-conserving — a lone active tenant stays capped
+while the pool idles. Accepted for v1; the burstable cap is a later, additive change.
+* Adaptive admission means throughput is *discovered*, not declared — first runs are
+slower while `L` finds the source's ceiling.
+* A persisted `sync_unit` table is connector state to reconcile and GC — bought for
+discovery cost, operator visibility, and unit-level operations (pause / disable /
+re-sync a single repo).
+
+== Open questions
+
+* *Residency mechanism and Cloud-vs-self-host.* Temporal Cloud regional namespaces vs.
+self-hosted per-region clusters — gated on a cost estimate that must price *both* the
+fixed 15-minute poll (50k connections × 96 wakes/day is an action firehose) *and*
+event-driven wake for push-capable sources (Drive watch, Gmail, webhooks), since the
+per-action math may flip the decision. Event-driven wake collapses the action bill and
+freshness lag together, at the cost of channel renewal and a missed-event reconcile
+backstop.
+* *GraphQL points as a second budget dimension.* GitHub Projects v2 (GraphQL) is metered
+in points, separately from the REST request budget; a second adaptive bucket, added when
+boards become a bottleneck.
+* *A work-conserving (burstable) tenant cap* — when SLA tiers arrive.
+* *Out-of-process, language-agnostic connectors* (the Airbyte container-per-connector
+model) — later, if community connectors matter; the activity boundary already gives
+crash isolation.
+
+== Decisions to be recorded as ADRs
+
+* xref:ROOT:adrs/0034-temporal-sync-orchestrator.adoc[ADR-0034] — Temporal is the sync
+orchestrator (supersedes xref:ROOT:adrs/0028-river-job-queue.adoc[ADR-0028] and
+xref:ROOT:adrs/0030-keda-scaled-workers.adoc[ADR-0030]).
+* xref:ROOT:adrs/0035-connector-defined-sync-units.adoc[ADR-0035] — connector-defined
+sync units, one drain path; orchestration scales `O(connections)` (supersedes
+xref:ROOT:adrs/0029-per-container-sync-jobs.adoc[ADR-0029]).
+* xref:ROOT:adrs/0036-adaptive-admission-controller.adoc[ADR-0036] — one
+multi-dimensional adaptive admission controller (credential AIMD + tenant in-flight cap).
+* xref:ROOT:adrs/0037-mark-and-sweep-discovery.adoc[ADR-0037] — mark-and-sweep discovery
+with a degraded-discovery guard and soft-tombstone GC.
+* xref:ROOT:adrs/0038-cursor-write-order.adoc[ADR-0038] — cursor write order (storage
+first, then manifest + cursor in one transaction); at-least-once and idempotent.
+* xref:ROOT:adrs/0039-erasure-deletion-outbox.adoc[ADR-0039] — erasure is a deletion
+outbox with an SLA page.
+* xref:ROOT:adrs/0040-cooperative-cancellation-temporal.adoc[ADR-0040] — cooperative
+cancellation via Temporal cancellation and chunk-boundary heartbeat (supersedes
+xref:ROOT:adrs/0032-cooperative-sync-cancellation.adoc[ADR-0032]).
+
+Unchanged and still in force: xref:ROOT:adrs/0031-high-water-mark-cursor.adoc[ADR-0031]
+(the cursor is a true high-water mark) and
+xref:ROOT:adrs/0033-committed-at-visibility.adoc[ADR-0033] (`committed_at` visibility).

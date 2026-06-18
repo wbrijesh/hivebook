@@ -1,0 +1,33 @@
+# vmagent scrapes both halves of the integrations service: the always-on Connect
+# server and the (autoscaled) Temporal sync worker. Both expose Prometheus metrics at
+# /metrics on their http port (server :8080, worker :8081). The server's exporter emits
+# the outcome SLIs and the hivebook_temporal_backlog gauge KEDA scales on; the worker
+# emits the mechanism metrics (artifacts_ingested). Scraping the worker is best-effort:
+# it scales to zero, so the backlog scale signal lives on the always-on server, not here.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: integrations
+  namespace: hivebook
+spec:
+  selector:
+    matchLabels:
+      app: integrations
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: integrations-worker
+  namespace: hivebook
+spec:
+  selector:
+    matchLabels:
+      app: integrations-worker
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

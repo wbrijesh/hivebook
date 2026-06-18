@@ -1,0 +1,40 @@
+= 0031 — The sync cursor is a true high-water mark
+:adr-id: 0031
+:status: accepted
+:date: 2026-06-17
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0011-stopping-and-resumable-sync.adoc
+
+== Context
+
+ADR-0029 gave each container its own watermark, but the GitHub issue sync advanced
+it to the page's `max(updatedAt)` without ordering the query. If a run is
+interrupted (crash, DLQ, or a Stop — design-doc 0011), the cursor can sit ahead of
+items that were never synced, so the next `since=cursor` fetch skips them. A stop
+button makes interruption routine, so the cursor must be interruption-safe.
+
+== Decision
+
+A container's watermark is the `updatedAt` of the newest *fully-committed* item
+(bytes written **and** manifest upserted), and items are fetched in
+`updatedAt`-*ascending* order (GitHub: `sort=updated&direction=asc`). The watermark
+advances to an item only after that item is committed.
+
+This makes "everything with `updatedAt \<= watermark` is synced" hold at every
+instant, not just at the end of a run — so any interruption is a gapless resume
+point. The next run fetches `since=watermark` (inclusive; the boundary item
+re-appears and content-hash dedup absorbs it).
+
+== Alternatives considered
+
+* *Advance to the page max, unordered (the prior behavior)* — a latent gap: an
+interruption can leave the cursor past unsynced items, which are then skipped.
+* *Hard-cancel and ignore in-flight writes* — same gap without ordering.
+
+== Consequences
+
+Interruption (crash or Stop) always leaves a correct resume point, and resume is
+delta. The cost: the source must support ordering by update time; a connector that
+can't (GitHub Projects v2) falls back to full-refetch + dedup each run, with no
+mid-unit resume.

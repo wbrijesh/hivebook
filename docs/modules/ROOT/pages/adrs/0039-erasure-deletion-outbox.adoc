@@ -1,0 +1,41 @@
+= 0039 — Erasure is a deletion outbox with an SLA page
+:adr-id: 0039
+:status: proposed
+:date: 2026-06-18
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0012-sync-architecture-on-temporal.adoc
+
+== Context
+
+Removed units (xref:ROOT:adrs/0037-mark-and-sweep-discovery.adoc[ADR-0037]) and
+disconnected connections must have their artifact bytes erased. Object storage deletes
+fail — transient errors, throttling — and the v0.1 purge dropped the manifest row even
+when the delete failed, orphaning bytes it reported as purged. For a residency- and
+GDPR-bound corpus that is a compliance miss, and it is the same shape as the original
+incident: a failed operation nobody sees, now with legal consequences.
+
+== Decision
+
+Erasure is a *deletion outbox*. The manifest row is not dropped until the object delete
+is confirmed: mark the artifact `purge_pending`, attempt the delete (treat `204` and a
+`404`-already-gone both as success), and only then remove the record; anything else
+stays `purge_pending` for GC retry with backoff. Because erasure is contractual
+(typically a 30-day GDPR window), a `purge_pending` item that has not confirmed deletion
+within the SLA *pages* — it does not sit quietly in a retry loop.
+
+== Alternatives considered
+
+* *Fire-and-forget delete, then drop the row* (the v0.1 behaviour) — orphans bytes on any
+delete failure and loses the only pointer to them.
+* *Retry silently forever* — meets the mechanism but not the contract; a stuck delete is
+invisible until an audit finds undeleted data past the window.
+* *Synchronous delete in the request path* — couples disconnect latency to storage
+availability and still needs an outbox for the failure case.
+
+== Consequences
+
+Erasure is guaranteed-or-surfaced: bytes are provably gone, or an operator is paged
+before the compliance window closes. The cost: a `purge_pending` lifecycle and a GC
+retry loop with an SLA alarm, and the manifest row outlives the artifact bytes briefly
+by design.

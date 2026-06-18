@@ -1,0 +1,43 @@
+= 0033 — Atomic visibility via committed_at, not a staging copy
+:adr-id: 0033
+:status: accepted
+:date: 2026-06-17
+:supersedes:
+:superseded-by:
+:related-design-doc: design-docs/0011-stopping-and-resumable-sync.adoc
+
+== Context
+
+Stopping (ADR-0032) makes a partially-synced project routine — an interrupted
+initial backfill could leave, say, 3 of 5,000 issues. That partial data must not
+surface in the corpus. The instinct is a staging area (sync to a copy, promote on
+completion), but staging discards in-progress work, forcing a full re-sync on every
+stop and defeating delta (design-doc 0011).
+
+== Decision
+
+Gate *visibility*, not *storage*. Bytes are written incrementally to the real
+store; a per-project `committed_at` timestamp records the most recent completed
+full pass (`NULL` until the first one finishes). Readers of the corpus filter to
+projects with `committed_at IS NOT NULL`.
+
+So a project's initial backfill — the dangerous case — is invisible until it
+completes once; a stop mid-backfill keeps the work (cursor advanced) and keeps it
+hidden, and resume completes the pass and sets `committed_at`. After the first
+commit, steady-state deltas are written to the same store and visible as they land.
+
+== Alternatives considered
+
+* *Staging area / second byte store* — hides partial data but discards
+in-progress work (kills delta) and adds a copy store, a promote step, and GC of
+abandoned staging.
+* *Per-item generations (MVCC)* — full per-delta atomicity, but heavy: versioned
+keys, pointer flips, GC. Deltas are additive and individually correct, so the cost
+isn't justified at v0.1.
+
+== Consequences
+
+"No partial data exposed" for the cost of one column, while keeping the work that
+makes resume cheap. The trade: in-flight *deltas* of an already-committed project
+are visible as items land (additive, correct, but not all-or-nothing) — full
+per-delta atomicity is deferred.

@@ -55,6 +55,8 @@
   --color-spine-muted: var(--spine-muted);
   --color-spine-accent: var(--spine-accent);
   --color-spine-border: var(--spine-border);
+  --color-spine-active: var(--spine-active);
+  --color-spine-hover: var(--spine-hover);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -86,7 +88,7 @@
   --destructive: #d31510; /* red-900 */
   --destructive-foreground: #ffffff;
   --border: #d5d5d5; /* gray-300 */
-  --input: #b1b1b1; /* gray-400 — clearly visible field edges */
+  --input: #d5d5d5; /* matches --border — one border shade across fields + cards */
   --ring: #00719f; /* cyan-900 */
   --brand: #00719f;
   --brand-foreground: #ffffff;
@@ -120,7 +122,14 @@
   --spine-foreground: #f2f2f2; /* active / hovered icon + label */
   --spine-muted: #8c8c8c; /* idle icon — ~4.7:1 on the rail */
   --spine-accent: #2c2c2c; /* hover / active pill background */
-  --spine-border: #2c2c2c; /* hairline against the app plane */
+  /* Fixed in BOTH themes (like the rest of the spine) — the rail's hairlines
+     read the same in light and dark, matching the dark-mode app border. */
+  --spine-border: #3f3f3f; /* hairline against the app plane */
+  /* Active/hover tabs colour the text + icon with the accent (no background) —
+     fixed for the always-dark rail: the bright dark-mode cyan for active, a
+     dimmer cyan for hover so active still reads as the strongest. */
+  --spine-active: #2cc1e6;
+  --spine-hover: #3fa8c4;
 }
 
 .dark {
@@ -144,7 +153,7 @@
   --destructive: #f65843; /* red-700 (dark) */
   --destructive-foreground: #1d1d1d;
   --border: #3f3f3f; /* gray-200 */
-  --input: #545454; /* gray-300 */
+  --input: #3f3f3f; /* matches --border — one border shade across fields + cards */
   --ring: #2cc1e6; /* cyan-900 (dark) */
   --brand: #2cc1e6;
   --brand-foreground: #1d1d1d;
@@ -175,7 +184,63 @@
   --spine-foreground: #f2f2f2;
   --spine-muted: #8c8c8c;
   --spine-accent: #2c2c2c;
-  --spine-border: #000000;
+  --spine-border: #3f3f3f; /* same as light — fixed rail hairline */
+  --spine-active: #2cc1e6;
+  --spine-hover: #3fa8c4;
+}
+
+/* Indeterminate progress sweep — a sync is running but its total is unknown, so
+   the bar conveys activity, not completion. */
+@keyframes hb-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(150%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Indeterminate line loader (Fluent style): a single segment travels across the
+   track while its width breathes (grows on the way in, shrinks on the way out) and
+   its opacity pulses — for "working, total unknown" states like source discovery. */
+@keyframes hb-line-travel {
+  0% {
+    left: -25%;
+    width: 12%;
+  }
+  18% {
+    width: 26%;
+  }
+  38% {
+    width: 42%;
+  }
+  55% {
+    width: 34%;
+  }
+  75% {
+    width: 22%;
+  }
+  100% {
+    left: 100%;
+    width: 12%;
+  }
+}
+@keyframes hb-line-pulse {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.hb-line-loader-bar {
+  animation:
+    hb-line-travel 2.4s cubic-bezier(0.45, 0, 0.25, 1) infinite,
+    hb-line-pulse 1.6s ease-in-out infinite;
 }
 
 @layer base {

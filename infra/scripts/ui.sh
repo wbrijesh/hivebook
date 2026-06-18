@@ -94,7 +94,9 @@ ui_progress() {
     allok=1; j=0; sp=${spin:frame:1}
     for it in "${items[@]}"; do
       r=${rr[$j]:-0}; d=${dd[$j]:-1}
-      if [ "${r:-0}" -ge "${d:-1}" ] 2>/dev/null && [ "${d:-0}" -ge 1 ] 2>/dev/null; then
+      # Ready when ready >= desired. A desired of 0 (e.g. a KEDA-scaled worker
+      # idling at zero) is ready too — there's nothing to wait for.
+      if [ "${r:-0}" -ge "${d:-0}" ] 2>/dev/null; then
         printf '\033[K  %s✓%s %s\n' "$OK" "$OFF" "$it"
       else
         printf '\033[K  %s%s%s %s %s(%s/%s)%s\n' "$RUN" "$sp" "$OFF" "$it" "$DIM" "$r" "$d" "$OFF"

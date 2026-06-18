@@ -95,6 +95,21 @@ organization is the tenant id (1:1). It is exposed only when the web app request
 the `urn:zitadel:iam:user:resourceowner` scope, which it does. Full design:
 xref:ROOT:design-docs/0005-tenancy-and-onboarding.adoc[design-doc 0005].
 
+== Member directory (management API)
+
+The *Members* surface reads the workspace's people live from ZITADEL's management
+API (`POST /management/v1/orgs/me/members/_search`, the tenant org selected via the
+`x-zitadel-orgid` header). The API needs a service-account token, read from
+`HIVEBOOK_ZITADEL_MGMT_TOKEN` (mapped from the `MGMT_TOKEN` key of the
+`hivebook-oidc` secret). When unset, `ListMembers` returns `configured=false` and
+the UI shows "directory not connected" — nothing else breaks.
+
+`just update api` defaults that token to the `iam-admin` PAT the FirstInstance
+bootstrap creates (secret `iam-admin-pat`, IAM_OWNER — it can read any org's
+members). That's a convenience for local dev; in production, set
+`HIVEBOOK_ZITADEL_MGMT_TOKEN` in `infra/.env` to a dedicated machine user with a
+least-privilege org-viewer role instead of reusing the bootstrap admin.
+
 '''''
 
 == What was actually done the first time (API one-off)

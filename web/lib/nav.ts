@@ -2,6 +2,7 @@ import type { ElementType } from "react"
 import {
   RiBarChartLine,
   RiBook2Line,
+  RiFile2Line,
   RiFileList3Line,
   RiFileSearchLine,
   RiLayoutGrid2Line,
@@ -29,6 +30,7 @@ export const NAV: NavItem[] = [
   { key: "ask", label: "Ask", href: "/ask", group: "knowledge", icon: RiSparkling2Line }, // prettier-ignore
   { key: "book", label: "Book", href: "/book", group: "knowledge", icon: RiBook2Line }, // prettier-ignore
   { key: "sources", label: "Sources", href: "/sources", group: "manage", icon: RiLayoutGrid2Line }, // prettier-ignore
+  { key: "files", label: "Files", href: "/files", group: "manage", icon: RiFile2Line }, // prettier-ignore
   { key: "entities", label: "Entities", href: "/entities", group: "manage", icon: RiNodeTree }, // prettier-ignore
   { key: "review", label: "Review", href: "/review", group: "manage", icon: RiFileSearchLine }, // prettier-ignore
   { key: "members", label: "Members", href: "/members", group: "manage", icon: RiTeamLine }, // prettier-ignore
